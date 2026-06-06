@@ -1,0 +1,19 @@
+# CODEOWNERS — clean-room reader/writer separation
+#
+# Part of the clean-room process gate (Story 1.1). See docs/clean-room/.
+#
+# Any change under the Premium/Enterprise (PE/EE) licensed source must be reviewed by the
+# clean-room process owner so that contact between the PE/EE-reader population and the
+# Bucket A writer population is always surfaced. "Influenced by" counts as contamination,
+# not just verbatim copying — see docs/clean-room/implementer-isolation.md.
+#
+# TODO: replace @clean-room-owner with the GitHub handle recorded in
+#       docs/clean-room/owner-and-sign-off.md §1, then enable branch protection
+#       "Require review from Code Owners" on develop and master.
+
+/premium/                     @clean-room-owner
+/enterprise/                  @clean-room-owner
+
+# The clean-room governance artifacts themselves are owned by the process owner.
+/docs/clean-room/             @clean-room-owner
+/.github/workflows/clean-room-provenance-gate.yml @clean-room-owner

@@ -4,6 +4,10 @@
 ### How to test this PR
 - E.g. a short series of steps on how to test the features/bug fixes in this PR.
 
+### Clean-room (Bucket A)
+
+- [ ] This PR is **Bucket A** (a clean-room reimplementation of a `premium/`/`enterprise/` feature). If checked, a provenance record under `docs/clean-room/provenance/` is **required** and merge is blocked without it — see [docs/clean-room/merge-gate.md](../docs/clean-room/merge-gate.md).
+
 ### Checklist
 
 - [ ] A changelog entry has been added to `changelog/entries/unreleased` using `changelog/src/changelog.py`

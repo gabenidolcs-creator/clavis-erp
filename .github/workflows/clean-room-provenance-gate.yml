@@ -1,0 +1,52 @@
+name: Clean-room provenance gate
+
+# Binding merge gate (Story 1.1, clean-room gate (3)): blocks any Bucket A pull request
+# that lacks a valid provenance record under docs/clean-room/provenance/.
+# See docs/clean-room/merge-gate.md.
+#
+# To make this gate enforced, a repo admin must add "clean-room-provenance-gate /
+# provenance" as a required status check in branch protection for develop and master.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited, labeled, unlabeled, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  provenance:
+    name: provenance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect changed files
+        id: changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA" || true
+          {
+            echo "files<<EOF"
+            git diff --name-only "$BASE_SHA" "$HEAD_SHA"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run clean-room provenance gate
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          CHANGED_FILES: ${{ steps.changes.outputs.files }}
+        run: |
+          python3 docs/clean-room/scripts/check_provenance.py
+
+      - name: Self-test the gate logic
+        run: |
+          python3 docs/clean-room/scripts/test_check_provenance.py
+          python3 docs/clean-room/scripts/test_gate_e2e.py
