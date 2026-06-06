@@ -47,3 +47,11 @@ class WriteFieldValuesOperationType(FieldOperationType):
 
 class SubmitAnonymousFieldValuesOperationType(FieldOperationType):
     type = "database.table.field.submit_anonymous_values"
+
+
+class UpdateFieldPermissionOperationType(FieldOperationType):
+    """Story 1.4: managing a field's edit-restriction rule. Admin-only — its ``type``
+    string is added to ``BasicPermissionManagerType.ADMIN_ONLY_OPERATIONS`` so only the
+    Admin tier may set/change the threshold."""
+
+    type = "database.table.field.update_permission"

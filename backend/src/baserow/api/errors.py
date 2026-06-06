@@ -53,6 +53,15 @@ ERROR_ROLE_PROHIBITED = (
     HTTP_403_FORBIDDEN,
     "Your role is prohibited from performing this operation.",
 )
+# Story 1.4: distinct 403 for a field-edit restriction (an actor below a field's
+# editable_by_role threshold attempting to write the field's values or change its
+# config). Mapped globally via api_exception_registry; MRO precedence ensures
+# FieldEditProhibitedError wins over the PermissionException → 401 catch-all.
+ERROR_FIELD_EDIT_PROHIBITED = (
+    "ERROR_FIELD_EDIT_PROHIBITED",
+    HTTP_403_FORBIDDEN,
+    "You are not allowed to edit this restricted field.",
+)
 ERROR_MAX_LOCKS_PER_TRANSACTION_EXCEEDED = (
     "MAX_LOCKS_PER_TRANSACTION_EXCEEDED",
     HTTP_400_BAD_REQUEST,

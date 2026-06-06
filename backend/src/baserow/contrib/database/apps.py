@@ -802,6 +802,7 @@ class DatabaseConfig(AppConfig):
             RestoreFieldOperationType,
             SubmitAnonymousFieldValuesOperationType,
             UpdateFieldOperationType,
+            UpdateFieldPermissionOperationType,
             WriteFieldValuesOperationType,
         )
         from .formula import TypeFormulaOperationType
@@ -943,6 +944,7 @@ class DatabaseConfig(AppConfig):
         operation_type_registry.register(UpdateViewDefaultValuesOperationType())
         operation_type_registry.register(WriteFieldValuesOperationType())
         operation_type_registry.register(SubmitAnonymousFieldValuesOperationType())
+        operation_type_registry.register(UpdateFieldPermissionOperationType())
         operation_type_registry.register(DeleteViewSortOperationType())
         operation_type_registry.register(DeleteViewGroupByOperationType())
         operation_type_registry.register(PrioritizeViewSortOperationType())

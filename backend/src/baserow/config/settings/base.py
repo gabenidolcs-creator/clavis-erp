@@ -1279,6 +1279,7 @@ PERMISSION_MANAGERS = [
     "token",
     "write_field_values",
     "role",
+    "field_permissions",
     "rbac",
     "basic",
     "automation_workflow",

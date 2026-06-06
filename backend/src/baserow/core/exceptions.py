@@ -83,6 +83,34 @@ class RoleProhibitedError(PermissionException):
             super().__init__("Role prohibited from this operation.", *args, **kwargs)
 
 
+class FieldEditProhibitedError(PermissionException):
+    """
+    Raised when a field carries a ``FieldPermission`` edit-restriction (Story 1.4) and
+    the actor's effective role is below the field's ``editable_by_role`` threshold —
+    e.g. an Editor trying to write a value into a field marked admin-only, or trying to
+    change that field's config.
+
+    Distinct from the generic ``PermissionDenied``/``PermissionException`` so the API can
+    map it to **HTTP 403** (``ERROR_FIELD_EDIT_PROHIBITED``) via the global
+    ``api_exception_registry``, while the catch-all permission denial stays 401. MRO
+    most-specific-first resolution guarantees this subclass wins over the
+    ``PermissionException`` catch-all. The field remains readable — this restricts edit
+    only.
+    """
+
+    def __init__(self, actor=None, *args, **kwargs):
+        if actor:
+            super().__init__(
+                f"{actor} is prohibited from editing this restricted field.",
+                *args,
+                **kwargs,
+            )
+        else:
+            super().__init__(
+                "Editing this restricted field is prohibited.", *args, **kwargs
+            )
+
+
 class WorkspaceDoesNotExist(Exception):
     """Raised when trying to get a workspace that does not exist."""
 

@@ -25,6 +25,7 @@ from baserow.contrib.database.fields.utils.duration import (
     postgres_interval_to_seconds,
     prepare_duration_value_for_db,
 )
+from baserow.core.rbac.roles import ROLE_CHOICES
 from baserow.core.utils import split_comma_separated_string
 
 
@@ -32,6 +33,24 @@ class FieldConstraintSerializer(serializers.ModelSerializer):
     class Meta:
         model = FieldConstraint
         fields = ("type_name",)
+
+
+class FieldPermissionSerializer(serializers.Serializer):
+    """Story 1.4: a field's edit-restriction rule.
+
+    ``editable_by_role`` is the minimum fixed-tier role allowed to edit the field's
+    values/config. ``null`` means the field is unrestricted (no rule).
+    """
+
+    editable_by_role = serializers.ChoiceField(
+        choices=ROLE_CHOICES,
+        allow_null=True,
+        required=True,
+        help_text=(
+            "The minimum role (Viewer/Commenter/Editor/Admin) allowed to edit this "
+            "field. Send null to clear the restriction (make the field unrestricted)."
+        ),
+    )
 
 
 class FieldSerializer(serializers.ModelSerializer):

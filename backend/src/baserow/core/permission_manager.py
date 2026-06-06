@@ -312,6 +312,12 @@ class BasicPermissionManagerType(PermissionManagerType):
         # lockstep with RbacPermissionManagerType.RBAC_MANAGED_OPERATIONS.
         AssignRoleWorkspaceOperationType.type,
         ReadRoleAssignmentsWorkspaceOperationType.type,
+        # Field edit-restriction management (Story 1.4): admin-only. Listed as a literal
+        # string (not the OperationType.type attribute) because `baserow.core` must not
+        # import `baserow.contrib.database` operation classes — a core→contrib layering
+        # violation. Keeps a role-None actor denied here so the FieldPermissionManager's
+        # deny (for actors WITH a non-admin role) and this fallback together cover both.
+        "database.table.field.update_permission",
     ]
 
     def check_multiple_permissions(self, checks, workspace=None, include_trash=False):

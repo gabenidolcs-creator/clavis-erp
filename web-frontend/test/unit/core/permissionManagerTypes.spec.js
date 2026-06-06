@@ -1,7 +1,10 @@
 import { TestApp } from '@baserow/test/helpers/testApp'
 import { expect, test, describe, beforeEach, afterEach } from 'vitest'
 
-import { RbacPermissionManagerType } from '@baserow/modules/core/permissionManagerTypes'
+import {
+  RbacPermissionManagerType,
+  FieldPermissionManagerType,
+} from '@baserow/modules/core/permissionManagerTypes'
 
 describe('RbacPermissionManagerType', () => {
   let testApp = null
@@ -52,8 +55,92 @@ describe('RbacPermissionManagerType', () => {
     // deliberately keeps deferring (null) to avoid a second source of truth; it does
     // not mirror the deny. Even a mutating op resolves to null on the client.
     expect(type.hasPermission({}, 'workspace.update', {}, 1)).toBe(null)
+    expect(type.hasPermission({}, 'database.table.create_row', {}, 1)).toBe(
+      null
+    )
+  })
+})
+
+describe('FieldPermissionManagerType', () => {
+  let testApp = null
+
+  beforeEach(() => {
+    testApp = new TestApp()
+  })
+
+  afterEach(() => {
+    testApp.afterEach()
+  })
+
+  test('is registered in the permissionManager namespace', () => {
+    const registry = testApp.getRegistry()
+    const type = registry.get('permissionManager', 'field_permissions')
+
+    expect(type.constructor.name).toBe('FieldPermissionManagerType')
+    expect(type.getType()).toBe('field_permissions')
+    expect(FieldPermissionManagerType.getType()).toBe('field_permissions')
+  })
+
+  test('renders a restricted field read-only (false) for governed edit ops', () => {
+    const registry = testApp.getRegistry()
+    const type = registry.get('permissionManager', 'field_permissions')
+    const permissions = { restricted_field_ids: [42] }
+
     expect(
-      type.hasPermission({}, 'database.table.create_row', {}, 1)
+      type.hasPermission(
+        permissions,
+        'database.table.field.write_values',
+        { id: 42 },
+        1
+      )
+    ).toBe(false)
+    expect(
+      type.hasPermission(
+        permissions,
+        'database.table.field.update',
+        { id: 42 },
+        1
+      )
+    ).toBe(false)
+  })
+
+  test('defers (null) for an unrestricted field', () => {
+    const registry = testApp.getRegistry()
+    const type = registry.get('permissionManager', 'field_permissions')
+    const permissions = { restricted_field_ids: [42] }
+
+    expect(
+      type.hasPermission(
+        permissions,
+        'database.table.field.write_values',
+        { id: 7 },
+        1
+      )
+    ).toBe(null)
+  })
+
+  test('defers (null) for a non-governed operation on a restricted field', () => {
+    const registry = testApp.getRegistry()
+    const type = registry.get('permissionManager', 'field_permissions')
+    const permissions = { restricted_field_ids: [42] }
+
+    // Read is not a governed op — the field stays readable, server stays the SoT.
+    expect(
+      type.hasPermission(
+        permissions,
+        'database.table.field.read',
+        { id: 42 },
+        1
+      )
+    ).toBe(null)
+  })
+
+  test('defers (null) when no restricted_field_ids payload is present', () => {
+    const registry = testApp.getRegistry()
+    const type = registry.get('permissionManager', 'field_permissions')
+
+    expect(
+      type.hasPermission({}, 'database.table.field.write_values', { id: 42 }, 1)
     ).toBe(null)
   })
 })

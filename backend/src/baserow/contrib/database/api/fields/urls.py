@@ -5,6 +5,7 @@ from baserow.contrib.database.fields.registries import field_type_registry
 from .views import (
     AsyncDuplicateFieldView,
     ChangePrimaryFieldView,
+    FieldPermissionView,
     FieldsView,
     FieldView,
     PasswordFieldAuthenticationView,
@@ -24,6 +25,11 @@ urlpatterns = field_type_registry.api_urls + [
         r"(?P<field_id>[0-9]+)/unique_row_values/$",
         UniqueRowValueFieldView.as_view(),
         name="unique_row_values",
+    ),
+    re_path(
+        r"(?P<field_id>[0-9]+)/permission/$",
+        FieldPermissionView.as_view(),
+        name="permission",
     ),
     re_path(r"(?P<field_id>[0-9]+)/$", FieldView.as_view(), name="item"),
     re_path(

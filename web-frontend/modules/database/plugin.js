@@ -1,4 +1,5 @@
 import { defineNuxtPlugin } from '#app'
+import { FieldPermissionManagerType } from '@baserow/modules/core/permissionManagerTypes'
 import { DatabaseApplicationType } from '@baserow/modules/database/applicationTypes'
 import {
   DuplicateTableJobType,
@@ -398,6 +399,13 @@ export default defineNuxtPlugin({
 
     $registry.register('plugin', new DatabasePlugin(context))
     $registry.register('application', new DatabaseApplicationType(context))
+
+    // Story 1.4: renders edit-restricted fields read-only using the backend
+    // field_permissions get_permissions_object payload.
+    $registry.register(
+      'permissionManager',
+      new FieldPermissionManagerType(context)
+    )
 
     $registry.register('job', new DuplicateTableJobType(context))
     $registry.register('job', new SyncDataSyncTableJobType(context))

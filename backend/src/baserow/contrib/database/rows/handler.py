@@ -76,6 +76,7 @@ from baserow.core.db import (
 )
 from baserow.core.exceptions import (
     CannotCalculateIntermediateOrder,
+    FieldEditProhibitedError,
     PermissionDenied,
 )
 from baserow.core.handler import CoreHandler
@@ -2215,9 +2216,16 @@ class RowHandler(metaclass=baserow_trace_methods(tracer)):
             c.context for (c, has_permissions) in results.items() if not has_permissions
         ]
         if unwritable_fields and raise_if_not_permitted:
-            raise PermissionDenied(
-                f"You don't have permission to update the following fields: {', '.join([f.name for f in unwritable_fields])}"
-            )
+            # Story 1.4: the batch check_multiple_permissions aggregator collapses a
+            # manager exception to False (it is not called with
+            # return_permissions_exceptions=True here), so the *kind* of denial is lost
+            # at this point. A write_values denial is, by construction, a field-edit
+            # restriction (the only manager that denies this op is the field-permission
+            # layer; basic/member/rbac all defer or grant it). Raise the dedicated
+            # FieldEditProhibitedError so the API returns HTTP 403
+            # (ERROR_FIELD_EDIT_PROHIBITED) rather than the generic 401 — while the
+            # *decision* still came from the central permission chain.
+            raise FieldEditProhibitedError()
         return unwritable_fields
 
     def _raise_if_values_contain_hidden_fields(

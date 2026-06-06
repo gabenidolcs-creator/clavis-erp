@@ -181,6 +181,15 @@ class CoreConfig(AppConfig):
 
         permission_manager_type_registry.register(RbacPermissionManagerType())
 
+        # Clean-room field-permission layer (Story 1.4, Bucket A): the single central
+        # manager that answers the already-emitted write_values / field.update ops with
+        # the per-field edit-restriction threshold.
+        from baserow.core.field_permissions.permission_manager import (
+            FieldPermissionManagerType,
+        )
+
+        permission_manager_type_registry.register(FieldPermissionManagerType())
+
         # Clean-room RBAC enforcement (Story 1.3, Bucket A): map the dedicated
         # RoleProhibitedError to HTTP 403 globally so EVERY endpoint returns 403 for a
         # role-prohibited mutation with zero per-view edits. The generic
@@ -198,6 +207,21 @@ class CoreConfig(AppConfig):
                 RegisteredException(
                     exception_class=RoleProhibitedError,
                     exception_error=ERROR_ROLE_PROHIBITED,
+                )
+            )
+
+        # Clean-room field-permission layer (Story 1.4, Bucket A): map the dedicated
+        # FieldEditProhibitedError to HTTP 403 globally, mirroring the RoleProhibitedError
+        # wiring above. MRO most-specific-first resolution ensures this subclass wins
+        # over the PermissionException → 401 catch-all on every endpoint.
+        from baserow.api.errors import ERROR_FIELD_EDIT_PROHIBITED
+        from baserow.core.exceptions import FieldEditProhibitedError
+
+        if ERROR_FIELD_EDIT_PROHIBITED[0] not in api_exception_registry.registry:
+            api_exception_registry.register(
+                RegisteredException(
+                    exception_class=FieldEditProhibitedError,
+                    exception_error=ERROR_FIELD_EDIT_PROHIBITED,
                 )
             )
 

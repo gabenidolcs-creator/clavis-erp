@@ -102,6 +102,9 @@ from baserow.contrib.database.fields.exceptions import (
     SelectOptionDoesNotBelongToField,
     TableHasNoPrimaryField,
 )
+from baserow.contrib.database.fields.field_permission_handler import (
+    FieldPermissionHandler,
+)
 from baserow.contrib.database.fields.handler import FieldHandler
 from baserow.contrib.database.fields.job_types import DuplicateFieldJobType
 from baserow.contrib.database.fields.models import PasswordField
@@ -145,6 +148,7 @@ from .serializers import (
     ChangePrimaryFieldParamsSerializer,
     CreateFieldSerializer,
     DuplicateFieldParamsSerializer,
+    FieldPermissionSerializer,
     FieldSerializer,
     FieldSerializerWithRelatedFields,
     ListFieldsQueryParamsSerializer,
@@ -839,3 +843,91 @@ class PasswordFieldAuthenticationView(APIView):
 
         serializer = PasswordFieldAuthenticationResponseSerializer({"is_correct": True})
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class FieldPermissionView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def _serialize(self, field) -> Dict[str, Any]:
+        permission = FieldPermissionHandler.get_field_permission(field)
+        editable_by_role = permission.editable_by_role if permission else None
+        return FieldPermissionSerializer({"editable_by_role": editable_by_role}).data
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="field_id",
+                location=OpenApiParameter.PATH,
+                type=OpenApiTypes.INT,
+                description="The field whose edit-restriction rule is requested.",
+            ),
+        ],
+        tags=["Database table fields"],
+        operation_id="get_database_field_permission",
+        description=(
+            "Returns the edit-restriction rule (Story 1.4) for the field with the "
+            "provided `field_id`. `editable_by_role` is null when the field is "
+            "unrestricted."
+        ),
+        responses={
+            200: FieldPermissionSerializer,
+            400: get_error_schema(["ERROR_USER_NOT_IN_GROUP"]),
+            404: get_error_schema(["ERROR_FIELD_DOES_NOT_EXIST"]),
+        },
+    )
+    @map_exceptions(
+        {
+            FieldDoesNotExist: ERROR_FIELD_DOES_NOT_EXIST,
+            UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
+        }
+    )
+    def get(self, request: Request, field_id: int) -> Response:
+        field = FieldHandler().get_field(field_id)
+        # A read of the rule requires read access to the field's workspace.
+        CoreHandler().check_permissions(
+            request.user,
+            ReadFieldOperationType.type,
+            workspace=field.table.database.workspace,
+            context=field,
+        )
+        return Response(self._serialize(field))
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="field_id",
+                location=OpenApiParameter.PATH,
+                type=OpenApiTypes.INT,
+                description="The field whose edit-restriction rule is updated.",
+            ),
+        ],
+        tags=["Database table fields"],
+        operation_id="update_database_field_permission",
+        description=(
+            "Sets the edit-restriction rule (Story 1.4) for the field with the provided "
+            "`field_id`. Only an Admin may change it. Send `editable_by_role` = null to "
+            "clear the restriction."
+        ),
+        request=FieldPermissionSerializer,
+        responses={
+            200: FieldPermissionSerializer,
+            400: get_error_schema(
+                ["ERROR_USER_NOT_IN_GROUP", "ERROR_REQUEST_BODY_VALIDATION"]
+            ),
+            404: get_error_schema(["ERROR_FIELD_DOES_NOT_EXIST"]),
+        },
+    )
+    @transaction.atomic
+    @map_exceptions(
+        {
+            FieldDoesNotExist: ERROR_FIELD_DOES_NOT_EXIST,
+            UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
+        }
+    )
+    @validate_body(FieldPermissionSerializer)
+    def patch(self, request: Request, field_id: int, data: Dict[str, Any]) -> Response:
+        field = FieldHandler().get_field(field_id)
+        FieldPermissionHandler.set_field_permission(
+            request.user, field, data["editable_by_role"]
+        )
+        return Response(self._serialize(field))

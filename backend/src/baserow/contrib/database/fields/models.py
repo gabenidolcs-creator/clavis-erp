@@ -43,6 +43,7 @@ from baserow.core.mixins import (
     TrashableModelMixin,
     WithRegistry,
 )
+from baserow.core.rbac.roles import ROLE_CHOICES
 from baserow.core.utils import remove_special_characters, to_snake_case
 
 from .fields import SerialField
@@ -1014,3 +1015,51 @@ class DuplicateFieldJob(
 
 
 SpecificFieldForUpdate = NewType("SpecificFieldForUpdate", Field)
+
+
+class FieldPermission(models.Model):
+    """Per-field edit-restriction rule (Story 1.4, Bucket A clean-room).
+
+    A single row per ``Field`` records ``editable_by_role`` — the **minimum** fixed-tier
+    role (``baserow.core.rbac.roles``) allowed to **edit** that field's values and
+    config. The model lives in the ``database`` app (next to ``Field``) on purpose: an
+    FK from ``core`` to ``database.Field`` would invert the app/migration dependency
+    (``database`` already depends on ``core``). The *enforcement* lives in
+    ``baserow.core.field_permissions`` as a permission-manager that consumes the existing
+    ``database.table.field.write_values`` / ``database.table.field.update`` operations.
+
+    Semantics (fixed-tier minimum threshold — NOT the enterprise custom-subject model):
+
+    - **No row = unrestricted** (the pre-1.4 behavior: any member with a write role may
+      edit). This model is therefore purely additive; absence is the default.
+    - ``editable_by_role`` is a *minimum*: an actor whose effective role is
+      ``role_at_least(role, editable_by_role)`` may edit; a lower role is denied write
+      (HTTP 403) while keeping read access. ``ADMIN`` makes the field admin-only (the
+      "Salary read-only to unauthorized members" case).
+    """
+
+    field = models.OneToOneField(
+        Field,
+        on_delete=models.CASCADE,
+        related_name="permission",
+        help_text="The field this edit-restriction rule applies to.",
+    )
+    editable_by_role = models.CharField(
+        max_length=32,
+        choices=ROLE_CHOICES,
+        help_text=(
+            "The minimum fixed-tier role (Viewer/Commenter/Editor/Admin) allowed to "
+            "edit this field's values and config. Effective roles below this threshold "
+            "are denied writes (HTTP 403) but keep read access. Absence of a row means "
+            "the field is unrestricted."
+        ),
+    )
+
+    class Meta:
+        app_label = "database"
+
+    def __str__(self):
+        return (
+            f"<FieldPermission field={self.field_id} "
+            f"editable_by_role={self.editable_by_role}>"
+        )

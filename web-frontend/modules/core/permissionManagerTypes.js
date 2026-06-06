@@ -111,6 +111,39 @@ export class RbacPermissionManagerType extends PermissionManagerType {
   }
 }
 
+export class FieldPermissionManagerType extends PermissionManagerType {
+  static getType() {
+    return 'field_permissions'
+  }
+
+  /**
+   * Story 1.4: renders an edit-restricted field read-only. The backend
+   * `FieldPermissionManagerType.get_permissions_object` returns
+   * `{ restricted_field_ids: [...] }` — the ids of fields in this workspace the actor
+   * may NOT edit. When the cell read-only gate `canWriteFieldValues` asks
+   * `$hasPermission('database.table.field.write_values', field, workspaceId)` (and the
+   * field-config update op), we answer `false` for a restricted field so the cell
+   * becomes read-only. For everything else we DEFER (return null) so the server stays
+   * the single source of truth and unrelated permissions are unaffected.
+   */
+  hasPermission(permissions, operation, context, workspaceId) {
+    const governed = [
+      'database.table.field.write_values',
+      'database.table.field.update',
+    ]
+    if (
+      governed.includes(operation) &&
+      context !== null &&
+      context !== undefined &&
+      Array.isArray(permissions?.restricted_field_ids) &&
+      permissions.restricted_field_ids.includes(context.id)
+    ) {
+      return false
+    }
+    return null
+  }
+}
+
 export class BasicPermissionManagerType extends PermissionManagerType {
   static getType() {
     return 'basic'
