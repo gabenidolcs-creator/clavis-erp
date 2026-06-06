@@ -44,11 +44,16 @@ describe('RbacPermissionManagerType', () => {
     }
   })
 
-  test('defers (returns null) so existing behavior is preserved', () => {
+  test('defers (returns null) — server is the authoritative source of truth', () => {
     const registry = testApp.getRegistry()
     const type = registry.get('permissionManager', 'rbac')
 
-    // Story 1.2 stands up the role layer but does not tighten client enforcement.
+    // Story 1.3 enforces Viewer/Commenter denial SERVER-side (403). The client
+    // deliberately keeps deferring (null) to avoid a second source of truth; it does
+    // not mirror the deny. Even a mutating op resolves to null on the client.
     expect(type.hasPermission({}, 'workspace.update', {}, 1)).toBe(null)
+    expect(
+      type.hasPermission({}, 'database.table.create_row', {}, 1)
+    ).toBe(null)
   })
 })

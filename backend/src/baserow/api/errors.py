@@ -45,6 +45,14 @@ ERROR_PERMISSION_DENIED = (
     HTTP_401_UNAUTHORIZED,
     "You don't have the required permission to execute this operation.",
 )
+# Story 1.3: distinct 403 for fixed-tier role prohibitions (Viewer/Commenter mutating a
+# Row/Field/View). Mapped globally via api_exception_registry; MRO precedence ensures
+# RoleProhibitedError wins over the PermissionException → 401 catch-all.
+ERROR_ROLE_PROHIBITED = (
+    "ERROR_ROLE_PROHIBITED",
+    HTTP_403_FORBIDDEN,
+    "Your role is prohibited from performing this operation.",
+)
 ERROR_MAX_LOCKS_PER_TRANSACTION_EXCEEDED = (
     "MAX_LOCKS_PER_TRANSACTION_EXCEEDED",
     HTTP_400_BAD_REQUEST,

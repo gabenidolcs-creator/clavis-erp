@@ -101,10 +101,12 @@ export class RbacPermissionManagerType extends PermissionManagerType {
   }
 
   hasPermission(permissions, operation, context, workspaceId) {
-    // Story 1.2 stands up the role layer but does NOT tighten client-side
-    // enforcement. The backend rbac manager returns no permissions object, so this
-    // manager defers (returns undefined/null) and existing behavior is preserved.
-    // Commenter/Viewer enforcement is Story 1.3.
+    // Story 1.3 decision: the client keeps DEFERRING (returns null). The server is the
+    // single authoritative source of truth for role enforcement (architecture mandates
+    // server-side enforcement via PERMISSION_MANAGERS); a Viewer/Commenter who attempts
+    // a mutation gets a 403 from the backend. Mirroring the deny here would create a
+    // second source of truth to keep in sync. Optional UI gating (disabling controls)
+    // is deferred to a later UX-focused story.
     return null
   }
 }

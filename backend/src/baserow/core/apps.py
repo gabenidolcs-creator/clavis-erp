@@ -181,6 +181,26 @@ class CoreConfig(AppConfig):
 
         permission_manager_type_registry.register(RbacPermissionManagerType())
 
+        # Clean-room RBAC enforcement (Story 1.3, Bucket A): map the dedicated
+        # RoleProhibitedError to HTTP 403 globally so EVERY endpoint returns 403 for a
+        # role-prohibited mutation with zero per-view edits. The generic
+        # PermissionException stays mapped to 401; MRO most-specific-first resolution in
+        # apply_exception_mapping ensures this subclass wins over the catch-all.
+        from baserow.api.errors import ERROR_ROLE_PROHIBITED
+        from baserow.api.registries import (
+            RegisteredException,
+            api_exception_registry,
+        )
+        from baserow.core.exceptions import RoleProhibitedError
+
+        if ERROR_ROLE_PROHIBITED[0] not in api_exception_registry.registry:
+            api_exception_registry.register(
+                RegisteredException(
+                    exception_class=RoleProhibitedError,
+                    exception_error=ERROR_ROLE_PROHIBITED,
+                )
+            )
+
         from .object_scopes import (
             ApplicationObjectScopeType,
             CoreObjectScopeType,

@@ -60,6 +60,29 @@ class PermissionDenied(PermissionException):
             super().__init__(f"Permission denied.", *args, **kwargs)
 
 
+class RoleProhibitedError(PermissionException):
+    """
+    Raised when a fixed-tier RBAC role (Story 1.3) is *prohibited* from performing an
+    operation — e.g. a Viewer/Commenter attempting a Row/Field/View mutation.
+
+    Distinct from the generic ``PermissionDenied``/``PermissionException`` so the API can
+    map it to **HTTP 403** (``ERROR_ROLE_PROHIBITED``) via the global
+    ``api_exception_registry``, while the catch-all permission denial stays 401. MRO
+    most-specific-first resolution guarantees this subclass wins over the
+    ``PermissionException`` catch-all.
+    """
+
+    def __init__(self, actor=None, *args, **kwargs):
+        if actor:
+            super().__init__(
+                f"{actor}'s role is prohibited from performing this operation.",
+                *args,
+                **kwargs,
+            )
+        else:
+            super().__init__("Role prohibited from this operation.", *args, **kwargs)
+
+
 class WorkspaceDoesNotExist(Exception):
     """Raised when trying to get a workspace that does not exist."""
 

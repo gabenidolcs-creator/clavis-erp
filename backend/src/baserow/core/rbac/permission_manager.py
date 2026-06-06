@@ -14,13 +14,20 @@ Story 1.2 contract — **defer, don't deny:**
   ``BasicPermissionManagerType.ADMIN_ONLY_OPERATIONS`` (in lockstep), so a user with no
   ``RoleAssignment`` is still authorized correctly by the legacy ADMIN-string check.
 
-Commenter/Viewer deny-with-403 *tightening* is Story 1.3 — explicitly not done here.
+Story 1.3 adds the **deny** side for the two read-scoped tiers: a Viewer/Commenter that
+attempts a Row/Field/View mutation (or, for Viewer, a comment) gets a
+``RoleProhibitedError`` value in the result (= deny → HTTP 403). Reads/subscribe and
+unlisted ops still **defer** so read access is preserved (NOT deny-by-default). The deny
+policy lives in ``enforcement.py`` as operation-``type`` strings. Editor/Admin behavior
+is unchanged from 1.2.
 """
 
+from baserow.core.exceptions import RoleProhibitedError
 from baserow.core.registries import PermissionManagerType
 from baserow.core.subjects import UserSubjectType
 
 from . import roles
+from .enforcement import COMMENTER_DENIED_OPS, VIEWER_DENIED_OPS
 from .models import RoleAssignment
 from .operations import (
     AssignRoleWorkspaceOperationType,
@@ -115,6 +122,18 @@ class RbacPermissionManagerType(PermissionManagerType):
 
             if role is None:
                 # No assignment in scope — defer entirely to preserve pre-1.2 behavior.
+                continue
+
+            # Story 1.3 deny side: read-scoped tiers are prohibited from the enumerated
+            # mutating ops. Returning the exception INSTANCE = deny (the handler
+            # re-raises it; the API maps RoleProhibitedError → 403). Unlisted ops (reads,
+            # subscribe, unrelated workspace ops) fall through and DEFER below — never
+            # deny-by-default for these roles, or read access breaks.
+            if role == roles.VIEWER and operation in VIEWER_DENIED_OPS:
+                result[check] = RoleProhibitedError(check.actor)
+                continue
+            if role == roles.COMMENTER and operation in COMMENTER_DENIED_OPS:
+                result[check] = RoleProhibitedError(check.actor)
                 continue
 
             if operation in admin_only_operations:
