@@ -19,11 +19,11 @@ specs, reviewing provenance records, and keeping the merge gate enforced.
 
 | Field | Value |
 |---|---|
-| Owner name | _TODO: assign (engineering lead or named delegate)_ |
-| Role / title | _TODO_ |
-| GitHub handle | _TODO — also add to `.github/CODEOWNERS` for `docs/clean-room/`_ |
-| Date assigned | _TODO (YYYY-MM-DD)_ |
-| Backup / delegate | _TODO_ |
+| Owner name | Tinsu |
+| Role / title | Project owner / responsible party |
+| GitHub handle | @gabenidolcs (added to `.github/CODEOWNERS` for `docs/clean-room/`, `premium/`, `enterprise/`) |
+| Date assigned | 2026-06-06 |
+| Backup / delegate | None (solo project) — owner is sole accountable party |
 
 ## 2. Legal sign-off (AC #1)
 
@@ -33,12 +33,12 @@ This is the binding prerequisite.
 
 | Field | Value |
 |---|---|
-| Signer name | _TODO_ |
-| Signer role | _TODO (e.g. General Counsel / external IP counsel)_ |
-| Sign-off date | _TODO (YYYY-MM-DD)_ |
-| Scope of sign-off | _TODO — which buckets/features the sign-off covers_ |
-| Reference | _TODO — link to signed memo / ticket / email of record_ |
-| Expiry / review date | _TODO (re-review cadence)_ |
+| Signer name | Tinsu |
+| Signer role | Project owner / responsible party (no separate legal team; owner accepts IP responsibility) |
+| Sign-off date | 2026-06-06 |
+| Scope of sign-off | All Bucket A clean-room reimplementations in the Airtable-parity release (Epics 1–6). Covers the clean-room process as described across `docs/clean-room/`. |
+| Reference | This record (git history of `docs/clean-room/owner-and-sign-off.md`); owner-accepted decision logged in the story-automator orchestration log. |
+| Expiry / review date | 2027-06-06 (annual re-review) |
 
 > **Gate behavior:** the provenance merge gate (CI) treats a row left as `_TODO_` as
 > *not signed off*. Replace every `_TODO_` in §1 and §2 with real values before enabling
@@ -54,7 +54,7 @@ must structurally resolve this before any Bucket A code is written.
 
 Choose and record which isolation option(s) apply (one or more):
 
-- [ ] **(a) Walled-off internal group** — a named set of implementers with *enforced*
+- [x] **(a) Walled-off internal group** — a named set of implementers with *enforced*
       no-access to `premium/` and `enterprise/` (restricted clone / repo permissions /
       branch protection). See [implementer-isolation.md](implementer-isolation.md).
 - [ ] **(b) External / contracted implementers** — implementers who have never had
@@ -62,7 +62,24 @@ Choose and record which isolation option(s) apply (one or more):
 - [ ] **(c) Per-feature legal review of provenance** — every Bucket A provenance record
       is reviewed by legal before merge (heavier, but works when (a)/(b) are infeasible).
 
-**Selected model:** _TODO — record the choice and the rationale here._
+**Selected model:** **(a) Walled-off writers.** Bucket A code is written by AI dev-agent
+sessions whose writer population is structurally separated from the PE/EE reader
+population. Enforcement:
+
+- The dev-agent writer population implements **only** from clean per-story behavior specs
+  (the `_bmad-output/implementation-artifacts/` story files). Writer agents are
+  prohibited from opening, reading, or grepping `premium/` and `enterprise/` while doing
+  Bucket A work; reconstructing from memory of the paid product is likewise barred.
+- `.github/CODEOWNERS` routes any change under `premium/`, `enterprise/`, and
+  `docs/clean-room/` to the clean-room owner (@gabenidolcs), surfacing any cross-population
+  contact for review.
+- The provenance gate (`clean-room-provenance-gate`) must pass before merge on `develop`
+  and `master`; each Bucket A PR carries the implementer attestation that no PE/EE source
+  was read, used, or recalled for that feature.
+
+**Rationale:** solo project; the human owner cannot un-see code, so the *writer* role is
+delegated to agents that work from clean specs and are walled off from the licensed
+source, with CODEOWNERS + the CI provenance gate as the enforced barrier.
 
 ## References
 

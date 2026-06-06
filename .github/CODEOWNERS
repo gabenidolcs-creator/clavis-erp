@@ -7,13 +7,13 @@
 # Bucket A writer population is always surfaced. "Influenced by" counts as contamination,
 # not just verbatim copying — see docs/clean-room/implementer-isolation.md.
 #
-# TODO: replace @clean-room-owner with the GitHub handle recorded in
-#       docs/clean-room/owner-and-sign-off.md §1, then enable branch protection
-#       "Require review from Code Owners" on develop and master.
+# Owner: @gabenidolcs (recorded in docs/clean-room/owner-and-sign-off.md §1, signed off
+# 2026-06-06). Repo admin must still enable branch protection "Require review from Code
+# Owners" on develop and master to make this enforceable in GitHub settings.
 
-/premium/                     @clean-room-owner
-/enterprise/                  @clean-room-owner
+/premium/                     @gabenidolcs
+/enterprise/                  @gabenidolcs
 
 # The clean-room governance artifacts themselves are owned by the process owner.
-/docs/clean-room/             @clean-room-owner
-/.github/workflows/clean-room-provenance-gate.yml @clean-room-owner
+/docs/clean-room/             @gabenidolcs
+/.github/workflows/clean-room-provenance-gate.yml @gabenidolcs
