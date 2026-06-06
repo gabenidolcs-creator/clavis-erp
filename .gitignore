@@ -169,4 +169,7 @@ field-diagrams/
 web-frontend/.nuxt-storybook/
 web-frontend/storybook-static
 
-.agent
+.agent/
+.agents/
+_bmad/
+.agents/.story-automator-active

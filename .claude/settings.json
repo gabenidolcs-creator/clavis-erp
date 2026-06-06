@@ -1,0 +1,18 @@
+{
+  "env": {
+    "BMAD_RUNTIME_PROVIDER": "claude"
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "env PROJECT_ROOT=/home/tinxu-luna/clavis/clavis-erp /home/tinxu-luna/clavis/clavis-erp/.agents/skills/bmad-story-automator/scripts/story-automator stop-hook",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
