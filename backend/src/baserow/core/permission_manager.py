@@ -43,6 +43,10 @@ from .operations import (
     UpdateWorkspaceOperationType,
     UpdateWorkspaceUserOperationType,
 )
+from .rbac.operations import (
+    AssignRoleWorkspaceOperationType,
+    ReadRoleAssignmentsWorkspaceOperationType,
+)
 from .registries import PermissionManagerType
 from .subjects import AnonymousUserSubjectType, UserSubjectType
 
@@ -303,6 +307,11 @@ class BasicPermissionManagerType(PermissionManagerType):
         DeleteWorkspaceOperationType.type,
         UpdateWorkspaceUserOperationType.type,
         DeleteWorkspaceUserOperationType.type,
+        # RBAC role-management ops (Story 1.2): admin-only here so that legacy admins
+        # without a RoleAssignment remain authorized via the ADMIN-string check, in
+        # lockstep with RbacPermissionManagerType.RBAC_MANAGED_OPERATIONS.
+        AssignRoleWorkspaceOperationType.type,
+        ReadRoleAssignmentsWorkspaceOperationType.type,
     ]
 
     def check_multiple_permissions(self, checks, workspace=None, include_trash=False):

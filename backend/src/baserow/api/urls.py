@@ -17,6 +17,7 @@ from .integrations import urls as integrations_urls
 from .jobs import urls as jobs_urls
 from .mcp import urls as mcp_urls
 from .notifications import urls as notifications_urls
+from .rbac import urls as rbac_urls
 from .search import urls as search_urls
 from .settings import urls as settings_urls
 from .snapshots import urls as snapshots_urls
@@ -56,6 +57,7 @@ urlpatterns = (
         path("search/", include(search_urls, namespace="search")),
         path("admin/", include(admin_urls, namespace="admin")),
         path("mcp/", include(mcp_urls, namespace="mcp")),
+        path("", include(rbac_urls, namespace="rbac")),
         path(
             "",
             include(integrations_urls, namespace="integrations"),

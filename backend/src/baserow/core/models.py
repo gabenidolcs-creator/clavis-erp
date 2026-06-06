@@ -855,3 +855,10 @@ class SchemaOperation(CreatedAndUpdatedOnMixin, models.Model):
 
     class Meta:
         unique_together = [["content_type_id", "operation"]]
+
+
+# Register the clean-room RBAC model (Story 1.2, Bucket A) with the core app. The
+# RoleAssignment model lives in core/rbac/models.py and uses string FK references, so
+# importing it here (after Workspace/Application are defined) wires it into the `core`
+# app without a circular import.
+from baserow.core.rbac.models import RoleAssignment  # noqa: E402,F401

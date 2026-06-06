@@ -130,7 +130,15 @@
     "admin": "Admin",
     "adminDescription": "Can fully configure and edit workspaces and applications.",
     "member": "Member",
-    "memberDescription": "Can fully configure and edit applications."
+    "memberDescription": "Can fully configure and edit applications.",
+    "rbacAdmin": "Admin",
+    "rbacAdminDescription": "Can fully configure and edit workspaces and applications, and manage member roles.",
+    "rbacEditor": "Editor",
+    "rbacEditorDescription": "Can create, edit, and delete records and structure.",
+    "rbacCommenter": "Commenter",
+    "rbacCommenterDescription": "Can view records and leave comments, but cannot edit data.",
+    "rbacViewer": "Viewer",
+    "rbacViewerDescription": "Can view records but cannot edit or comment."
   },
   "fieldType": {
     "singleLineText": "Single line text",

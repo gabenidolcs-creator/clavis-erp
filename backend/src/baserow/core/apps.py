@@ -175,6 +175,12 @@ class CoreConfig(AppConfig):
             AllowIfTemplatePermissionManagerType()
         )
 
+        # Clean-room RBAC fixed-tier role manager (Story 1.2, Bucket A). Registered into
+        # the PERMISSION_MANAGERS chain after "member" and before "basic".
+        from baserow.core.rbac.permission_manager import RbacPermissionManagerType
+
+        permission_manager_type_registry.register(RbacPermissionManagerType())
+
         from .object_scopes import (
             ApplicationObjectScopeType,
             CoreObjectScopeType,
@@ -264,6 +270,15 @@ class CoreConfig(AppConfig):
         operation_type_registry.register(OrderApplicationsOperationType())
         operation_type_registry.register(UpdateWorkspaceUserOperationType())
         operation_type_registry.register(DeleteWorkspaceUserOperationType())
+
+        # Clean-room RBAC role-management operations (Story 1.2, Bucket A).
+        from baserow.core.rbac.operations import (
+            AssignRoleWorkspaceOperationType,
+            ReadRoleAssignmentsWorkspaceOperationType,
+        )
+
+        operation_type_registry.register(AssignRoleWorkspaceOperationType())
+        operation_type_registry.register(ReadRoleAssignmentsWorkspaceOperationType())
         operation_type_registry.register(UpdateApplicationOperationType())
         operation_type_registry.register(DuplicateApplicationOperationType())
         operation_type_registry.register(DeleteApplicationOperationType())

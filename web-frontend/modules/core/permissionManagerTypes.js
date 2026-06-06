@@ -68,6 +68,47 @@ export class WorkspaceMemberPermissionManagerType extends PermissionManagerType 
   }
 }
 
+export class RbacPermissionManagerType extends PermissionManagerType {
+  static getType() {
+    return 'rbac'
+  }
+
+  /**
+   * The fixed-tier RBAC roles (Story 1.2). Capability ordering:
+   * Admin > Editor > Commenter > Viewer.
+   */
+  getRolesTranslations() {
+    const { $i18n: i18n } = this.app
+
+    return {
+      ADMIN: {
+        name: i18n.t('permission.rbacAdmin'),
+        description: i18n.t('permission.rbacAdminDescription'),
+      },
+      EDITOR: {
+        name: i18n.t('permission.rbacEditor'),
+        description: i18n.t('permission.rbacEditorDescription'),
+      },
+      COMMENTER: {
+        name: i18n.t('permission.rbacCommenter'),
+        description: i18n.t('permission.rbacCommenterDescription'),
+      },
+      VIEWER: {
+        name: i18n.t('permission.rbacViewer'),
+        description: i18n.t('permission.rbacViewerDescription'),
+      },
+    }
+  }
+
+  hasPermission(permissions, operation, context, workspaceId) {
+    // Story 1.2 stands up the role layer but does NOT tighten client-side
+    // enforcement. The backend rbac manager returns no permissions object, so this
+    // manager defers (returns undefined/null) and existing behavior is preserved.
+    // Commenter/Viewer enforcement is Story 1.3.
+    return null
+  }
+}
+
 export class BasicPermissionManagerType extends PermissionManagerType {
   static getType() {
     return 'basic'
