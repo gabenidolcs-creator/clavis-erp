@@ -455,6 +455,7 @@ class ViewSerializer(serializers.ModelSerializer):
             "allow_public_export",
             "ownership_type",
             "owned_by_id",
+            "locked",
         )
         extra_kwargs = {
             "id": {"read_only": True},
@@ -462,6 +463,7 @@ class ViewSerializer(serializers.ModelSerializer):
             "public_view_has_password": {"read_only": True},
             "ownership_type": {"read_only": True},
             "owned_by_id": {"read_only": True},
+            "locked": {"read_only": True},
         }
 
     def __init__(self, instance=None, *args, **kwargs):
@@ -603,11 +605,13 @@ class UpdateViewSerializer(serializers.ModelSerializer):
             "filters_disabled",
             "public_view_password",
             "ownership_type",
+            "locked",
         )
         extra_kwargs = {
             "name": {"required": False},
             "filter_type": {"required": False},
             "filters_disabled": {"required": False},
+            "locked": {"required": False},
         }
 
 

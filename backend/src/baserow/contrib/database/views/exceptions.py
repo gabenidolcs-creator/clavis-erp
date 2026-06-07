@@ -264,3 +264,7 @@ class InvalidAPIGroupedFiltersFormatException(ValueError):
     """
     Raised when the provided view filters format is invalid.
     """
+
+
+class ViewIsLockedException(Exception):
+    """Raised when a non-owner/non-admin tries to mutate config of a locked view."""

@@ -141,6 +141,11 @@ class View(
             " that have access to the table."
         ),
     )
+    locked = models.BooleanField(
+        default=False,
+        help_text="When True, view configuration (filters, sorts, field options) is "
+        "read-only for users other than the lock owner and workspace admins.",
+    )
     db_index_name = models.CharField(
         max_length=30,
         null=True,

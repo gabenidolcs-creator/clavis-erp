@@ -117,6 +117,7 @@ from baserow.contrib.database.views.exceptions import (
     ViewGroupByFieldNotSupported,
     ViewGroupByNotInView,
     ViewGroupByNotSupported,
+    ViewIsLockedException,
     ViewNotInTable,
     ViewOwnershipTypeDoesNotExist,
     ViewOwnershipTypeNotCompatibleWithViewType,
@@ -170,6 +171,7 @@ from .errors import (
     ERROR_VIEW_GROUP_BY_NOT_SUPPORTED,
     ERROR_VIEW_NOT_IN_TABLE,
     ERROR_VIEW_OWNERSHIP_TYPE_DOES_NOT_EXIST,
+    ERROR_VIEW_IS_LOCKED,
     ERROR_VIEW_OWNERSHIP_TYPE_INCOMPATIBLE_WITH_VIEW_TYPE,
     ERROR_VIEW_SORT_DOES_NOT_EXIST,
     ERROR_VIEW_SORT_FIELD_ALREADY_EXISTS,
@@ -584,6 +586,7 @@ class ViewView(APIView):
         {
             ViewDoesNotExist: ERROR_VIEW_DOES_NOT_EXIST,
             UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
+            ViewIsLockedException: ERROR_VIEW_IS_LOCKED,
         }
     )
     @allowed_includes("filters", "sortings", "decorations", "group_bys")
@@ -872,6 +875,7 @@ class ViewFiltersView(APIView):
             ViewFilterNotSupported: ERROR_VIEW_FILTER_NOT_SUPPORTED,
             ViewFilterTypeNotAllowedForField: ERROR_VIEW_FILTER_TYPE_UNSUPPORTED_FIELD,
             ViewFilterGroupDoesNotExist: ERROR_VIEW_FILTER_GROUP_DOES_NOT_EXIST,
+            ViewIsLockedException: ERROR_VIEW_IS_LOCKED,
         }
     )
     def post(self, request, data, view_id):
@@ -964,6 +968,7 @@ class ViewFilterView(APIView):
             UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
             FieldNotInTable: ERROR_FIELD_NOT_IN_TABLE,
             ViewFilterTypeNotAllowedForField: ERROR_VIEW_FILTER_TYPE_UNSUPPORTED_FIELD,
+            ViewIsLockedException: ERROR_VIEW_IS_LOCKED,
         }
     )
     def patch(self, request, data, view_filter_id):
@@ -1023,6 +1028,7 @@ class ViewFilterView(APIView):
         {
             ViewFilterDoesNotExist: ERROR_VIEW_FILTER_DOES_NOT_EXIST,
             UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
+            ViewIsLockedException: ERROR_VIEW_IS_LOCKED,
         }
     )
     def delete(self, request, view_filter_id):
@@ -1306,6 +1312,7 @@ class ViewDecorationsView(APIView):
             UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
             ViewDecorationNotSupported: ERROR_VIEW_DECORATION_NOT_SUPPORTED,
             DecoratorValueProviderTypeNotCompatible: ERROR_VIEW_DECORATION_VALUE_PROVIDER_NOT_COMPATIBLE,
+            ViewIsLockedException: ERROR_VIEW_IS_LOCKED,
         }
     )
     def post(self, request, data, view_id):
@@ -1401,6 +1408,7 @@ class ViewDecorationView(APIView):
             ViewDecorationDoesNotExist: ERROR_VIEW_DECORATION_DOES_NOT_EXIST,
             UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
             DecoratorValueProviderTypeNotCompatible: ERROR_VIEW_DECORATION_VALUE_PROVIDER_NOT_COMPATIBLE,
+            ViewIsLockedException: ERROR_VIEW_IS_LOCKED,
         }
     )
     @require_request_data_type(dict)
@@ -1480,6 +1488,7 @@ class ViewDecorationView(APIView):
         {
             ViewDecorationDoesNotExist: ERROR_VIEW_DECORATION_DOES_NOT_EXIST,
             UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
+            ViewIsLockedException: ERROR_VIEW_IS_LOCKED,
         }
     )
     def delete(self, request, view_decoration_id):
@@ -1640,6 +1649,7 @@ class ViewSortingsView(APIView):
             ViewSortNotSupported: ERROR_VIEW_SORT_NOT_SUPPORTED,
             ViewSortFieldAlreadyExist: ERROR_VIEW_SORT_FIELD_ALREADY_EXISTS,
             ViewSortFieldNotSupported: ERROR_VIEW_SORT_FIELD_NOT_SUPPORTED,
+            ViewIsLockedException: ERROR_VIEW_IS_LOCKED,
         }
     )
     def post(self, request, data, view_id):
@@ -1736,6 +1746,7 @@ class ViewSortView(APIView):
             FieldNotInTable: ERROR_FIELD_NOT_IN_TABLE,
             ViewSortFieldAlreadyExist: ERROR_VIEW_SORT_FIELD_ALREADY_EXISTS,
             ViewSortFieldNotSupported: ERROR_VIEW_SORT_FIELD_NOT_SUPPORTED,
+            ViewIsLockedException: ERROR_VIEW_IS_LOCKED,
         }
     )
     def patch(self, request, data, view_sort_id):
@@ -1792,6 +1803,7 @@ class ViewSortView(APIView):
         {
             ViewSortDoesNotExist: ERROR_VIEW_SORT_DOES_NOT_EXIST,
             UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
+            ViewIsLockedException: ERROR_VIEW_IS_LOCKED,
         }
     )
     def delete(self, request, view_sort_id):
@@ -2375,6 +2387,7 @@ class ViewGroupBysView(APIView):
             ViewGroupByNotSupported: ERROR_VIEW_GROUP_BY_NOT_SUPPORTED,
             ViewGroupByFieldAlreadyExist: ERROR_VIEW_GROUP_BY_FIELD_ALREADY_EXISTS,
             ViewGroupByFieldNotSupported: ERROR_VIEW_GROUP_BY_FIELD_NOT_SUPPORTED,
+            ViewIsLockedException: ERROR_VIEW_IS_LOCKED,
         }
     )
     def post(self, request, data, view_id):
@@ -2467,6 +2480,7 @@ class ViewGroupByView(APIView):
             FieldNotInTable: ERROR_FIELD_NOT_IN_TABLE,
             ViewGroupByFieldAlreadyExist: ERROR_VIEW_GROUP_BY_FIELD_ALREADY_EXISTS,
             ViewGroupByFieldNotSupported: ERROR_VIEW_GROUP_BY_FIELD_NOT_SUPPORTED,
+            ViewIsLockedException: ERROR_VIEW_IS_LOCKED,
         }
     )
     def patch(self, request, data, view_group_by_id):
@@ -2526,6 +2540,7 @@ class ViewGroupByView(APIView):
         {
             ViewGroupByDoesNotExist: ERROR_VIEW_GROUP_BY_DOES_NOT_EXIST,
             UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
+            ViewIsLockedException: ERROR_VIEW_IS_LOCKED,
         }
     )
     def delete(self, request, view_group_by_id):

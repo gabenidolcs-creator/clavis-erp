@@ -194,6 +194,12 @@ class UpdateViewOperationType(ViewOperationType):
     type = "database.table.view.update"
 
 
+class UpdateLockedViewConfigOperationType(ViewOperationType):
+    """Grants admin-only bypass on locked-view config mutations."""
+
+    type = "database.table.view.update_locked_config"
+
+
 class CanReceiveNotificationOnSubmitFormViewOperationType(ViewOperationType):
     type = "database.table.view.can_receive_notification_on_submit_form_view"
 

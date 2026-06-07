@@ -659,7 +659,9 @@
     "toCollaborative": "To collaborative",
     "webhooks": "Webhooks",
     "importFile": "Import file",
-    "deleteView": "Delete view"
+    "deleteView": "Delete view",
+    "locked": "Locked",
+    "lockedTooltip": "This view is locked. Only the owner or an Admin can modify its configuration."
   },
   "defaultValuesModal": {
     "title": "Default values for {name}",

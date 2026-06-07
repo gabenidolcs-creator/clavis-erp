@@ -13,6 +13,7 @@ from rest_framework.status import (
     HTTP_204_NO_CONTENT,
     HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
+    HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
 )
 
@@ -1930,3 +1931,82 @@ def test_patch_default_values_invalid_single_select_option(api_client, data_fixt
     assert response.status_code == HTTP_400_BAD_REQUEST
     response_json = response.json()
     assert response_json["error"] == "ERROR_REQUEST_BODY_VALIDATION"
+
+
+@pytest.mark.django_db
+def test_patch_view_locked_flag_sets_owned_by(api_client, data_fixture):
+    """PATCH view with locked=True sets owned_by to requesting user and returns 200."""
+    user, token = data_fixture.create_user_and_token()
+    table = data_fixture.create_database_table(user=user)
+    view = data_fixture.create_grid_view(user=user, table=table)
+
+    response = api_client.patch(
+        reverse("api:database:views:item", kwargs={"view_id": view.id}),
+        {"locked": True},
+        format="json",
+        HTTP_AUTHORIZATION=f"JWT {token}",
+    )
+    assert response.status_code == HTTP_200_OK
+    data = response.json()
+    assert data["locked"] is True
+
+    view.refresh_from_db()
+    assert view.locked is True
+    assert view.owned_by_id == user.id
+
+
+@pytest.mark.django_db
+def test_patch_locked_view_filter_non_owner_returns_403(api_client, data_fixture):
+    """Non-owner PATCH to create a filter on a locked view returns 403."""
+    owner, owner_token = data_fixture.create_user_and_token()
+    member, member_token = data_fixture.create_user_and_token()
+    workspace = data_fixture.create_workspace(user=owner)
+    data_fixture.create_user_workspace(user=member, workspace=workspace, permissions="MEMBER")
+    database = data_fixture.create_database_application(workspace=workspace, user=owner)
+    table = data_fixture.create_database_table(user=owner, database=database)
+    field = data_fixture.create_text_field(user=owner, table=table)
+    view = data_fixture.create_grid_view(user=owner, table=table)
+
+    # Owner locks the view.
+    api_client.patch(
+        reverse("api:database:views:item", kwargs={"view_id": view.id}),
+        {"locked": True},
+        format="json",
+        HTTP_AUTHORIZATION=f"JWT {owner_token}",
+    )
+
+    # Member (non-owner) tries to create a filter.
+    response = api_client.post(
+        reverse("api:database:views:list_filters", kwargs={"view_id": view.id}),
+        {"field": field.id, "type": "equal", "value": "test"},
+        format="json",
+        HTTP_AUTHORIZATION=f"JWT {member_token}",
+    )
+    assert response.status_code == HTTP_400_BAD_REQUEST
+    assert response.json()["error"] == "ERROR_VIEW_IS_LOCKED"
+
+
+@pytest.mark.django_db
+def test_patch_locked_view_filter_owner_succeeds(api_client, data_fixture):
+    """Lock owner can create a filter on the locked view."""
+    user, token = data_fixture.create_user_and_token()
+    table = data_fixture.create_database_table(user=user)
+    field = data_fixture.create_text_field(user=user, table=table)
+    view = data_fixture.create_grid_view(user=user, table=table)
+
+    # Lock the view.
+    api_client.patch(
+        reverse("api:database:views:item", kwargs={"view_id": view.id}),
+        {"locked": True},
+        format="json",
+        HTTP_AUTHORIZATION=f"JWT {token}",
+    )
+
+    # Owner creates a filter — should succeed.
+    response = api_client.post(
+        reverse("api:database:views:list_filters", kwargs={"view_id": view.id}),
+        {"field": field.id, "type": "equal", "value": "owner_value"},
+        format="json",
+        HTTP_AUTHORIZATION=f"JWT {token}",
+    )
+    assert response.status_code == HTTP_200_OK

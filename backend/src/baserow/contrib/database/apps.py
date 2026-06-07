@@ -890,6 +890,7 @@ class DatabaseConfig(AppConfig):
             UpdateViewFilterGroupOperationType,
             UpdateViewFilterOperationType,
             UpdateViewGroupByOperationType,
+            UpdateLockedViewConfigOperationType,
             UpdateViewOperationType,
             UpdateViewPublicOperationType,
             UpdateViewRowCommentOperationType,
@@ -962,6 +963,7 @@ class DatabaseConfig(AppConfig):
         operation_type_registry.register(CreateAndUsePersonalViewOperationType())
         operation_type_registry.register(ReadViewOperationType())
         operation_type_registry.register(UpdateViewOperationType())
+        operation_type_registry.register(UpdateLockedViewConfigOperationType())
         operation_type_registry.register(
             CanReceiveNotificationOnSubmitFormViewOperationType()
         )

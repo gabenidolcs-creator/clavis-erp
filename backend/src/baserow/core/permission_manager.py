@@ -318,6 +318,9 @@ class BasicPermissionManagerType(PermissionManagerType):
         # violation. Keeps a role-None actor denied here so the FieldPermissionManager's
         # deny (for actors WITH a non-admin role) and this fallback together cover both.
         "database.table.field.update_permission",
+        # Locked-view config bypass (Story 1.7): admin-only. String literal, not
+        # import, to preserve the core→contrib no-import rule.
+        "database.table.view.update_locked_config",
     ]
 
     def check_multiple_permissions(self, checks, workspace=None, include_trash=False):

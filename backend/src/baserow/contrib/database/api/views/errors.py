@@ -1,6 +1,7 @@
 from rest_framework.status import (
     HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
+    HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
 )
 
@@ -149,4 +150,9 @@ ERROR_VIEW_OWNERSHIP_TYPE_INCOMPATIBLE_WITH_VIEW_TYPE = (
     HTTP_400_BAD_REQUEST,
     "The ownership type {e.ownership_type} is not compatible with "
     "view type {e.view_type}.",
+)
+ERROR_VIEW_IS_LOCKED = (
+    "ERROR_VIEW_IS_LOCKED",
+    HTTP_400_BAD_REQUEST,
+    "This view is locked. Only the lock owner or an Admin can modify its configuration.",
 )

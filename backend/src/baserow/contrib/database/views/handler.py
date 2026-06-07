@@ -864,6 +864,31 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
                     "You do not have access to this personal view."
                 )
 
+    def _check_locked_view_config_access(
+        self, user: AbstractUser, view: View
+    ) -> None:
+        """Raise ViewIsLockedException if view is locked and user is not the lock owner or workspace admin."""
+        if not view.locked:
+            return
+        if view.owned_by_id is not None and getattr(user, "id", None) == view.owned_by_id:
+            return
+        from .operations import UpdateLockedViewConfigOperationType
+        from .exceptions import ViewIsLockedException
+        from baserow.core.exceptions import PermissionException
+
+        workspace = view.table.database.workspace
+        try:
+            CoreHandler().check_permissions(
+                user,
+                UpdateLockedViewConfigOperationType.type,
+                workspace=workspace,
+                context=view,
+            )
+        except PermissionException:
+            raise ViewIsLockedException(
+                "This view is locked. Only the lock owner or an Admin can modify its configuration."
+            )
+
     def get_view(
         self,
         view_id: int | str,
@@ -1149,6 +1174,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
 
         view_type = view_type_registry.get_by_model(view)
         view_type.check_view_update_permissions(user, view, data)
+        self._check_locked_view_config_access(user, view)
         view_type.before_view_update(data, view, user)
 
         old_view = deepcopy(view)
@@ -1161,6 +1187,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             "public_view_password",
             "show_logo",
             "allow_public_export",
+            "locked",
         ] + view_type.allowed_fields
 
         changed_allowed_keys = set(extract_allowed(view_values, allowed_fields).keys())
@@ -1187,10 +1214,14 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             changed_allowed_keys.add(ownership_type_key)
 
         previous_public_value = view.public
+        old_locked = old_view.locked
         allowed_attrs, allowed_m2m_fields = split_attrs_and_m2m_fields(
             allowed_fields, view
         )
         view = set_allowed_attrs(view_values, allowed_attrs, view)
+        new_locked = view.locked
+        if not old_locked and new_locked:
+            view.owned_by = user
         if previous_public_value != view.public:
             workspace = view.table.database.workspace
             CoreHandler().check_permissions(
@@ -1394,6 +1425,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             # update is triggered by user a action, we have one from the view but in
             # some situation, we have automatic processing and we don't have any user.
             self._check_personal_view_access(user, view)
+            self._check_locked_view_config_access(user, view)
             CoreHandler().check_permissions(
                 user,
                 UpdateViewFieldOptionsOperationType.type,
@@ -1768,6 +1800,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         """
 
         self._check_personal_view_access(user, view)
+        self._check_locked_view_config_access(user, view)
         workspace = view.table.database.workspace
         # Inference-oracle guard (Story 1.5): filtering on a field the actor may not see
         # leaks its value through the presence/count of matching rows. Mirror the
@@ -1848,6 +1881,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         """
 
         self._check_personal_view_access(user, view_filter.view)
+        self._check_locked_view_config_access(user, view_filter.view)
         workspace = view_filter.view.table.database.workspace
         CoreHandler().check_permissions(
             user,
@@ -1904,6 +1938,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         """
 
         self._check_personal_view_access(user, view_filter.view)
+        self._check_locked_view_config_access(user, view_filter.view)
         workspace = view_filter.view.table.database.workspace
         CoreHandler().check_permissions(
             user,
@@ -1997,6 +2032,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             workspace=workspace,
             context=view,
         )
+        self._check_locked_view_config_access(user, view)
 
         attrs = {}
         if filter_type is not None:
@@ -2031,6 +2067,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             workspace=workspace,
             context=filter_group,
         )
+        self._check_locked_view_config_access(user, filter_group.view)
 
         filter_group.filter_type = filter_type
         filter_group.save()
@@ -2055,6 +2092,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             workspace=workspace,
             context=filter_group,
         )
+        self._check_locked_view_config_access(user, filter_group.view)
 
         filter_group_id = filter_group.id
 
@@ -2261,6 +2299,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         field = field.specific
 
         self._check_personal_view_access(user, view)
+        self._check_locked_view_config_access(user, view)
         workspace = view.table.database.workspace
         CoreHandler().check_permissions(
             user, ReadFieldOperationType.type, workspace=workspace, context=field
@@ -2344,6 +2383,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             raise ViewSortDoesNotExist(f"The view {view_sort.view.id} is trashed.")
 
         self._check_personal_view_access(user, view_sort.view)
+        self._check_locked_view_config_access(user, view_sort.view)
         workspace = view_sort.view.table.database.workspace
         field = field if field is not None else view_sort.field
         order = order if order is not None else view_sort.order
@@ -2412,6 +2452,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         """
 
         self._check_personal_view_access(user, view_sort.view)
+        self._check_locked_view_config_access(user, view_sort.view)
         workspace = view_sort.view.table.database.workspace
         CoreHandler().check_permissions(
             user,
@@ -2570,6 +2611,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         CoreHandler().check_permissions(
             user, CreateViewGroupByOperationType.type, workspace=workspace, context=view
         )
+        self._check_locked_view_config_access(user, view)
 
         if not sort_type:
             sort_type = DEFAULT_SORT_TYPE_KEY
@@ -2667,6 +2709,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             workspace=workspace,
             context=view_group_by,
         )
+        self._check_locked_view_config_access(user, view_group_by.view)
 
         # If the field has changed we need to check if the field belongs to the table.
         if (
@@ -2729,6 +2772,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             workspace=workspace,
             context=view_group_by,
         )
+        self._check_locked_view_config_access(user, view_group_by.view)
 
         view_group_by_id = view_group_by.id
         view_group_by.delete()
@@ -2810,6 +2854,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
 
         if user:
             self._check_personal_view_access(user, view)
+            self._check_locked_view_config_access(user, view)
             workspace = view.table.database.workspace
             CoreHandler().check_permissions(
                 user,
@@ -2954,6 +2999,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
 
         if user:
             self._check_personal_view_access(user, view_decoration.view)
+            self._check_locked_view_config_access(user, view_decoration.view)
             workspace = view_decoration.view.table.database.workspace
             CoreHandler().check_permissions(
                 user,
@@ -3012,6 +3058,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
 
         if user:
             self._check_personal_view_access(user, view_decoration.view)
+            self._check_locked_view_config_access(user, view_decoration.view)
         workspace = view_decoration.view.table.database.workspace
         CoreHandler().check_permissions(
             user,

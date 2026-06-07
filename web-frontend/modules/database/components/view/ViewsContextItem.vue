@@ -23,6 +23,11 @@
         >
           <i class="iconoir-lock"></i>
         </div>
+        <i
+          v-if="view.locked"
+          class="iconoir-lock"
+          :title="$t('viewContext.lockedTooltip')"
+        ></i>
       </div>
     </a>
     <i
@@ -124,6 +129,20 @@ export default {
         return this.viewOwnershipType.getDeactivatedModal()
       }
       return null
+    },
+    isLockedForCurrentUser() {
+      if (!this.view.locked) return false
+      const userId = this.$store.getters['auth/getUserId']
+      if (this.view.owned_by_id === userId) return false
+      if (
+        this.$hasPermission(
+          'database.table.view.update_locked_config',
+          this.view,
+          this.database.workspace.id
+        )
+      )
+        return false
+      return true
     },
     showViewContext() {
       return (

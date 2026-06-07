@@ -43,6 +43,7 @@ from baserow.contrib.database.views.exceptions import (
     ViewGroupByFieldNotSupported,
     ViewGroupByNotInView,
     ViewGroupByNotSupported,
+    ViewIsLockedException,
     ViewNotInTable,
     ViewOwnershipTypeDoesNotExist,
     ViewSortDoesNotExist,
@@ -5459,3 +5460,98 @@ def test_prioritize_view_group_bys(send_mock, data_fixture):
         group_by_2.id,
     ]
     assert send_mock.call_args[1]["user"].id == user.id
+
+
+@pytest.mark.django_db
+def test_lock_view_sets_owned_by(data_fixture):
+    """Locking a view sets owned_by to the locking user."""
+    user = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=user)
+    database = data_fixture.create_database_application(workspace=workspace, user=user)
+    table = data_fixture.create_database_table(user=user, database=database)
+    view = data_fixture.create_grid_view(user=user, table=table)
+    handler = ViewHandler()
+
+    result = handler.update_view(user, view, locked=True)
+    assert result.updated_view_instance.locked is True
+    assert result.updated_view_instance.owned_by_id == user.id
+
+
+@pytest.mark.django_db
+def test_non_owner_editor_cannot_modify_locked_view_config(data_fixture):
+    """Editor who is not lock owner gets ViewIsLockedException on config mutation."""
+    owner = data_fixture.create_user()
+    editor = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=owner)
+    data_fixture.create_user_workspace(user=editor, workspace=workspace, permissions="MEMBER")
+    database = data_fixture.create_database_application(workspace=workspace, user=owner)
+    table = data_fixture.create_database_table(user=owner, database=database)
+    field = data_fixture.create_text_field(user=owner, table=table)
+    view = data_fixture.create_grid_view(user=owner, table=table)
+    handler = ViewHandler()
+
+    handler.update_view(owner, view, locked=True)
+    view.refresh_from_db()
+
+    with pytest.raises(ViewIsLockedException):
+        handler.create_filter(editor, view, field, "equal", "test")
+
+
+@pytest.mark.django_db
+def test_admin_can_modify_locked_view_config(data_fixture):
+    """Workspace admin can modify locked view config even if not lock owner."""
+    owner = data_fixture.create_user()
+    admin = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=owner)
+    data_fixture.create_user_workspace(
+        user=admin, workspace=workspace, permissions="ADMIN"
+    )
+    database = data_fixture.create_database_application(workspace=workspace, user=owner)
+    table = data_fixture.create_database_table(user=owner, database=database)
+    field = data_fixture.create_text_field(user=owner, table=table)
+    view = data_fixture.create_grid_view(user=owner, table=table)
+    handler = ViewHandler()
+
+    handler.update_view(owner, view, locked=True)
+    view.refresh_from_db()
+
+    # Admin can create a filter on the locked view without exception.
+    view_filter = handler.create_filter(admin, view, field, "equal", "admin_value")
+    assert view_filter.value == "admin_value"
+
+
+@pytest.mark.django_db
+def test_lock_owner_can_unlock(data_fixture):
+    """Lock owner can set locked=False."""
+    user = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=user)
+    database = data_fixture.create_database_application(workspace=workspace, user=user)
+    table = data_fixture.create_database_table(user=user, database=database)
+    view = data_fixture.create_grid_view(user=user, table=table)
+    handler = ViewHandler()
+
+    handler.update_view(user, view, locked=True)
+    view.refresh_from_db()
+    assert view.locked is True
+
+    result = handler.update_view(user, view, locked=False)
+    assert result.updated_view_instance.locked is False
+
+
+@pytest.mark.django_db
+def test_non_owner_cannot_unlock(data_fixture):
+    """Non-owner non-admin cannot set locked=False (ViewIsLockedException)."""
+    owner = data_fixture.create_user()
+    member = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=owner)
+    data_fixture.create_user_workspace(user=member, workspace=workspace, permissions="MEMBER")
+    database = data_fixture.create_database_application(workspace=workspace, user=owner)
+    table = data_fixture.create_database_table(user=owner, database=database)
+    view = data_fixture.create_grid_view(user=owner, table=table)
+    handler = ViewHandler()
+
+    handler.update_view(owner, view, locked=True)
+    view.refresh_from_db()
+
+    with pytest.raises(ViewIsLockedException):
+        handler.update_view(member, view, locked=False)
