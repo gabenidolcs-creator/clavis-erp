@@ -28,6 +28,7 @@ import { Registerable } from '@baserow/modules/core/registry'
 import { mix } from '@baserow/modules/core/mixins'
 import FieldNumberSubForm from '@baserow/modules/database/components/field/FieldNumberSubForm'
 import FieldCurrencySubForm from '@baserow/modules/database/components/field/FieldCurrencySubForm'
+import FieldPercentSubForm from '@baserow/modules/database/components/field/FieldPercentSubForm'
 import FieldAutonumberSubForm from '@baserow/modules/database/components/field/FieldAutonumberSubForm'
 import FieldDurationSubForm from '@baserow/modules/database/components/field/FieldDurationSubForm'
 import FieldRatingSubForm from '@baserow/modules/database/components/field/FieldRatingSubForm'
@@ -2001,6 +2002,31 @@ export class CurrencyFieldType extends NumberFieldType {
     if (value === null || value === undefined || value === '') return ''
     const symbol = field.currency_symbol || '$'
     const displayField = { ...field, number_prefix: symbol }
+    return formatDecimalNumber(displayField, value)
+  }
+}
+
+export class PercentFieldType extends NumberFieldType {
+  static getType() {
+    return 'percent'
+  }
+
+  static getIconClass() {
+    return 'iconoir-percentage'
+  }
+
+  getName() {
+    const { $i18n: i18n } = this.app
+    return i18n.t('fieldType.percent')
+  }
+
+  getFormComponent() {
+    return FieldPercentSubForm
+  }
+
+  toHumanReadableString(field, value, delimiter = ', ') {
+    if (value === null || value === undefined || value === '') return ''
+    const displayField = { ...field, number_suffix: '%', number_prefix: '' }
     return formatDecimalNumber(displayField, value)
   }
 }

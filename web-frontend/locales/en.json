@@ -180,7 +180,8 @@
     "multipleCollaboratorsDropdown": "Dropdown",
     "multipleCollaboratorsCheckboxes": "Checkboxes",
     "defaultValueFunctionNow": "Current date",
-    "currency": "Currency"
+    "currency": "Currency",
+    "percent": "Percent"
   },
   "fieldErrors": {
     "invalidNumber": "Invalid number",

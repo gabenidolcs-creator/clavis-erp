@@ -421,6 +421,11 @@ class CurrencyField(NumberField):
         app_label = "database"
 
 
+class PercentField(NumberField):
+    class Meta:
+        app_label = "database"
+
+
 class RatingField(Field):
     max_value = models.PositiveSmallIntegerField(
         default=5,

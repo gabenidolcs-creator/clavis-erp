@@ -240,6 +240,7 @@ from .models import (
     MultipleSelectField,
     NumberField,
     PasswordField,
+    PercentField,
     PhoneNumberField,
     RatingField,
     RollupField,
@@ -894,6 +895,19 @@ class CurrencyFieldType(NumberFieldType):
     def prepare_values(self, values, user):
         values = super().prepare_values(values, user)
         values["number_prefix"] = values.get("currency_symbol", "$") or "$"
+        return values
+
+
+class PercentFieldType(NumberFieldType):
+    type = "percent"
+    model_class = PercentField
+    _can_group_by = True
+    _can_have_db_index = True
+
+    def prepare_values(self, values, user):
+        values = super().prepare_values(values, user)
+        values["number_suffix"] = "%"
+        values["number_prefix"] = ""
         return values
 
 

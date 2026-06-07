@@ -215,6 +215,7 @@ class DatabaseConfig(AppConfig):
             MultipleSelectFieldType,
             NumberFieldType,
             PasswordFieldType,
+            PercentFieldType,
             PhoneNumberFieldType,
             RatingFieldType,
             RollupFieldType,
@@ -230,6 +231,7 @@ class DatabaseConfig(AppConfig):
         field_type_registry.register(EmailFieldType())
         field_type_registry.register(NumberFieldType())
         field_type_registry.register(CurrencyFieldType())
+        field_type_registry.register(PercentFieldType())
         field_type_registry.register(RatingFieldType())
         field_type_registry.register(BooleanFieldType())
         field_type_registry.register(DateFieldType())
