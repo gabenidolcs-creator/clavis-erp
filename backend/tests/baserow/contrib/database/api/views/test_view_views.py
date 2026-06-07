@@ -13,12 +13,9 @@ from rest_framework.status import (
     HTTP_204_NO_CONTENT,
     HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
-    HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
     HTTP_429_TOO_MANY_REQUESTS,
 )
-
-from baserow.contrib.database.views.models import OWNERSHIP_TYPE_PERSONAL
 
 from baserow.contrib.database.api.constants import PUBLIC_PLACEHOLDER_ENTITY_ID
 from baserow.contrib.database.api.rows.serializers import (
@@ -28,6 +25,7 @@ from baserow.contrib.database.api.rows.serializers import (
 from baserow.contrib.database.rows.handler import RowHandler
 from baserow.contrib.database.views.handler import ViewHandler, ViewIndexingHandler
 from baserow.contrib.database.views.models import (
+    OWNERSHIP_TYPE_PERSONAL,
     GalleryViewFieldOptions,
     GridView,
     GridViewFieldOptions,
@@ -2063,7 +2061,7 @@ def test_public_view_auth_rate_limit_returns_429(api_client, data_fixture):
 
     # 6th attempt — rate limit kicks in → 429
     response = api_client.post(url, {"password": "wrong"}, format="json")
-    assert response.status_code == 429
+    assert response.status_code == HTTP_429_TOO_MANY_REQUESTS
     assert response.json()["error"] == "ERROR_PUBLIC_VIEW_AUTH_RATE_LIMIT"
 
     cache.clear()
@@ -2075,7 +2073,6 @@ def test_public_view_auth_share_principal_hides_restricted_fields(
 ):
     """Share principal (AnonymousUser) cannot see fields with readable_by_role restriction."""
     from baserow.contrib.database.fields.models import FieldPermission
-    from baserow.contrib.database.views.handler import ViewHandler
 
     user = data_fixture.create_user()
     workspace = data_fixture.create_workspace(user=user)
@@ -2190,7 +2187,7 @@ def test_public_view_auth_rate_limit_per_slug_isolation(api_client, data_fixture
     for _ in range(5):
         api_client.post(url_a, {"password": "wrong"}, format="json")
     rate_limited = api_client.post(url_a, {"password": "wrong"}, format="json")
-    assert rate_limited.status_code == 429
+    assert rate_limited.status_code == HTTP_429_TOO_MANY_REQUESTS
 
     # slug_b is a separate counter — must still accept requests
     response_b = api_client.post(url_b, {"password": "wrong"}, format="json")

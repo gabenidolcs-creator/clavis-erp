@@ -395,3 +395,17 @@ No action items. All MEDIUM findings were doc-only and fixed inline.
 | 2026-06-06 | Story Context Engine | Story file created |
 | 2026-06-06 | claude-sonnet-4-6 | Verified all implementation pre-applied; all tests pass; story closed as review |
 | 2026-06-07 | claude-sonnet-4-6 (review) | Code review: Approved. Fixed File List (uv.lock + test count). Status → done |
+
+---
+
+### Review 2 Findings (2026-06-07, independent re-review)
+
+| Severity | Finding | Status |
+|----------|---------|--------|
+| Medium | `HTTP_429_TOO_MANY_REQUESTS` added to top-level imports but test assertions used literal `429` — dead import (ruff F401) | Fixed: replaced literals with constant |
+| Medium | `ViewHandler` imported inside `test_public_view_auth_share_principal_hides_restricted_fields` but never used (ruff F401) | Fixed: removed |
+| Low | `HTTP_403_FORBIDDEN` unused in top-level imports (left by Story 1.7), ruff F401 + I001 import sort | Fixed: removed via ruff --fix |
+
+**Outcome:** Approve. No CRITICAL/HIGH issues. 3 lint fixes applied to `test_view_views.py`. Status remains: **done**.
+
+_Reviewer: claude-sonnet-4-6 (review-2) on 2026-06-07_
