@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-06
-last_updated: 2026-06-06T21:48:00Z
+last_updated: 2026-06-06T22:04:00Z
 project: clavis-erp
 project_key: NOKEY
 tracking_system: file-system
@@ -51,7 +51,7 @@ development_status:
   1-5-field-visibility-hiding-inference-oracle-guard-and-cache-invalidation: done
   1-6-personal-views: done
   1-7-locked-views: done
-  1-8-password-protected-share-links-with-least-privilege-principal: backlog
+  1-8-password-protected-share-links-with-least-privilege-principal: done
   1-9-exports-honor-field-permissions: backlog
   epic-1-retrospective: optional
 

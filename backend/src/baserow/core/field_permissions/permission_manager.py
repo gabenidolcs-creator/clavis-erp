@@ -260,10 +260,22 @@ class FieldPermissionManagerType(PermissionManagerType):
         """
 
         actor_id = getattr(actor, "id", None)
-        if workspace is None or actor_id is None:
+        if workspace is None:
             return set()
 
         from baserow.contrib.database.fields.models import FieldPermission
+
+        if actor_id is None:
+            # Share principal (AnonymousUser): deny-by-default for any field with a
+            # readable_by_role restriction — anonymous access has no role (FR-17/33).
+            restricted_ids = (
+                FieldPermission.objects.filter(
+                    field__table__database__workspace=workspace
+                )
+                .exclude(readable_by_role__isnull=True)
+                .values_list("field_id", flat=True)
+            )
+            return set(restricted_ids)
 
         rows = list(
             FieldPermission.objects.filter(field__table__database__workspace=workspace)

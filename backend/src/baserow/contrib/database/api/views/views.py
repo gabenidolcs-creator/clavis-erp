@@ -147,11 +147,16 @@ from baserow.core.action.registries import action_type_registry
 from baserow.core.db import specific_iterator
 from baserow.core.exceptions import UserNotInWorkspace
 from baserow.core.handler import CoreHandler
+from baserow.core.utils import get_user_remote_ip_address_from_request
+from baserow.throttling.exceptions import RateLimitExceededException
+from baserow.throttling.handler import rate_limit
+from baserow.throttling.types import RateLimit
 
 from ..constants import SEARCH_MODE_API_PARAM
 from .errors import (
     ERROR_CANNOT_SHARE_VIEW_TYPE,
     ERROR_NO_AUTHORIZATION_TO_PUBLICLY_SHARED_VIEW,
+    ERROR_PUBLIC_VIEW_AUTH_RATE_LIMIT,
     ERROR_UNRELATED_FIELD,
     ERROR_VIEW_DECORATION_DOES_NOT_EXIST,
     ERROR_VIEW_DECORATION_NOT_SUPPORTED,
@@ -169,9 +174,9 @@ from .errors import (
     ERROR_VIEW_GROUP_BY_FIELD_NOT_SUPPORTED,
     ERROR_VIEW_GROUP_BY_NOT_IN_VIEW,
     ERROR_VIEW_GROUP_BY_NOT_SUPPORTED,
+    ERROR_VIEW_IS_LOCKED,
     ERROR_VIEW_NOT_IN_TABLE,
     ERROR_VIEW_OWNERSHIP_TYPE_DOES_NOT_EXIST,
-    ERROR_VIEW_IS_LOCKED,
     ERROR_VIEW_OWNERSHIP_TYPE_INCOMPATIBLE_WITH_VIEW_TYPE,
     ERROR_VIEW_SORT_DOES_NOT_EXIST,
     ERROR_VIEW_SORT_FIELD_ALREADY_EXISTS,
@@ -2152,13 +2157,13 @@ class PublicViewAuthView(APIView):
         responses={
             200: PublicViewAuthResponseSerializer,
             401: {"description": "The password provided for this view is incorrect"},
-            404: get_error_schema(["ERROR_VIEW_DOES_NOT_EXIST"]),
+            429: get_error_schema(["ERROR_PUBLIC_VIEW_AUTH_RATE_LIMIT"]),
         },
     )
     @validate_body(PublicViewAuthRequestSerializer)
     @map_exceptions(
         {
-            ViewDoesNotExist: ERROR_VIEW_DOES_NOT_EXIST,
+            RateLimitExceededException: ERROR_PUBLIC_VIEW_AUTH_RATE_LIMIT,
         }
     )
     def post(self, request: Request, slug: str, data: Dict[str, Any]) -> Response:
@@ -2173,12 +2178,24 @@ class PublicViewAuthView(APIView):
         """
 
         handler = ViewHandler()
-        view = handler.get_public_view_by_slug(
-            request.user, slug, raise_authorization_error=False
-        )
+        ip = get_user_remote_ip_address_from_request(request)
 
-        if not view.check_public_view_password(data["password"]):
-            raise AuthenticationFailed()
+        def _check():
+            try:
+                view = handler.get_public_view_by_slug(
+                    request.user, slug, raise_authorization_error=False
+                )
+            except ViewDoesNotExist:
+                raise AuthenticationFailed()
+            if not view.check_public_view_password(data["password"]):
+                raise AuthenticationFailed()
+            return view
+
+        view = rate_limit(
+            rate=RateLimit.from_string("5/m"),
+            key=f"public_view_auth:{ip}:{slug}",
+            raise_exception=True,
+        )(_check)()
 
         access_token = handler.encode_public_view_token(view)
         serializer = PublicViewAuthResponseSerializer({"access_token": access_token})

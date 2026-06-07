@@ -15,6 +15,7 @@ from rest_framework.status import (
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
+    HTTP_429_TOO_MANY_REQUESTS,
 )
 
 from baserow.contrib.database.views.models import OWNERSHIP_TYPE_PERSONAL
@@ -2010,3 +2011,189 @@ def test_patch_locked_view_filter_owner_succeeds(api_client, data_fixture):
         HTTP_AUTHORIZATION=f"JWT {token}",
     )
     assert response.status_code == HTTP_200_OK
+
+
+# ---------------------------------------------------------------------------
+# Story 1.8 — Password-Protected Share Links tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_public_view_auth_argon2_hash_stored(api_client, data_fixture):
+    """Passwords set after enabling Argon2id hasher are stored with argon2$argon2id prefix."""
+    user = data_fixture.create_user()
+    password = "correct-horse-battery"
+    view = data_fixture.create_public_password_protected_grid_view(
+        user=user, password=password
+    )
+    view.refresh_from_db()
+    assert view.public_view_password.startswith("argon2$argon2id")
+
+
+@pytest.mark.django_db
+def test_public_view_auth_nonexistent_slug_returns_401(api_client, data_fixture):
+    """Non-existent slug returns 401, not 404 — no link-existence oracle."""
+    response = api_client.post(
+        reverse("api:database:views:public_auth", kwargs={"slug": "does-not-exist"}),
+        {"password": "any-password"},
+        format="json",
+    )
+    assert response.status_code == HTTP_401_UNAUTHORIZED
+    # Must NOT reveal 404 / ERROR_VIEW_DOES_NOT_EXIST
+    assert response.json().get("error") != "ERROR_VIEW_DOES_NOT_EXIST"
+
+
+@pytest.mark.django_db
+def test_public_view_auth_rate_limit_returns_429(api_client, data_fixture):
+    """Exceeding 5 attempts per IP+slug returns 429."""
+    from django.core.cache import cache
+
+    cache.clear()
+
+    user = data_fixture.create_user()
+    view = data_fixture.create_public_password_protected_grid_view(
+        user=user, password="correct-password"
+    )
+    url = reverse("api:database:views:public_auth", kwargs={"slug": view.slug})
+
+    # 5 wrong attempts — all should return 401
+    for _ in range(5):
+        response = api_client.post(url, {"password": "wrong"}, format="json")
+        assert response.status_code == HTTP_401_UNAUTHORIZED
+
+    # 6th attempt — rate limit kicks in → 429
+    response = api_client.post(url, {"password": "wrong"}, format="json")
+    assert response.status_code == 429
+    assert response.json()["error"] == "ERROR_PUBLIC_VIEW_AUTH_RATE_LIMIT"
+
+    cache.clear()
+
+
+@pytest.mark.django_db
+def test_public_view_auth_share_principal_hides_restricted_fields(
+    api_client, data_fixture
+):
+    """Share principal (AnonymousUser) cannot see fields with readable_by_role restriction."""
+    from baserow.contrib.database.fields.models import FieldPermission
+    from baserow.contrib.database.views.handler import ViewHandler
+
+    user = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=user)
+    database = data_fixture.create_database_application(user=user, workspace=workspace)
+    table = data_fixture.create_database_table(user=user, database=database)
+    visible_field = data_fixture.create_text_field(user=user, table=table, name="visible")
+    restricted_field = data_fixture.create_text_field(
+        user=user, table=table, name="restricted"
+    )
+    FieldPermission.objects.create(field=restricted_field, readable_by_role="ADMIN")
+
+    view = data_fixture.create_grid_view(user=user, table=table, public=True)
+    password = "share-secret"
+    view.set_password(password)
+    view.save()
+
+    # Obtain a public view token
+    auth_response = api_client.post(
+        reverse("api:database:views:public_auth", kwargs={"slug": view.slug}),
+        {"password": password},
+        format="json",
+    )
+    assert auth_response.status_code == HTTP_200_OK
+    token = auth_response.json()["access_token"]
+
+    # Access public rows with the token
+    rows_url = reverse(
+        "api:database:views:grid:public_rows", kwargs={"slug": view.slug}
+    )
+    response = api_client.get(
+        rows_url,
+        format="json",
+        HTTP_BASEROW_VIEW_AUTHORIZATION=f"JWT {token}",
+    )
+    assert response.status_code == HTTP_200_OK
+    results = response.json().get("results", [])
+    # restricted field must be absent from every row
+    for row in results:
+        assert f"field_{restricted_field.id}" not in row
+
+
+@pytest.mark.django_db
+def test_public_view_auth_password_removal_reverts_to_open(api_client, data_fixture):
+    """AC #4: Clearing public_view_password="" on a public view allows access without a token."""
+    user = data_fixture.create_user()
+    view = data_fixture.create_public_password_protected_grid_view(
+        user=user, password="secret123"
+    )
+    info_url = reverse("api:database:views:public_info", kwargs={"slug": view.slug})
+
+    # Password set — access without token is denied
+    response = api_client.get(info_url, format="json")
+    assert response.status_code == HTTP_401_UNAUTHORIZED
+
+    # Remove password by setting it to empty string
+    view.public_view_password = ""
+    view.save()
+
+    # Password cleared — public view accessible without token
+    response = api_client.get(info_url, format="json")
+    assert response.status_code == HTTP_200_OK
+
+
+@pytest.mark.django_db
+def test_public_view_auth_uniform_error_body(api_client, data_fixture):
+    """Wrong password and non-existent slug both return identical 401 error body (no oracle)."""
+    from django.core.cache import cache
+
+    cache.clear()
+
+    user = data_fixture.create_user()
+    view = data_fixture.create_public_password_protected_grid_view(
+        user=user, password="correct"
+    )
+
+    wrong_password_response = api_client.post(
+        reverse("api:database:views:public_auth", kwargs={"slug": view.slug}),
+        {"password": "wrong"},
+        format="json",
+    )
+    nonexistent_response = api_client.post(
+        reverse("api:database:views:public_auth", kwargs={"slug": "no-such-slug"}),
+        {"password": "wrong"},
+        format="json",
+    )
+
+    assert wrong_password_response.status_code == HTTP_401_UNAUTHORIZED
+    assert nonexistent_response.status_code == HTTP_401_UNAUTHORIZED
+    assert wrong_password_response.json() == nonexistent_response.json()
+
+    cache.clear()
+
+
+@pytest.mark.django_db
+def test_public_view_auth_rate_limit_per_slug_isolation(api_client, data_fixture):
+    """Rate limit counters are scoped per slug — exhausting one slug does not block another."""
+    from django.core.cache import cache
+
+    cache.clear()
+
+    user = data_fixture.create_user()
+    view_a = data_fixture.create_public_password_protected_grid_view(
+        user=user, password="pass-a"
+    )
+    view_b = data_fixture.create_public_password_protected_grid_view(
+        user=user, password="pass-b"
+    )
+    url_a = reverse("api:database:views:public_auth", kwargs={"slug": view_a.slug})
+    url_b = reverse("api:database:views:public_auth", kwargs={"slug": view_b.slug})
+
+    # Exhaust rate limit on slug_a (6 wrong attempts → 429)
+    for _ in range(5):
+        api_client.post(url_a, {"password": "wrong"}, format="json")
+    rate_limited = api_client.post(url_a, {"password": "wrong"}, format="json")
+    assert rate_limited.status_code == 429
+
+    # slug_b is a separate counter — must still accept requests
+    response_b = api_client.post(url_b, {"password": "wrong"}, format="json")
+    assert response_b.status_code == HTTP_401_UNAUTHORIZED
+
+    cache.clear()

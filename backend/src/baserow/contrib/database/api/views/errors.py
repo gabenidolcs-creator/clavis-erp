@@ -1,8 +1,8 @@
 from rest_framework.status import (
     HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
-    HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
+    HTTP_429_TOO_MANY_REQUESTS,
 )
 
 ERROR_VIEW_DOES_NOT_EXIST = (
@@ -155,4 +155,9 @@ ERROR_VIEW_IS_LOCKED = (
     "ERROR_VIEW_IS_LOCKED",
     HTTP_400_BAD_REQUEST,
     "This view is locked. Only the lock owner or an Admin can modify its configuration.",
+)
+ERROR_PUBLIC_VIEW_AUTH_RATE_LIMIT = (
+    "ERROR_PUBLIC_VIEW_AUTH_RATE_LIMIT",
+    HTTP_429_TOO_MANY_REQUESTS,
+    "Too many password attempts. Please try again later.",
 )

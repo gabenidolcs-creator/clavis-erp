@@ -625,7 +625,9 @@
     "enter": "Enter",
     "error": {
       "incorrectPasswordTitle": "Incorrect password",
-      "incorrectPasswordText": "The provided password is incorrect."
+      "incorrectPasswordText": "The provided password is incorrect.",
+      "rateLimitTitle": "Too many attempts",
+      "rateLimitText": "Too many password attempts have been made. Please wait a minute before trying again."
     }
   },
   "viewFieldsContext": {

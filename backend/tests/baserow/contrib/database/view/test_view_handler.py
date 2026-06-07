@@ -5555,3 +5555,53 @@ def test_non_owner_cannot_unlock(data_fixture):
 
     with pytest.raises(ViewIsLockedException):
         handler.update_view(member, view, locked=False)
+
+
+# ---------------------------------------------------------------------------
+# Story 1.8 — FieldPermissionManagerType._hidden_field_ids for AnonymousUser
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_hidden_field_ids_anonymous_hides_restricted(data_fixture):
+    """AnonymousUser gets back all field IDs that carry a readable_by_role restriction."""
+    from django.contrib.auth.models import AnonymousUser
+
+    from baserow.contrib.database.fields.models import FieldPermission
+    from baserow.core.field_permissions.permission_manager import (
+        FieldPermissionManagerType,
+    )
+
+    owner = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=owner)
+    database = data_fixture.create_database_application(user=owner, workspace=workspace)
+    table = data_fixture.create_database_table(user=owner, database=database)
+    field = data_fixture.create_text_field(user=owner, table=table)
+    FieldPermission.objects.create(field=field, readable_by_role="ADMIN")
+
+    manager = FieldPermissionManagerType()
+    hidden = manager._hidden_field_ids(AnonymousUser(), workspace)
+
+    assert field.id in hidden
+
+
+@pytest.mark.django_db
+def test_hidden_field_ids_anonymous_no_restriction_returns_empty(data_fixture):
+    """AnonymousUser with no FieldPermission rows in workspace → empty set (no false-positives)."""
+    from django.contrib.auth.models import AnonymousUser
+
+    from baserow.core.field_permissions.permission_manager import (
+        FieldPermissionManagerType,
+    )
+
+    owner = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=owner)
+    database = data_fixture.create_database_application(user=owner, workspace=workspace)
+    table = data_fixture.create_database_table(user=owner, database=database)
+    data_fixture.create_text_field(user=owner, table=table)
+    # No FieldPermission rows created — field has no restriction
+
+    manager = FieldPermissionManagerType()
+    hidden = manager._hidden_field_ids(AnonymousUser(), workspace)
+
+    assert hidden == set()

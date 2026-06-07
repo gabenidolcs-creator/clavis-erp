@@ -128,6 +128,11 @@ async function authorizeView() {
         $i18n.t('publicViewAuthLogin.error.incorrectPasswordTitle'),
         $i18n.t('publicViewAuthLogin.error.incorrectPasswordText')
       )
+    } else if (statusCode === 429) {
+      showError(
+        $i18n.t('publicViewAuthLogin.error.rateLimitTitle'),
+        $i18n.t('publicViewAuthLogin.error.rateLimitText')
+      )
     } else {
       showError(
         $i18n.t('error.errorTitle'),
