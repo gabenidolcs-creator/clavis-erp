@@ -57,6 +57,7 @@ from baserow.contrib.database.views.handler import ViewHandler, ViewIndexingHand
 from baserow.contrib.database.views.models import (
     DEFAULT_SORT_TYPE_KEY,
     OWNERSHIP_TYPE_COLLABORATIVE,
+    OWNERSHIP_TYPE_PERSONAL,
     FormView,
     GridView,
     GridViewFieldOptions,
@@ -76,6 +77,7 @@ from baserow.contrib.database.views.row_checker import FilteredViewRows
 from baserow.contrib.database.views.signals import view_loaded
 from baserow.contrib.database.views.view_ownership_types import (
     CollaborativeViewOwnershipType,
+    PersonalViewOwnershipType,
 )
 from baserow.contrib.database.views.view_types import GridViewType
 from baserow.contrib.database.ws.views.rows.handler import ViewRealtimeRowsHandler
@@ -2532,34 +2534,50 @@ def test_can_submit_form_view_handler_with_zero_number_required(data_fixture):
 @pytest.mark.view_ownership
 def test_list_views_ownership_type(data_fixture):
     user = data_fixture.create_user()
-    table = data_fixture.create_database_table(user=user)
+    workspace = data_fixture.create_workspace(user=user)
+    database = data_fixture.create_database_application(workspace=workspace, user=user)
+    table = data_fixture.create_database_table(user=user, database=database)
+    user2 = data_fixture.create_user()
+    data_fixture.create_user_workspace(user=user2, workspace=workspace)
     handler = ViewHandler()
-    view = handler.create_view(
-        user=user,
-        table=table,
-        type_name="grid",
-        name="Test grid",
-        ownership_type=OWNERSHIP_TYPE_COLLABORATIVE,
-    )
-    view2 = handler.create_view(
-        user=user,
-        table=table,
-        type_name="grid",
-        name="Test grid",
-        ownership_type=OWNERSHIP_TYPE_COLLABORATIVE,
-    )
-    view2.ownership_type = "personal"
-    view2.save()
 
-    result = handler.list_views(user, table, "grid", False, False, False, False, 10)
-    assert len(result) == 1
+    handler.create_view(
+        user=user,
+        table=table,
+        type_name="grid",
+        name="Collaborative grid",
+        ownership_type=OWNERSHIP_TYPE_COLLABORATIVE,
+    )
+    personal_view = handler.create_view(
+        user=user,
+        table=table,
+        type_name="grid",
+        name="Personal grid",
+        ownership_type=OWNERSHIP_TYPE_COLLABORATIVE,
+    )
+    personal_view.ownership_type = OWNERSHIP_TYPE_PERSONAL
+    personal_view.owned_by = user
+    personal_view.save()
+
+    # Owner sees both collaborative and their own personal view.
+    owner_result = handler.list_views(user, table, "grid", False, False, False, False, 10)
+    assert len(owner_result) == 2
+
+    # Non-owner sees only the collaborative view.
+    non_owner_result = handler.list_views(user2, table, "grid", False, False, False, False, 10)
+    assert len(non_owner_result) == 1
+    assert non_owner_result[0].ownership_type == OWNERSHIP_TYPE_COLLABORATIVE
 
 
 @pytest.mark.django_db
 @pytest.mark.view_ownership
 def test_get_view_ownership_type(data_fixture):
     user = data_fixture.create_user()
-    table = data_fixture.create_database_table(user=user)
+    workspace = data_fixture.create_workspace(user=user)
+    database = data_fixture.create_database_application(workspace=workspace, user=user)
+    table = data_fixture.create_database_table(user=user, database=database)
+    user2 = data_fixture.create_user()
+    data_fixture.create_user_workspace(user=user2, workspace=workspace)
     handler = ViewHandler()
 
     view = handler.create_view(
@@ -2573,45 +2591,137 @@ def test_get_view_ownership_type(data_fixture):
     grid = handler.get_view_as_user(user, view.id)
     assert grid.ownership_type == OWNERSHIP_TYPE_COLLABORATIVE
 
-    view.ownership_type = "personal"
+    view.ownership_type = OWNERSHIP_TYPE_PERSONAL
+    view.owned_by = user
     view.save()
 
+    # Owner can access their own personal view.
+    personal_grid = handler.get_view_as_user(user, view.id)
+    assert personal_grid.ownership_type == OWNERSHIP_TYPE_PERSONAL
+
+    # Non-owner cannot access another user's personal view.
     with pytest.raises(PermissionDenied):
-        handler.get_view_as_user(user, view.id)
+        handler.get_view_as_user(user2, view.id)
 
 
 @pytest.mark.django_db
 @pytest.mark.view_ownership
 def test_create_view_ownership_type(data_fixture):
-    ownership_types = {"collaborative": CollaborativeViewOwnershipType()}
+    user = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=user)
+    database = data_fixture.create_database_application(workspace=workspace, user=user)
+    table = data_fixture.create_database_table(user=user, database=database)
+    handler = ViewHandler()
 
+    collaborative_view = handler.create_view(
+        user=user,
+        table=table,
+        type_name="grid",
+        name="Test grid",
+        ownership_type=OWNERSHIP_TYPE_COLLABORATIVE,
+    )
+    assert collaborative_view.ownership_type == OWNERSHIP_TYPE_COLLABORATIVE
+
+    # Personal ownership type is now registered — creation succeeds.
+    personal_view = handler.create_view(
+        user=user,
+        table=table,
+        type_name="grid",
+        name="Personal grid",
+        ownership_type=OWNERSHIP_TYPE_PERSONAL,
+    )
+    assert personal_view.ownership_type == OWNERSHIP_TYPE_PERSONAL
+    assert personal_view.owned_by == user
+
+    # Unknown type still raises.
+    ownership_types = {
+        "collaborative": CollaborativeViewOwnershipType(),
+        "personal": PersonalViewOwnershipType(),
+    }
     with patch(
         "baserow.contrib.database.views.registries.view_ownership_type_registry.registry",
         ownership_types,
     ):
-        user = data_fixture.create_user()
-        table = data_fixture.create_database_table(user=user)
-        handler = ViewHandler()
-
-        view = handler.create_view(
-            user=user,
-            table=table,
-            type_name="grid",
-            name="Test grid",
-            ownership_type=OWNERSHIP_TYPE_COLLABORATIVE,
-        )
-
-        grid = GridView.objects.first()
-        assert grid.ownership_type == OWNERSHIP_TYPE_COLLABORATIVE
-
         with pytest.raises(ViewOwnershipTypeDoesNotExist):
             handler.create_view(
                 user=user,
                 table=table,
                 type_name="grid",
                 name="grid",
-                ownership_type="personal",
+                ownership_type="unknown_type",
             )
+
+
+@pytest.mark.django_db
+@pytest.mark.view_ownership
+def test_personal_view_idor_list_filter(data_fixture):
+    """Two users in same workspace: personal view is excluded from non-owner list."""
+    user = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=user)
+    database = data_fixture.create_database_application(workspace=workspace, user=user)
+    table = data_fixture.create_database_table(user=user, database=database)
+    user2 = data_fixture.create_user()
+    data_fixture.create_user_workspace(user=user2, workspace=workspace)
+    handler = ViewHandler()
+
+    handler.create_view(
+        user=user,
+        table=table,
+        type_name="grid",
+        name="Shared",
+        ownership_type=OWNERSHIP_TYPE_COLLABORATIVE,
+    )
+    handler.create_view(
+        user=user,
+        table=table,
+        type_name="grid",
+        name="Private",
+        ownership_type=OWNERSHIP_TYPE_PERSONAL,
+    )
+
+    owner_views = handler.list_views(user, table, "grid", False, False, False, False, 10)
+    assert len(owner_views) == 2
+
+    other_views = handler.list_views(user2, table, "grid", False, False, False, False, 10)
+    assert len(other_views) == 1
+    assert other_views[0].name == "Shared"
+
+
+@pytest.mark.django_db
+@pytest.mark.view_ownership
+def test_personal_view_toggle_back_to_collaborative(data_fixture):
+    """Owner toggles personal view back to collaborative — becomes visible to others."""
+    user = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=user)
+    database = data_fixture.create_database_application(workspace=workspace, user=user)
+    table = data_fixture.create_database_table(user=user, database=database)
+    user2 = data_fixture.create_user()
+    data_fixture.create_user_workspace(user=user2, workspace=workspace)
+    handler = ViewHandler()
+
+    personal_view = handler.create_view(
+        user=user,
+        table=table,
+        type_name="grid",
+        name="Was Personal",
+        ownership_type=OWNERSHIP_TYPE_PERSONAL,
+    )
+    assert personal_view.ownership_type == OWNERSHIP_TYPE_PERSONAL
+
+    # Non-owner cannot see it yet.
+    views_before = handler.list_views(user2, table, "grid", False, False, False, False, 10)
+    assert len(views_before) == 0
+
+    # Owner toggles back to collaborative.
+    handler.update_view(user, personal_view, ownership_type=OWNERSHIP_TYPE_COLLABORATIVE)
+
+    updated = View.objects.get(pk=personal_view.pk)
+    assert updated.ownership_type == OWNERSHIP_TYPE_COLLABORATIVE
+
+    # Non-owner can now see it.
+    views_after = handler.list_views(user2, table, "grid", False, False, False, False, 10)
+    assert len(views_after) == 1
+    assert views_after[0].pk == personal_view.pk
 
 
 @pytest.mark.django_db
@@ -2660,8 +2770,8 @@ def test_duplicate_view_ownership_type(data_fixture):
     view.ownership_type = "personal"
     view.save()
 
-    with pytest.raises(PermissionDenied):
-        handler.duplicate_view(user, view)
+    # owner can duplicate their own personal view
+    handler.duplicate_view(user, view)
 
     with pytest.raises(PermissionDenied):
         handler.duplicate_view(user2, view)
@@ -2687,11 +2797,12 @@ def test_delete_view_ownership_type(data_fixture):
     view.ownership_type = "personal"
     view.save()
 
-    with pytest.raises(PermissionDenied):
-        handler.delete_view(user, view)
-
+    # non-owner blocked first (view preserved for owner check)
     with pytest.raises(PermissionDenied):
         handler.delete_view(user2, view)
+
+    # owner can delete their own personal view
+    handler.delete_view(user, view)
 
 
 @pytest.mark.django_db
@@ -2714,14 +2825,13 @@ def test_field_options_view_ownership_type(data_fixture):
     view.ownership_type = "personal"
     view.save()
 
-    with pytest.raises(PermissionDenied):
-        handler.get_field_options_as_user(user, view)
+    # owner can access field options on their personal view
+    handler.get_field_options_as_user(user, view)
 
     with pytest.raises(PermissionDenied):
         handler.get_field_options_as_user(user2, view)
 
-    with pytest.raises(PermissionDenied):
-        handler.update_field_options(view, {}, user)
+    handler.update_field_options(view, {}, user)
 
     with pytest.raises(PermissionDenied):
         handler.update_field_options(view, {}, user2)
@@ -2749,35 +2859,27 @@ def test_filters_view_ownership_type(data_fixture):
     view.ownership_type = "personal"
     view.save()
 
-    with pytest.raises(PermissionDenied):
-        handler.create_filter(user, view, field, "equal", "value")
-
+    # owner can manage filters on their personal view
+    handler.create_filter(user, view, field, "equal", "value2")
     with pytest.raises(PermissionDenied):
         handler.create_filter(user2, view, field, "equal", "value")
 
-    with pytest.raises(PermissionDenied):
-        handler.get_filter(user, filter.id)
-
+    handler.get_filter(user, filter.id)
     with pytest.raises(PermissionDenied):
         handler.get_filter(user2, filter.id)
 
-    with pytest.raises(PermissionDenied):
-        handler.list_filters(user, view.id)
-
+    handler.list_filters(user, view.id)
     with pytest.raises(PermissionDenied):
         handler.list_filters(user2, view.id)
 
-    with pytest.raises(PermissionDenied):
-        handler.update_filter(user, filter, field, "equal", "another value")
-
+    handler.update_filter(user, filter, field, "equal", "another value")
     with pytest.raises(PermissionDenied):
         handler.update_filter(user2, filter, field, "equal", "another value")
 
-    with pytest.raises(PermissionDenied):
-        handler.delete_filter(user, filter)
-
+    # test non-owner delete first (filter preserved), then owner can delete
     with pytest.raises(PermissionDenied):
         handler.delete_filter(user2, filter)
+    handler.delete_filter(user, filter)
 
 
 @pytest.mark.django_db
@@ -2801,35 +2903,26 @@ def test_sorts_view_ownership_type(data_fixture):
     view.ownership_type = "personal"
     view.save()
 
-    with pytest.raises(PermissionDenied):
-        handler.create_sort(user=user, view=view, field=field, order="ASC")
-
+    # owner can manage sorts on their personal view; non-owner is blocked
     with pytest.raises(PermissionDenied):
         handler.create_sort(user=user2, view=view, field=field, order="ASC")
 
-    with pytest.raises(PermissionDenied):
-        handler.get_sort(user, equal_sort.id)
-
+    handler.get_sort(user, equal_sort.id)
     with pytest.raises(PermissionDenied):
         handler.get_sort(user2, equal_sort.id)
 
-    with pytest.raises(PermissionDenied):
-        handler.list_sorts(user, view.id)
-
+    handler.list_sorts(user, view.id)
     with pytest.raises(PermissionDenied):
         handler.list_sorts(user2, view.id)
 
-    with pytest.raises(PermissionDenied):
-        handler.update_sort(user, equal_sort, field)
-
+    handler.update_sort(user, equal_sort, field)
     with pytest.raises(PermissionDenied):
         handler.update_sort(user2, equal_sort, field)
 
-    with pytest.raises(PermissionDenied):
-        handler.delete_sort(user, equal_sort)
-
+    # test non-owner delete first (sort preserved), then owner can delete
     with pytest.raises(PermissionDenied):
         handler.delete_sort(user2, equal_sort)
+    handler.delete_sort(user, equal_sort)
 
 
 @pytest.mark.django_db
@@ -2855,15 +2948,7 @@ def test_decorations_view_ownership_type(data_fixture):
     view.ownership_type = "personal"
     view.save()
 
-    with pytest.raises(PermissionDenied):
-        handler.create_decoration(
-            view,
-            decorator_type_name,
-            value_provider_type_name,
-            value_provider_conf,
-            user=user,
-        )
-
+    # non-owner cannot create decorations on a personal view
     with pytest.raises(PermissionDenied):
         handler.create_decoration(
             view,
@@ -2873,29 +2958,22 @@ def test_decorations_view_ownership_type(data_fixture):
             user=user2,
         )
 
-    with pytest.raises(PermissionDenied):
-        handler.get_decoration(user, decoration.id)
-
+    handler.get_decoration(user, decoration.id)
     with pytest.raises(PermissionDenied):
         handler.get_decoration(user2, decoration.id)
 
-    with pytest.raises(PermissionDenied):
-        handler.list_decorations(user, view.id)
-
+    handler.list_decorations(user, view.id)
     with pytest.raises(PermissionDenied):
         handler.list_decorations(user2, view.id)
 
-    with pytest.raises(PermissionDenied):
-        handler.update_decoration(decoration, user)
-
+    handler.update_decoration(decoration, user)
     with pytest.raises(PermissionDenied):
         handler.update_decoration(decoration, user2)
 
-    with pytest.raises(PermissionDenied):
-        handler.delete_decoration(decoration, user)
-
+    # test non-owner delete first (decoration preserved), then owner can delete
     with pytest.raises(PermissionDenied):
         handler.delete_decoration(decoration, user2)
+    handler.delete_decoration(decoration, user)
 
 
 @pytest.mark.django_db
@@ -2937,15 +3015,12 @@ def test_aggregations_view_ownership_type(data_fixture):
     view.ownership_type = "personal"
     view.save()
 
-    with pytest.raises(PermissionDenied):
-        handler.get_view_field_aggregations(user, view)
-
+    # owner can access aggregations on their personal view
+    handler.get_view_field_aggregations(user, view)
     with pytest.raises(PermissionDenied):
         handler.get_view_field_aggregations(user2, view)
 
-    with pytest.raises(PermissionDenied):
-        handler.get_field_aggregations(user, view, aggr)
-
+    handler.get_field_aggregations(user, view, aggr)
     with pytest.raises(PermissionDenied):
         handler.get_field_aggregations(user2, view, aggr)
 
@@ -2970,11 +3045,10 @@ def test_update_view_slug_ownership_type(data_fixture):
     view.ownership_type = "personal"
     view.save()
 
+    # owner can update slug on their personal view
+    handler.update_view_slug(user, view, "new-slug")
     with pytest.raises(PermissionDenied):
-        handler.update_view_slug(user, view, "new-slug")
-
-    with pytest.raises(PermissionDenied):
-        handler.update_view_slug(user2, view, "new-slug")
+        handler.update_view_slug(user2, view, "another-slug")
 
 
 @pytest.mark.django_db

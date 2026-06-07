@@ -5,11 +5,12 @@ from rest_framework.status import (
     HTTP_200_OK,
     HTTP_204_NO_CONTENT,
     HTTP_400_BAD_REQUEST,
+    HTTP_401_UNAUTHORIZED,
     HTTP_404_NOT_FOUND,
 )
 
 from baserow.contrib.database.views.handler import ViewHandler
-from baserow.contrib.database.views.models import ViewSort
+from baserow.contrib.database.views.models import OWNERSHIP_TYPE_PERSONAL, ViewSort
 from baserow.contrib.database.views.registries import view_type_registry
 
 
@@ -742,3 +743,38 @@ def test_create_view_sort_assigns_next_priority(api_client, data_fixture):
         .values_list("priority", flat=True)
     )
     assert priorities == [1, 2, 3]
+
+
+@pytest.mark.django_db
+def test_create_sort_personal_view_non_owner_returns_401(api_client, data_fixture):
+    """Non-owner POST of a sort on a personal view returns 401; owner POST succeeds."""
+    user, token = data_fixture.create_user_and_token()
+    workspace = data_fixture.create_workspace(user=user)
+    database = data_fixture.create_database_application(workspace=workspace, user=user)
+    table = data_fixture.create_database_table(user=user, database=database)
+    field = data_fixture.create_text_field(table=table)
+
+    user2, token2 = data_fixture.create_user_and_token()
+    data_fixture.create_user_workspace(user=user2, workspace=workspace)
+
+    personal_view = data_fixture.create_grid_view(
+        table=table, owned_by=user, ownership_type=OWNERSHIP_TYPE_PERSONAL
+    )
+
+    payload = {"field": field.id, "order": "ASC"}
+
+    response = api_client.post(
+        reverse("api:database:views:list_sortings", kwargs={"view_id": personal_view.id}),
+        payload,
+        format="json",
+        HTTP_AUTHORIZATION=f"JWT {token2}",
+    )
+    assert response.status_code == HTTP_401_UNAUTHORIZED
+
+    response = api_client.post(
+        reverse("api:database:views:list_sortings", kwargs={"view_id": personal_view.id}),
+        payload,
+        format="json",
+        HTTP_AUTHORIZATION=f"JWT {token}",
+    )
+    assert response.status_code == HTTP_200_OK

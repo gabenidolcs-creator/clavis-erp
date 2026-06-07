@@ -322,7 +322,10 @@ import {
   DistributionViewAggregationType,
 } from '@baserow/modules/database/viewAggregationTypes'
 import { FormViewFormModeType } from '@baserow/modules/database/formViewModeTypes'
-import { CollaborativeViewOwnershipType } from '@baserow/modules/database/viewOwnershipTypes'
+import {
+  CollaborativeViewOwnershipType,
+  PersonalViewOwnershipType,
+} from '@baserow/modules/database/viewOwnershipTypes'
 import { DatabasePlugin } from '@baserow/modules/database/plugins'
 import {
   CollaboratorAddedToRowNotificationType,
@@ -677,6 +680,10 @@ export default defineNuxtPlugin({
     $registry.register(
       'viewOwnershipType',
       new CollaborativeViewOwnershipType(context)
+    )
+    $registry.register(
+      'viewOwnershipType',
+      new PersonalViewOwnershipType(context)
     )
 
     $registry.register('field', new TextFieldType(context))

@@ -16,6 +16,8 @@ from rest_framework.status import (
     HTTP_404_NOT_FOUND,
 )
 
+from baserow.contrib.database.views.models import OWNERSHIP_TYPE_PERSONAL
+
 from baserow.contrib.database.api.constants import PUBLIC_PLACEHOLDER_ENTITY_ID
 from baserow.contrib.database.api.rows.serializers import (
     RowSerializer,
@@ -133,8 +135,9 @@ def test_list_views_ownership_type(api_client, data_fixture):
     view_1 = data_fixture.create_grid_view(
         table=table_1, order=1, ownership_type="collaborative"
     )
+    # Personal view owned by the same user — they should see it.
     view_2 = data_fixture.create_grid_view(
-        table=table_1, order=3, ownership_type="personal"
+        table=table_1, order=3, ownership_type="personal", owned_by=user
     )
 
     response = api_client.get(
@@ -145,6 +148,145 @@ def test_list_views_ownership_type(api_client, data_fixture):
     assert response.status_code == HTTP_200_OK
     response_json = response.json()
     assert len(response_json) == 2
+
+
+@pytest.mark.django_db
+def test_personal_view_idor_api(api_client, data_fixture):
+    """Non-owner GET of a personal view returns 401 (PermissionDenied → IDOR guard)."""
+    user, token = data_fixture.create_user_and_token()
+    workspace = data_fixture.create_workspace(user=user)
+    database = data_fixture.create_database_application(workspace=workspace, user=user)
+    table = data_fixture.create_database_table(user=user, database=database)
+
+    user2, token2 = data_fixture.create_user_and_token()
+    data_fixture.create_user_workspace(user=user2, workspace=workspace)
+
+    personal_view = data_fixture.create_grid_view(
+        table=table, owned_by=user, ownership_type=OWNERSHIP_TYPE_PERSONAL
+    )
+
+    # Non-owner cannot fetch personal view directly.
+    response = api_client.get(
+        reverse("api:database:views:item", kwargs={"view_id": personal_view.id}),
+        **{"HTTP_AUTHORIZATION": f"JWT {token2}"},
+    )
+    assert response.status_code == HTTP_401_UNAUTHORIZED
+
+    # Owner CAN fetch their own personal view.
+    response = api_client.get(
+        reverse("api:database:views:item", kwargs={"view_id": personal_view.id}),
+        **{"HTTP_AUTHORIZATION": f"JWT {token}"},
+    )
+    assert response.status_code == HTTP_200_OK
+    assert response.json()["ownership_type"] == OWNERSHIP_TYPE_PERSONAL
+
+
+@pytest.mark.django_db
+def test_list_views_excludes_others_personal_views(api_client, data_fixture):
+    """Non-owner list of views for a table must not include personal views owned by others."""
+    user, token = data_fixture.create_user_and_token()
+    workspace = data_fixture.create_workspace(user=user)
+    database = data_fixture.create_database_application(workspace=workspace, user=user)
+    table = data_fixture.create_database_table(user=user, database=database)
+
+    user2, token2 = data_fixture.create_user_and_token()
+    data_fixture.create_user_workspace(user=user2, workspace=workspace)
+
+    collaborative_view = data_fixture.create_grid_view(
+        table=table, order=1, ownership_type="collaborative"
+    )
+    data_fixture.create_grid_view(
+        table=table, order=2, owned_by=user, ownership_type=OWNERSHIP_TYPE_PERSONAL
+    )
+
+    response = api_client.get(
+        reverse("api:database:views:list", kwargs={"table_id": table.id}),
+        **{"HTTP_AUTHORIZATION": f"JWT {token2}"},
+    )
+
+    assert response.status_code == HTTP_200_OK
+    ids = [v["id"] for v in response.json()]
+    assert collaborative_view.id in ids
+    assert len(ids) == 1
+
+
+@pytest.mark.django_db
+def test_patch_personal_view_non_owner_returns_401(api_client, data_fixture):
+    """Non-owner PATCH of a personal view returns 401; owner PATCH succeeds."""
+    user, token = data_fixture.create_user_and_token()
+    workspace = data_fixture.create_workspace(user=user)
+    database = data_fixture.create_database_application(workspace=workspace, user=user)
+    table = data_fixture.create_database_table(user=user, database=database)
+
+    user2, token2 = data_fixture.create_user_and_token()
+    data_fixture.create_user_workspace(user=user2, workspace=workspace)
+
+    personal_view = data_fixture.create_grid_view(
+        table=table, owned_by=user, ownership_type=OWNERSHIP_TYPE_PERSONAL
+    )
+
+    response = api_client.patch(
+        reverse("api:database:views:item", kwargs={"view_id": personal_view.id}),
+        {"name": "hacked"},
+        format="json",
+        HTTP_AUTHORIZATION=f"JWT {token2}",
+    )
+    assert response.status_code == HTTP_401_UNAUTHORIZED
+
+    response = api_client.patch(
+        reverse("api:database:views:item", kwargs={"view_id": personal_view.id}),
+        {"name": "renamed"},
+        format="json",
+        HTTP_AUTHORIZATION=f"JWT {token}",
+    )
+    assert response.status_code == HTTP_200_OK
+    assert response.json()["name"] == "renamed"
+
+
+@pytest.mark.django_db
+def test_delete_personal_view_non_owner_returns_401(api_client, data_fixture):
+    """Non-owner DELETE of a personal view returns 401; owner DELETE succeeds."""
+    user, token = data_fixture.create_user_and_token()
+    workspace = data_fixture.create_workspace(user=user)
+    database = data_fixture.create_database_application(workspace=workspace, user=user)
+    table = data_fixture.create_database_table(user=user, database=database)
+
+    user2, token2 = data_fixture.create_user_and_token()
+    data_fixture.create_user_workspace(user=user2, workspace=workspace)
+
+    personal_view = data_fixture.create_grid_view(
+        table=table, owned_by=user, ownership_type=OWNERSHIP_TYPE_PERSONAL
+    )
+
+    response = api_client.delete(
+        reverse("api:database:views:item", kwargs={"view_id": personal_view.id}),
+        HTTP_AUTHORIZATION=f"JWT {token2}",
+    )
+    assert response.status_code == HTTP_401_UNAUTHORIZED
+
+    response = api_client.delete(
+        reverse("api:database:views:item", kwargs={"view_id": personal_view.id}),
+        HTTP_AUTHORIZATION=f"JWT {token}",
+    )
+    assert response.status_code == HTTP_204_NO_CONTENT
+
+
+@pytest.mark.django_db
+def test_create_personal_view_via_post(api_client, data_fixture):
+    """POST with ownership_type=personal creates a personal view owned by the caller."""
+    user, token = data_fixture.create_user_and_token()
+    table = data_fixture.create_database_table(user=user)
+
+    response = api_client.post(
+        reverse("api:database:views:list", kwargs={"table_id": table.id}),
+        {"name": "My personal grid", "type": "grid", "ownership_type": "personal"},
+        format="json",
+        HTTP_AUTHORIZATION=f"JWT {token}",
+    )
+
+    assert response.status_code == HTTP_200_OK
+    data = response.json()
+    assert data["ownership_type"] == OWNERSHIP_TYPE_PERSONAL
 
 
 @pytest.mark.django_db
@@ -692,8 +834,7 @@ def test_patch_view_validate_ownership_type_invalid_type(api_client, data_fixtur
     assert view.ownership_type == previous_ownership_type
     assert (
         response_data["detail"]["ownership_type"][0]["error"]
-        == "Ownership type must be one of the above: 'collaborative','personal'"
-        ",'restricted'."
+        == "Ownership type must be one of the above: 'collaborative','personal'."
     )
 
 

@@ -567,9 +567,13 @@ class DatabaseConfig(AppConfig):
 
         form_view_mode_registry.register(FormViewModeTypeForm())
 
-        from .views.view_ownership_types import CollaborativeViewOwnershipType
+        from .views.view_ownership_types import (
+            CollaborativeViewOwnershipType,
+            PersonalViewOwnershipType,
+        )
 
         view_ownership_type_registry.register(CollaborativeViewOwnershipType())
+        view_ownership_type_registry.register(PersonalViewOwnershipType())
 
         from .application_types import DatabaseApplicationType
 

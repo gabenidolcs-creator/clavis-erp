@@ -689,6 +689,17 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             views,
             table.database.workspace,
         )
+
+        from django.db.models import Q
+
+        from .models import OWNERSHIP_TYPE_PERSONAL
+
+        user_pk = getattr(user, "pk", None)
+        views = views.filter(
+            ~Q(ownership_type=OWNERSHIP_TYPE_PERSONAL)
+            | Q(ownership_type=OWNERSHIP_TYPE_PERSONAL, owned_by_id=user_pk)
+        )
+
         views = views.select_related(
             "content_type", "table", "table__database__workspace"
         )
@@ -834,6 +845,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         """
 
         view = self.get_view(view_id, view_model, base_queryset, table_id=table_id)
+        self._check_personal_view_access(user, view)
         CoreHandler().check_permissions(
             user,
             ReadViewOperationType.type,
@@ -841,6 +853,16 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             context=view,
         )
         return view
+
+    def _check_personal_view_access(self, user: AbstractUser, view: View) -> None:
+        """Raise PermissionDenied if view is personal and user is not the owner."""
+        from .models import OWNERSHIP_TYPE_PERSONAL
+
+        if view.ownership_type == OWNERSHIP_TYPE_PERSONAL:
+            if not hasattr(user, "id") or getattr(view, "owned_by_id", None) != user.id:
+                raise PermissionDenied(
+                    "You do not have access to this personal view."
+                )
 
     def get_view(
         self,
@@ -1024,6 +1046,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         :return: The created view instance.
         """
 
+        self._check_personal_view_access(user, original_view)
         workspace = original_view.table.database.workspace
         CoreHandler().check_permissions(
             user,
@@ -1221,12 +1244,15 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             ownership_type=first_view.ownership_type
         )
 
+        from .models import OWNERSHIP_TYPE_PERSONAL
+
         user_views = CoreHandler().filter_queryset(
             user,
             ListViewsOperationType.type,
             all_views,
             workspace=workspace,
         )
+        user_views = user_views.exclude(ownership_type=OWNERSHIP_TYPE_PERSONAL)
 
         view_ids = user_views.values_list("id", flat=True)
 
@@ -1299,6 +1325,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         if not isinstance(view, View):
             raise ValueError("The view is not an instance of View")
 
+        self._check_personal_view_access(user, view)
         workspace = view.table.database.workspace
         CoreHandler().check_permissions(
             user, DeleteViewOperationType.type, workspace=workspace, context=view
@@ -1319,6 +1346,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         :returns: View type that has get_field_options_serializer_class().
         """
 
+        self._check_personal_view_access(user, view)
         workspace = view.table.database.workspace
 
         CoreHandler().check_permissions(
@@ -1365,6 +1393,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             # Here we check the permissions only if we have a user. If the field options
             # update is triggered by user a action, we have one from the view but in
             # some situation, we have automatic processing and we don't have any user.
+            self._check_personal_view_access(user, view)
             CoreHandler().check_permissions(
                 user,
                 UpdateViewFieldOptionsOperationType.type,
@@ -1652,6 +1681,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         """
 
         view = self.get_view(view_id)
+        self._check_personal_view_access(user, view)
         workspace = view.table.database.workspace
         CoreHandler().check_permissions(
             user, ListViewFilterOperationType.type, workspace=workspace, context=view
@@ -1695,6 +1725,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
                 f"The view filter with id {view_filter_id} does not exist."
             )
 
+        self._check_personal_view_access(user, view_filter.view)
         workspace = view_filter.view.table.database.workspace
         CoreHandler().check_permissions(
             user,
@@ -1736,6 +1767,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         :return: The created view filter instance.
         """
 
+        self._check_personal_view_access(user, view)
         workspace = view.table.database.workspace
         # Inference-oracle guard (Story 1.5): filtering on a field the actor may not see
         # leaks its value through the presence/count of matching rows. Mirror the
@@ -1815,6 +1847,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         :return: The updated view filter instance.
         """
 
+        self._check_personal_view_access(user, view_filter.view)
         workspace = view_filter.view.table.database.workspace
         CoreHandler().check_permissions(
             user,
@@ -1870,6 +1903,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         :param view_filter: The view filter instance that needs to be deleted.
         """
 
+        self._check_personal_view_access(user, view_filter.view)
         workspace = view_filter.view.table.database.workspace
         CoreHandler().check_permissions(
             user,
@@ -2147,6 +2181,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         """
 
         view = ViewHandler().get_view(view_id)
+        self._check_personal_view_access(user, view)
         CoreHandler().check_permissions(
             user,
             ListViewSortOperationType.type,
@@ -2189,6 +2224,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
                 f"The view sort with id {view_sort_id} does not exist."
             )
 
+        self._check_personal_view_access(user, view_sort.view)
         workspace = view_sort.view.table.database.workspace
         CoreHandler().check_permissions(
             user, ReadViewSortOperationType.type, workspace=workspace, context=view_sort
@@ -2224,6 +2260,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
 
         field = field.specific
 
+        self._check_personal_view_access(user, view)
         workspace = view.table.database.workspace
         CoreHandler().check_permissions(
             user, ReadFieldOperationType.type, workspace=workspace, context=field
@@ -2306,6 +2343,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         if view_sort.view.trashed:
             raise ViewSortDoesNotExist(f"The view {view_sort.view.id} is trashed.")
 
+        self._check_personal_view_access(user, view_sort.view)
         workspace = view_sort.view.table.database.workspace
         field = field if field is not None else view_sort.field
         order = order if order is not None else view_sort.order
@@ -2373,6 +2411,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         :type view_sort: ViewSort
         """
 
+        self._check_personal_view_access(user, view_sort.view)
         workspace = view_sort.view.table.database.workspace
         CoreHandler().check_permissions(
             user,
@@ -2770,6 +2809,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         """
 
         if user:
+            self._check_personal_view_access(user, view)
             workspace = view.table.database.workspace
             CoreHandler().check_permissions(
                 user,
@@ -2828,6 +2868,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         """
 
         view = ViewHandler().get_view(view_id)
+        self._check_personal_view_access(user, view)
         CoreHandler().check_permissions(
             user,
             ListViewDecorationOperationType.type,
@@ -2862,6 +2903,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             view_decoration = base_queryset.select_related(
                 "view__table__database__workspace"
             ).get(pk=view_decoration_id)
+            self._check_personal_view_access(user, view_decoration.view)
             workspace = view_decoration.view.table.database.workspace
             CoreHandler().check_permissions(
                 user,
@@ -2911,6 +2953,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         """
 
         if user:
+            self._check_personal_view_access(user, view_decoration.view)
             workspace = view_decoration.view.table.database.workspace
             CoreHandler().check_permissions(
                 user,
@@ -2967,6 +3010,8 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             exists.
         """
 
+        if user:
+            self._check_personal_view_access(user, view_decoration.view)
         workspace = view_decoration.view.table.database.workspace
         CoreHandler().check_permissions(
             user,
@@ -3203,6 +3248,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         """
 
         if not skip_perm_check:
+            self._check_personal_view_access(user, view)
             CoreHandler().check_permissions(
                 user,
                 ListAggregationsViewOperationType.type,
@@ -3351,6 +3397,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         """
 
         if not skip_perm_check:
+            self._check_personal_view_access(user, view)
             CoreHandler().check_permissions(
                 user,
                 ReadAggregationsViewOperationType.type,
@@ -3470,6 +3517,7 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             support sharing.
         """
 
+        self._check_personal_view_access(user, view)
         view_type = view_type_registry.get_by_model(view.specific_class)
         if not view_type.can_share:
             raise CannotShareViewTypeError()
@@ -3534,6 +3582,11 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             raise ViewDoesNotExist("The view does not exist.") from exc
 
         if TrashHandler.item_has_a_trashed_parent(view.table, check_item_also=True):
+            raise ViewDoesNotExist("The view does not exist.")
+
+        from .models import OWNERSHIP_TYPE_PERSONAL
+
+        if view.ownership_type == OWNERSHIP_TYPE_PERSONAL and not view.public:
             raise ViewDoesNotExist("The view does not exist.")
 
         user_in_workspace = user and CoreHandler().check_permissions(

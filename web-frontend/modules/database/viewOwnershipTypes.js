@@ -191,3 +191,39 @@ export class CollaborativeViewOwnershipType extends ViewOwnershipType {
     return 'iconoir-group'
   }
 }
+
+export class PersonalViewOwnershipType extends ViewOwnershipType {
+  static getType() {
+    return 'personal'
+  }
+
+  getName() {
+    const { $i18n: i18n } = this.app
+    return i18n.t('viewOwnershipType.personal')
+  }
+
+  getDescription() {
+    const { $i18n: i18n } = this.app
+    return i18n.t('viewOwnershipType.personalDescription')
+  }
+
+  getIconClass() {
+    return 'iconoir-eye-off'
+  }
+
+  getListViewTypeSort() {
+    return 100
+  }
+
+  userCanTryCreate(table, workspaceId) {
+    return this.app.$hasPermission(
+      'database.table.create_and_use_personal_view',
+      table,
+      workspaceId
+    )
+  }
+
+  isCompatibleWithViewType(viewType) {
+    return true
+  }
+}

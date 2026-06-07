@@ -678,7 +678,9 @@
   },
   "viewOwnershipType": {
     "collaborative": "Collaborative",
-    "collaborativeDescription": "Everyone can see all the data and change the properties if they have the permissions."
+    "collaborativeDescription": "Everyone can see all the data and change the properties if they have the permissions.",
+    "personal": "Personal",
+    "personalDescription": "Only you can see this view. Other members cannot list or access it."
   },
   "galleryViewHeader": {
     "customizeCards": "Customize cards"
