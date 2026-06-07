@@ -599,8 +599,13 @@ def test_export_table_hides_permission_restricted_field(
                 HTTP_AUTHORIZATION=f"JWT {token}",
             )
         assert response.status_code == HTTP_200_OK
-        json = response.json()
-        filename = json["exported_file_name"]
+        job_id = response.json()["id"]
+        job_response = api_client.get(
+            reverse("api:database:export:get", kwargs={"job_id": job_id}),
+            format="json",
+            HTTP_AUTHORIZATION=f"JWT {token}",
+        )
+        filename = job_response.json()["exported_file_name"]
 
         file_path = tmpdir.join(settings.EXPORT_FILES_DIRECTORY, filename)
         assert file_path.isfile()
@@ -657,8 +662,13 @@ def test_export_view_hides_permission_restricted_field(
                 HTTP_AUTHORIZATION=f"JWT {token}",
             )
         assert response.status_code == HTTP_200_OK
-        json = response.json()
-        filename = json["exported_file_name"]
+        job_id = response.json()["id"]
+        job_response = api_client.get(
+            reverse("api:database:export:get", kwargs={"job_id": job_id}),
+            format="json",
+            HTTP_AUTHORIZATION=f"JWT {token}",
+        )
+        filename = job_response.json()["exported_file_name"]
 
         file_path = tmpdir.join(settings.EXPORT_FILES_DIRECTORY, filename)
         assert file_path.isfile()
@@ -697,8 +707,13 @@ def test_export_no_field_permissions_exports_all_fields(
                 HTTP_AUTHORIZATION=f"JWT {token}",
             )
         assert response.status_code == HTTP_200_OK
-        json = response.json()
-        filename = json["exported_file_name"]
+        job_id = response.json()["id"]
+        job_response = api_client.get(
+            reverse("api:database:export:get", kwargs={"job_id": job_id}),
+            format="json",
+            HTTP_AUTHORIZATION=f"JWT {token}",
+        )
+        filename = job_response.json()["exported_file_name"]
 
         file_path = tmpdir.join(settings.EXPORT_FILES_DIRECTORY, filename)
         assert file_path.isfile()

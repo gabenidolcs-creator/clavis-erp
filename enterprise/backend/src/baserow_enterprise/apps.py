@@ -75,7 +75,6 @@ class BaserowEnterpriseConfig(AppConfig):
         from .plugins import EnterprisePlugin
         from .role.member_data_types import EnterpriseRolesDataType
         from .role.operations import (
-            AssignRoleWorkspaceOperationType,
             ReadRoleApplicationOperationType,
             ReadRoleTableOperationType,
             ReadRoleViewOperationType,
@@ -127,7 +126,6 @@ class BaserowEnterpriseConfig(AppConfig):
         operation_type_registry.register(ReadTeamSubjectOperationType())
         operation_type_registry.register(ListTeamSubjectsOperationType())
         operation_type_registry.register(DeleteTeamSubjectOperationType())
-        operation_type_registry.register(AssignRoleWorkspaceOperationType())
         operation_type_registry.register(ReadRoleWorkspaceOperationType())
         operation_type_registry.register(RestoreTeamOperationType())
         operation_type_registry.register(ReadRoleApplicationOperationType())

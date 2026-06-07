@@ -59,7 +59,6 @@ class BaserowPremiumConfig(AppConfig):
             decorator_type_registry,
             decorator_value_provider_type_registry,
             form_view_mode_registry,
-            view_ownership_type_registry,
             view_type_registry,
         )
         from baserow.core.action.registries import action_type_registry
@@ -111,10 +110,6 @@ class BaserowPremiumConfig(AppConfig):
         decorator_value_provider_type_registry.register(
             ConditionalColorValueProviderType()
         )
-
-        from .views.view_ownership_types import PersonalViewOwnershipType
-
-        view_ownership_type_registry.register(PersonalViewOwnershipType())
 
         from baserow_premium.license.license_types import PremiumLicenseType
         from baserow_premium.license.registries import license_type_registry

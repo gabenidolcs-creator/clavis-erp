@@ -41,7 +41,7 @@ from baserow.core.exceptions import (
 )
 from baserow.core.rbac import roles
 from baserow.core.registries import PermissionManagerType
-from baserow.core.subjects import UserSubjectType
+from baserow.core.subjects import AnonymousUserSubjectType, UserSubjectType
 
 from .enforcement import (
     FIELD_EDIT_OPERATIONS,
@@ -53,7 +53,7 @@ from .enforcement import (
 
 class FieldPermissionManagerType(PermissionManagerType):
     type = "field_permissions"
-    supported_actor_types = [UserSubjectType.type]
+    supported_actor_types = [UserSubjectType.type, AnonymousUserSubjectType.type]
 
     def _field_ids_from_checks(self, checks):
         """Field ids of the checks that target a governed field operation.
