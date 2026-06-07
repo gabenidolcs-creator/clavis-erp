@@ -52,7 +52,7 @@ development_status:
   1-6-personal-views: done
   1-7-locked-views: done
   1-8-password-protected-share-links-with-least-privilege-principal: done
-  1-9-exports-honor-field-permissions: backlog
+  1-9-exports-honor-field-permissions: review
   epic-1-retrospective: optional
 
   # Epic 2: Richer Field Types

@@ -338,7 +338,15 @@ def _open_file_and_run_export(job: ExportJob) -> ExportJob:
     :return: An updated ExportJob instance with the exported_file_name set.
     """
 
+    from django.contrib.auth.models import AnonymousUser
+
+    from baserow.contrib.database.fields.field_permission_handler import (
+        FieldPermissionHandler,
+    )
+
     exporter: TableExporter = table_exporter_registry.get(job.exporter_type)
+    actor = job.user if job.user is not None else AnonymousUser()
+    hidden_ids = FieldPermissionHandler.get_hidden_field_ids(actor, job.table)
     exported_file_name = _generate_random_file_name_with_extension(
         exporter.file_extension
     )
@@ -360,12 +368,18 @@ def _open_file_and_run_export(job: ExportJob) -> ExportJob:
     with _create_storage_dir_if_missing_and_open(storage_location) as file:
         queryset_serializer_class = exporter.queryset_serializer_class
         if job.view is None:
-            serializer = queryset_serializer_class.for_table(job.table)
+            serializer = queryset_serializer_class.for_table(
+                job.table, hidden_field_ids=hidden_ids
+            )
         else:
             serializer, visible_fields_in_view = queryset_serializer_class.for_view(
-                job.view, visible_fields_in_order
+                job.view, visible_fields_in_order, hidden_field_ids=hidden_ids
             )
             only_by_field_ids = [f["field"].id for f in visible_fields_in_view]
+            if hidden_ids:
+                only_by_field_ids = [
+                    fid for fid in only_by_field_ids if fid not in hidden_ids
+                ]
 
         if filters is not None:
             serializer.add_ad_hoc_filters_dict_to_queryset(

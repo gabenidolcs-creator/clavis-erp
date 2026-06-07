@@ -180,20 +180,27 @@ class QuerysetSerializer(abc.ABC):
         """
 
     @classmethod
-    def for_table(cls, table) -> "QuerysetSerializer":
+    def for_table(cls, table, hidden_field_ids=None) -> "QuerysetSerializer":
         """
         Generates a queryset serializer for the provided table.
         :param table: The table to serialize.
+        :param hidden_field_ids: Optional set of field IDs to exclude from the export.
         :return: A QuerysetSerializer ready to serialize the table.
         """
 
         model = table.get_model()
         qs = model.objects.all().enhance_by_fields()
         ordered_field_objects = model._field_objects.values()
+        if hidden_field_ids:
+            ordered_field_objects = [
+                fo for fo in ordered_field_objects if fo["field"].id not in hidden_field_ids
+            ]
         return cls(qs, ordered_field_objects)
 
     @classmethod
-    def for_view(cls, view, visible_field_ids_in_order=None) -> "QuerysetSerializer":
+    def for_view(
+        cls, view, visible_field_ids_in_order=None, hidden_field_ids=None
+    ) -> "QuerysetSerializer":
         """
         Generates a queryset serializer for the provided view according to it's view
         type and any relevant view settings it might have (filters, sorts,
@@ -202,6 +209,7 @@ class QuerysetSerializer(abc.ABC):
         :param view: The view to serialize.
         :param visible_field_ids_in_order: Optionally provide a list of field IDs in
             the correct order. Only those fields will be included in the export.
+        :param hidden_field_ids: Optional set of field IDs to exclude from the export.
         :return: A QuerysetSerializer ready to serialize the table.
         """
 
@@ -222,6 +230,8 @@ class QuerysetSerializer(abc.ABC):
                 for field_id in visible_field_ids_in_order
                 if field_id in field_map
             ]
+        if hidden_field_ids:
+            fields = [fo for fo in fields if fo["field"].id not in hidden_field_ids]
         qs = ViewHandler().get_queryset(None, view, model=model)
         return cls(qs, fields), visible_field_objects_in_view
 

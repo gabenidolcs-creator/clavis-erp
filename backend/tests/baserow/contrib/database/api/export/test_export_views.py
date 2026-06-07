@@ -549,3 +549,215 @@ def test_exporting_csv_with_formatted_number_field(
             )
             with open(file_path, "r", encoding="utf-8") as written_file:
                 assert written_file.read() == expected
+
+
+# --- Story 1.9: Exports Honor Field Permissions ---
+
+
+@pytest.mark.django_db
+def test_export_table_hides_permission_restricted_field(
+    data_fixture, api_client, tmpdir, settings, django_capture_on_commit_callbacks
+):
+    """MEMBER user table export omits ADMIN-restricted field (AC #1)."""
+    from baserow.contrib.database.fields.models import FieldPermission
+    from baserow.core.rbac.handler import RbacHandler
+    from baserow.core.rbac.roles import ADMIN, EDITOR
+
+    owner = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=owner)
+    RbacHandler().assign_role(owner, workspace, ADMIN)
+    member = data_fixture.create_user()
+    data_fixture.create_user_workspace(
+        workspace=workspace, user=member, permissions="MEMBER"
+    )
+    RbacHandler().assign_role(member, workspace, EDITOR)
+    database = data_fixture.create_database_application(user=owner, workspace=workspace)
+    table = data_fixture.create_database_table(user=owner, database=database)
+    restricted_field = data_fixture.create_text_field(
+        table=table, name="restricted_field", order=0
+    )
+    open_field = data_fixture.create_text_field(table=table, name="open_field", order=1)
+    FieldPermission.objects.create(field=restricted_field, readable_by_role="ADMIN")
+
+    storage = FileSystemStorage(location=str(tmpdir), base_url="http://localhost")
+    with patch("baserow.core.storage.get_default_storage") as get_storage_mock:
+        get_storage_mock.return_value = storage
+        token = data_fixture.generate_token(member)
+        with django_capture_on_commit_callbacks(execute=True):
+            response = api_client.post(
+                reverse(
+                    "api:database:export:export_table",
+                    kwargs={"table_id": table.id},
+                ),
+                data={
+                    "exporter_type": "csv",
+                    "export_charset": "utf-8",
+                    "csv_include_header": "True",
+                    "csv_column_separator": ",",
+                },
+                format="json",
+                HTTP_AUTHORIZATION=f"JWT {token}",
+            )
+        assert response.status_code == HTTP_200_OK
+        json = response.json()
+        filename = json["exported_file_name"]
+
+        file_path = tmpdir.join(settings.EXPORT_FILES_DIRECTORY, filename)
+        assert file_path.isfile()
+        with open(file_path, "r", encoding="utf-8") as f:
+            header_line = f.readline()
+        assert "open_field" in header_line
+        assert "restricted_field" not in header_line
+
+
+@pytest.mark.django_db
+def test_export_view_hides_permission_restricted_field(
+    data_fixture, api_client, tmpdir, settings, django_capture_on_commit_callbacks
+):
+    """MEMBER user view export omits ADMIN-restricted field (AC #1)."""
+    from baserow.contrib.database.fields.models import FieldPermission
+    from baserow.core.rbac.handler import RbacHandler
+    from baserow.core.rbac.roles import ADMIN, EDITOR
+
+    owner = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=owner)
+    RbacHandler().assign_role(owner, workspace, ADMIN)
+    member = data_fixture.create_user()
+    data_fixture.create_user_workspace(
+        workspace=workspace, user=member, permissions="MEMBER"
+    )
+    RbacHandler().assign_role(member, workspace, EDITOR)
+    database = data_fixture.create_database_application(user=owner, workspace=workspace)
+    table = data_fixture.create_database_table(user=owner, database=database)
+    restricted_field = data_fixture.create_text_field(
+        table=table, name="restricted_field", order=0
+    )
+    open_field = data_fixture.create_text_field(table=table, name="open_field", order=1)
+    grid_view = data_fixture.create_grid_view(table=table)
+    FieldPermission.objects.create(field=restricted_field, readable_by_role="ADMIN")
+
+    storage = FileSystemStorage(location=str(tmpdir), base_url="http://localhost")
+    with patch("baserow.core.storage.get_default_storage") as get_storage_mock:
+        get_storage_mock.return_value = storage
+        token = data_fixture.generate_token(member)
+        with django_capture_on_commit_callbacks(execute=True):
+            response = api_client.post(
+                reverse(
+                    "api:database:export:export_table",
+                    kwargs={"table_id": table.id},
+                ),
+                data={
+                    "view_id": grid_view.id,
+                    "exporter_type": "csv",
+                    "export_charset": "utf-8",
+                    "csv_include_header": "True",
+                    "csv_column_separator": ",",
+                },
+                format="json",
+                HTTP_AUTHORIZATION=f"JWT {token}",
+            )
+        assert response.status_code == HTTP_200_OK
+        json = response.json()
+        filename = json["exported_file_name"]
+
+        file_path = tmpdir.join(settings.EXPORT_FILES_DIRECTORY, filename)
+        assert file_path.isfile()
+        with open(file_path, "r", encoding="utf-8") as f:
+            header_line = f.readline()
+        assert "open_field" in header_line
+        assert "restricted_field" not in header_line
+
+
+@pytest.mark.django_db
+def test_export_no_field_permissions_exports_all_fields(
+    data_fixture, api_client, tmpdir, settings, django_capture_on_commit_callbacks
+):
+    """No FieldPermission rows → all fields present in export (regression guard, AC #1)."""
+    user, token = data_fixture.create_user_and_token()
+    table = data_fixture.create_database_table(user=user)
+    data_fixture.create_text_field(table=table, name="field_one", order=0)
+    data_fixture.create_text_field(table=table, name="field_two", order=1)
+
+    storage = FileSystemStorage(location=str(tmpdir), base_url="http://localhost")
+    with patch("baserow.core.storage.get_default_storage") as get_storage_mock:
+        get_storage_mock.return_value = storage
+        with django_capture_on_commit_callbacks(execute=True):
+            response = api_client.post(
+                reverse(
+                    "api:database:export:export_table",
+                    kwargs={"table_id": table.id},
+                ),
+                data={
+                    "exporter_type": "csv",
+                    "export_charset": "utf-8",
+                    "csv_include_header": "True",
+                    "csv_column_separator": ",",
+                },
+                format="json",
+                HTTP_AUTHORIZATION=f"JWT {token}",
+            )
+        assert response.status_code == HTTP_200_OK
+        json = response.json()
+        filename = json["exported_file_name"]
+
+        file_path = tmpdir.join(settings.EXPORT_FILES_DIRECTORY, filename)
+        assert file_path.isfile()
+        with open(file_path, "r", encoding="utf-8") as f:
+            header_line = f.readline()
+        assert "field_one" in header_line
+        assert "field_two" in header_line
+
+
+@pytest.mark.django_db
+def test_export_anonymous_public_view_hides_restricted_field(
+    data_fixture, tmpdir, settings
+):
+    """Anonymous export job (user=None) omits ADMIN-restricted field (AC #2)."""
+    from baserow.contrib.database.export.handler import _open_file_and_run_export
+    from baserow.contrib.database.export.models import (
+        EXPORT_JOB_PENDING_STATUS,
+        ExportJob,
+    )
+    from baserow.contrib.database.fields.models import FieldPermission
+    from baserow.core.rbac.handler import RbacHandler
+    from baserow.core.rbac.roles import ADMIN
+
+    owner = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=owner)
+    RbacHandler().assign_role(owner, workspace, ADMIN)
+    database = data_fixture.create_database_application(user=owner, workspace=workspace)
+    table = data_fixture.create_database_table(user=owner, database=database)
+    restricted_field = data_fixture.create_text_field(
+        table=table, name="restricted_field", order=0
+    )
+    open_field = data_fixture.create_text_field(table=table, name="open_field", order=1)
+    public_view = data_fixture.create_grid_view(
+        table=table, public=True, allow_public_export=True
+    )
+    FieldPermission.objects.create(field=restricted_field, readable_by_role="ADMIN")
+
+    storage = FileSystemStorage(location=str(tmpdir), base_url="http://localhost")
+    with patch("baserow.core.storage.get_default_storage") as get_storage_mock:
+        get_storage_mock.return_value = storage
+        job = ExportJob.objects.create(
+            user=None,
+            table=table,
+            view=public_view,
+            exporter_type="csv",
+            state=EXPORT_JOB_PENDING_STATUS,
+            export_options={
+                "csv_include_header": True,
+                "csv_column_separator": ",",
+                "export_charset": "utf-8",
+            },
+        )
+        _open_file_and_run_export(job)
+
+        file_path = tmpdir.join(
+            settings.EXPORT_FILES_DIRECTORY, job.exported_file_name
+        )
+        assert file_path.isfile()
+        with open(file_path, "r", encoding="utf-8") as f:
+            header_line = f.readline()
+        assert "open_field" in header_line
+        assert "restricted_field" not in header_line
