@@ -27,6 +27,7 @@ import guessFormat from 'moment-guess'
 import { Registerable } from '@baserow/modules/core/registry'
 import { mix } from '@baserow/modules/core/mixins'
 import FieldNumberSubForm from '@baserow/modules/database/components/field/FieldNumberSubForm'
+import FieldCurrencySubForm from '@baserow/modules/database/components/field/FieldCurrencySubForm'
 import FieldAutonumberSubForm from '@baserow/modules/database/components/field/FieldAutonumberSubForm'
 import FieldDurationSubForm from '@baserow/modules/database/components/field/FieldDurationSubForm'
 import FieldRatingSubForm from '@baserow/modules/database/components/field/FieldRatingSubForm'
@@ -1977,6 +1978,32 @@ export class NumberFieldType extends FieldType {
 }
 
 BigNumber.config({ EXPONENTIAL_AT: NumberFieldType.getMaxNumberLength() })
+
+export class CurrencyFieldType extends NumberFieldType {
+  static getType() {
+    return 'currency'
+  }
+
+  static getIconClass() {
+    return 'baserow-icon-hashtag'
+  }
+
+  getName() {
+    const { $i18n: i18n } = this.app
+    return i18n.t('fieldType.currency')
+  }
+
+  getFormComponent() {
+    return FieldCurrencySubForm
+  }
+
+  toHumanReadableString(field, value, delimiter = ', ') {
+    if (value === null || value === undefined || value === '') return ''
+    const symbol = field.currency_symbol || '$'
+    const displayField = { ...field, number_prefix: symbol }
+    return formatDecimalNumber(displayField, value)
+  }
+}
 
 export class RatingFieldType extends FieldType {
   static getMaxNumberLength() {

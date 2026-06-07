@@ -199,6 +199,7 @@ class DatabaseConfig(AppConfig):
             CountFieldType,
             CreatedByFieldType,
             CreatedOnFieldType,
+            CurrencyFieldType,
             DateFieldType,
             DurationFieldType,
             EmailFieldType,
@@ -228,6 +229,7 @@ class DatabaseConfig(AppConfig):
         field_type_registry.register(URLFieldType())
         field_type_registry.register(EmailFieldType())
         field_type_registry.register(NumberFieldType())
+        field_type_registry.register(CurrencyFieldType())
         field_type_registry.register(RatingFieldType())
         field_type_registry.register(BooleanFieldType())
         field_type_registry.register(DateFieldType())
@@ -886,11 +888,11 @@ class DatabaseConfig(AppConfig):
             ReadViewSortOperationType,
             RestoreViewOperationType,
             RestoreViewRowCommentOperationType,
+            UpdateLockedViewConfigOperationType,
             UpdateViewDecorationOperationType,
             UpdateViewFilterGroupOperationType,
             UpdateViewFilterOperationType,
             UpdateViewGroupByOperationType,
-            UpdateLockedViewConfigOperationType,
             UpdateViewOperationType,
             UpdateViewPublicOperationType,
             UpdateViewRowCommentOperationType,

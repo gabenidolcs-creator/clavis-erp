@@ -307,6 +307,10 @@
     "defaultValueLabel": "Default value",
     "defaultValuePlaceholder": "Enter a default value"
   },
+  "fieldCurrencySubForm": {
+    "symbolLabel": "Currency symbol",
+    "symbolPlaceholder": "$"
+  },
   "fieldDurationSubForm": {
     "durationFormatLabel": "Duration format"
   },
@@ -1207,5 +1211,9 @@
   "rowEditFieldFormViewEditRow": {
     "copyLink": "Copy link",
     "noFormView": "No form view configured"
+  },
+  "fieldCurrencySubForm": {
+    "symbolLabel": "Currency symbol",
+    "symbolPlaceholder": "$"
   }
 }

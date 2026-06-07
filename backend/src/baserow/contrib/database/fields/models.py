@@ -410,6 +410,17 @@ class NumberField(Field):
         super(NumberField, self).save(*args, **kwargs)
 
 
+class CurrencyField(NumberField):
+    currency_symbol = models.CharField(
+        max_length=10,
+        default="$",
+        help_text="The currency symbol to display before the value.",
+    )
+
+    class Meta:
+        app_label = "database"
+
+
 class RatingField(Field):
     max_value = models.PositiveSmallIntegerField(
         default=5,

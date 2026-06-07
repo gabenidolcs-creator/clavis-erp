@@ -43,7 +43,7 @@ story_location: "{project-root}/_bmad-output/implementation-artifacts"
 
 development_status:
   # Epic 1: Trust & Access Foundation
-  epic-1: in-progress
+  epic-1: done
   1-1-establish-the-clean-room-process-gate: done
   1-2-rbac-role-model-and-migration: done
   1-3-role-enforcement-for-commenter-and-viewer: done
@@ -52,12 +52,12 @@ development_status:
   1-6-personal-views: done
   1-7-locked-views: done
   1-8-password-protected-share-links-with-least-privilege-principal: done
-  1-9-exports-honor-field-permissions: review
+  1-9-exports-honor-field-permissions: done
   epic-1-retrospective: optional
 
   # Epic 2: Richer Field Types
   epic-2: backlog
-  2-1-currency-field: backlog
+  2-1-currency-field: review
   2-2-percent-field: backlog
   2-3-barcode-field: backlog
   2-4-autonumber-field: backlog

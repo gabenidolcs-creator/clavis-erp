@@ -179,7 +179,8 @@
     "ai": "AI prompt",
     "multipleCollaboratorsDropdown": "Dropdown",
     "multipleCollaboratorsCheckboxes": "Checkboxes",
-    "defaultValueFunctionNow": "Current date"
+    "defaultValueFunctionNow": "Current date",
+    "currency": "Currency"
   },
   "fieldErrors": {
     "invalidNumber": "Invalid number",

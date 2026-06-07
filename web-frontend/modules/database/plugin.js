@@ -19,6 +19,7 @@ import {
   URLFieldType,
   EmailFieldType,
   LinkRowFieldType,
+  CurrencyFieldType,
   NumberFieldType,
   RatingFieldType,
   BooleanFieldType,
@@ -690,6 +691,7 @@ export default defineNuxtPlugin({
     $registry.register('field', new LongTextFieldType(context))
     $registry.register('field', new LinkRowFieldType(context))
     $registry.register('field', new NumberFieldType(context))
+    $registry.register('field', new CurrencyFieldType(context))
     $registry.register('field', new RatingFieldType(context))
     $registry.register('field', new BooleanFieldType(context))
     $registry.register('field', new DateFieldType(context))

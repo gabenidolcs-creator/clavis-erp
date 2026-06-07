@@ -223,6 +223,7 @@ from .models import (
     CountField,
     CreatedByField,
     CreatedOnField,
+    CurrencyField,
     DateField,
     DurationField,
     EmailField,
@@ -880,6 +881,33 @@ class NumberFieldType(FieldType):
             return int(Decimal(value))
 
         return float(Decimal(value))
+
+
+class CurrencyFieldType(NumberFieldType):
+    type = "currency"
+    model_class = CurrencyField
+    allowed_fields = NumberFieldType.allowed_fields + ["currency_symbol"]
+    serializer_field_names = NumberFieldType.serializer_field_names + ["currency_symbol"]
+    _can_group_by = True
+    _can_have_db_index = True
+
+    def prepare_values(self, values, user):
+        values = super().prepare_values(values, user)
+        values["number_prefix"] = values.get("currency_symbol", "$") or "$"
+        return values
+
+    def get_export_value(self, value, field_object, rich_value=False):
+        if value is None:
+            return value if rich_value else ""
+        symbol = getattr(field_object["field"], "currency_symbol", None) or "$"
+        # Map currency_symbol → number_prefix so parent formatting logic prepends it.
+        field = field_object["field"]
+        original_prefix = field.number_prefix
+        field.number_prefix = symbol
+        try:
+            return super().get_export_value(value, field_object, rich_value=rich_value)
+        finally:
+            field.number_prefix = original_prefix
 
 
 class RatingFieldType(FieldType):
