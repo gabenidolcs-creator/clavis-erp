@@ -140,3 +140,156 @@ def test_currency_field_api_round_trip(api_client, data_fixture):
     )
     assert response.status_code == 200
     assert response.json()["currency_symbol"] == "¥"
+
+
+@pytest.mark.django_db
+def test_currency_field_unauthenticated_returns_401(api_client, data_fixture):
+    table = data_fixture.create_database_table()
+    response = api_client.post(
+        f"/api/database/fields/table/{table.id}/",
+        {"name": "Budget", "type": "currency"},
+        format="json",
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_currency_field_symbol_too_long_rejected(api_client, data_fixture):
+    user, token = data_fixture.create_user_and_token()
+    table = data_fixture.create_database_table(user=user)
+    response = api_client.post(
+        f"/api/database/fields/table/{table.id}/",
+        {
+            "name": "Budget",
+            "type": "currency",
+            "currency_symbol": "TOOLONGSYMB",  # 11 chars, exceeds max_length=10
+        },
+        format="json",
+        HTTP_AUTHORIZATION=f"JWT {token}",
+    )
+    assert response.status_code == 400
+    assert "currency_symbol" in response.json()["detail"]
+
+
+@pytest.mark.django_db
+def test_currency_field_row_stores_as_decimal(data_fixture):
+    user = data_fixture.create_user()
+    table = data_fixture.create_database_table(user=user)
+    field = FieldHandler().create_field(
+        user=user,
+        table=table,
+        type_name="currency",
+        name="Price",
+        currency_symbol="€",
+        number_decimal_places=2,
+    )
+    model = table.get_model()
+    row = RowHandler().create_row(
+        user=user,
+        table=table,
+        values={f"field_{field.id}": Decimal("9.99")},
+    )
+    stored = model.objects.get(id=row.id)
+    assert getattr(stored, f"field_{field.id}") == Decimal("9.99")
+
+
+@pytest.mark.django_db
+def test_currency_field_delete_via_api(api_client, data_fixture):
+    user, token = data_fixture.create_user_and_token()
+    table = data_fixture.create_database_table(user=user)
+    response = api_client.post(
+        f"/api/database/fields/table/{table.id}/",
+        {"name": "Revenue", "type": "currency", "currency_symbol": "$"},
+        format="json",
+        HTTP_AUTHORIZATION=f"JWT {token}",
+    )
+    assert response.status_code == 200
+    field_id = response.json()["id"]
+
+    delete_response = api_client.delete(
+        f"/api/database/fields/{field_id}/",
+        HTTP_AUTHORIZATION=f"JWT {token}",
+    )
+    assert delete_response.status_code == 200
+
+    get_response = api_client.get(
+        f"/api/database/fields/{field_id}/",
+        HTTP_AUTHORIZATION=f"JWT {token}",
+    )
+    assert get_response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_currency_field_api_response_includes_number_prefix(api_client, data_fixture):
+    """prepare_values maps currency_symbol → number_prefix before save.
+    The serialized API response must expose number_prefix == currency_symbol
+    so the frontend numberField mixin renders the symbol via existing code paths."""
+    user, token = data_fixture.create_user_and_token()
+    table = data_fixture.create_database_table(user=user)
+
+    response = api_client.post(
+        f"/api/database/fields/table/{table.id}/",
+        {"name": "Cost", "type": "currency", "currency_symbol": "€"},
+        format="json",
+        HTTP_AUTHORIZATION=f"JWT {token}",
+    )
+    assert response.status_code == 200, response.json()
+    data = response.json()
+    assert data["currency_symbol"] == "€"
+    assert data["number_prefix"] == "€"
+
+
+@pytest.mark.django_db
+def test_currency_field_export_thousand_separator(data_fixture):
+    user = data_fixture.create_user()
+    table = data_fixture.create_database_table(user=user)
+    field = FieldHandler().create_field(
+        user=user,
+        table=table,
+        type_name="currency",
+        name="Revenue",
+        currency_symbol="$",
+        number_decimal_places=2,
+        number_separator="COMMA_PERIOD",
+    )
+    specific = field.specific
+    field_type = field_type_registry.get("currency")
+    field_object = {"field": specific}
+
+    result = field_type.get_export_value(Decimal("1234.56"), field_object)
+    assert result == "$1,234.56"
+
+
+@pytest.mark.django_db
+def test_currency_field_export_negative(data_fixture):
+    user = data_fixture.create_user()
+    table = data_fixture.create_database_table(user=user)
+    field = FieldHandler().create_field(
+        user=user,
+        table=table,
+        type_name="currency",
+        name="Loss",
+        currency_symbol="$",
+        number_decimal_places=2,
+    )
+    specific = field.specific
+    field_type = field_type_registry.get("currency")
+    field_object = {"field": specific}
+
+    result = field_type.get_export_value(Decimal("-99.99"), field_object)
+    assert result == "-$99.99"
+
+
+def test_currency_field_migration_is_reversible():
+    """Migration 0216 must have no irreversible RunSQL/RunPython operations."""
+    from importlib import import_module
+
+    migration_module = import_module(
+        "baserow.contrib.database.migrations"
+        ".0216_currencyfield_alter_formview_mode"
+    )
+    for op in migration_module.Migration.operations:
+        if hasattr(op, "reverse_sql"):
+            assert op.reverse_sql is not None, f"Operation {op!r} has no reverse_sql"
+        if hasattr(op, "reverse"):
+            assert op.reverse is not None, f"Operation {op!r} has no reverse function"

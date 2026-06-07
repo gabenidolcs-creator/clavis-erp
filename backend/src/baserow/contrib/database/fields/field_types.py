@@ -896,18 +896,6 @@ class CurrencyFieldType(NumberFieldType):
         values["number_prefix"] = values.get("currency_symbol", "$") or "$"
         return values
 
-    def get_export_value(self, value, field_object, rich_value=False):
-        if value is None:
-            return value if rich_value else ""
-        symbol = getattr(field_object["field"], "currency_symbol", None) or "$"
-        # Map currency_symbol → number_prefix so parent formatting logic prepends it.
-        field = field_object["field"]
-        original_prefix = field.number_prefix
-        field.number_prefix = symbol
-        try:
-            return super().get_export_value(value, field_object, rich_value=rich_value)
-        finally:
-            field.number_prefix = original_prefix
 
 
 class RatingFieldType(FieldType):

@@ -1211,9 +1211,5 @@
   "rowEditFieldFormViewEditRow": {
     "copyLink": "Copy link",
     "noFormView": "No form view configured"
-  },
-  "fieldCurrencySubForm": {
-    "symbolLabel": "Currency symbol",
-    "symbolPlaceholder": "$"
   }
 }
