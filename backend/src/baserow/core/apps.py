@@ -225,6 +225,21 @@ class CoreConfig(AppConfig):
                 )
             )
 
+        # Clean-room field-permission layer (Story 1.5, Bucket A): map the dedicated
+        # FieldVisibilityProhibitedError to HTTP 403 globally, mirroring the
+        # FieldEditProhibitedError wiring above. Raised by the inference-oracle guard when
+        # an actor below a field's readable_by_role threshold tries to filter/sort on it.
+        from baserow.api.errors import ERROR_FIELD_VISIBILITY_PROHIBITED
+        from baserow.core.exceptions import FieldVisibilityProhibitedError
+
+        if ERROR_FIELD_VISIBILITY_PROHIBITED[0] not in api_exception_registry.registry:
+            api_exception_registry.register(
+                RegisteredException(
+                    exception_class=FieldVisibilityProhibitedError,
+                    exception_error=ERROR_FIELD_VISIBILITY_PROHIBITED,
+                )
+            )
+
         from .object_scopes import (
             ApplicationObjectScopeType,
             CoreObjectScopeType,

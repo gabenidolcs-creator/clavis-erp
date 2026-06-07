@@ -18,6 +18,28 @@ if TYPE_CHECKING:
     from baserow.contrib.database.rows.models import RowHistory
 
 
+def _visibility_restricted_field_ids(table) -> Optional[List[int]]:
+    """Story 1.5: ids of fields in ``table`` that carry a visibility threshold.
+
+    Realtime row payloads are broadcast as ONE message to every subscriber of the table
+    page group — there is no per-recipient payload here — so any field with a
+    ``readable_by_role`` rule is excluded from the broadcast entirely. This guarantees a
+    below-threshold subscriber never receives a hidden value over WebSocket. Privileged
+    users still get the field on their next REST fetch (the model cache is invalidated on
+    every change), and they still receive the realtime row event itself. Returns ``None``
+    when the table has no visibility rules, preserving the unredacted fast path.
+    """
+
+    from baserow.contrib.database.fields.models import FieldPermission
+
+    ids = list(
+        FieldPermission.objects.filter(field__table=table)
+        .exclude(readable_by_role__isnull=True)
+        .values_list("field_id", flat=True)
+    )
+    return ids or None
+
+
 @receiver(row_signals.before_rows_update)
 def serialize_rows_values(
     sender,
@@ -33,6 +55,7 @@ def serialize_rows_values(
         rows,
         model,
         field_ids=updated_field_ids if serialize_only_updated_fields else None,
+        exclude_field_ids=_visibility_restricted_field_ids(table),
     )
 
 
@@ -57,7 +80,10 @@ def rows_created(
             RealtimeRowMessages.rows_created(
                 table_id=table.id,
                 serialized_rows=get_row_serializer_class(
-                    model, RowSerializer, is_response=True
+                    model,
+                    RowSerializer,
+                    is_response=True,
+                    exclude_field_ids=_visibility_restricted_field_ids(table),
                 )(rows, many=True).data,
                 metadata=row_metadata_registry.generate_and_merge_metadata_for_rows(
                     user, table, [row.id for row in rows]
@@ -103,6 +129,7 @@ def rows_updated(
                     field_ids=updated_field_ids
                     if serialize_only_updated_fields
                     else None,
+                    exclude_field_ids=_visibility_restricted_field_ids(table),
                 )(rows, many=True).data,
                 # Broadcast a list of updated fields so that the listener can take
                 # action even if the value didn't change.
@@ -139,9 +166,12 @@ def rows_ai_values_generation_error(
 
 @receiver(row_signals.before_rows_delete)
 def before_rows_delete(sender, rows, user, table, model, **kwargs):
-    return get_row_serializer_class(model, RowSerializer, is_response=True)(
-        rows, many=True
-    ).data
+    return get_row_serializer_class(
+        model,
+        RowSerializer,
+        is_response=True,
+        exclude_field_ids=_visibility_restricted_field_ids(table),
+    )(rows, many=True).data
 
 
 @receiver(row_signals.rows_deleted)

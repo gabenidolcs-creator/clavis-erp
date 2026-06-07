@@ -36,10 +36,15 @@ class FieldConstraintSerializer(serializers.ModelSerializer):
 
 
 class FieldPermissionSerializer(serializers.Serializer):
-    """Story 1.4: a field's edit-restriction rule.
+    """Story 1.4/1.5: a field's permission rule.
 
     ``editable_by_role`` is the minimum fixed-tier role allowed to edit the field's
-    values/config. ``null`` means the field is unrestricted (no rule).
+    values/config (Story 1.4). ``readable_by_role`` is the minimum fixed-tier role allowed
+    to *see* the field (Story 1.5). ``null`` on either means that half is unrestricted; a
+    rule row with both null is no rule at all.
+
+    The two are independent: ``editable_by_role`` is required on write (preserving the 1.4
+    contract); ``readable_by_role`` is optional and only changed when supplied.
     """
 
     editable_by_role = serializers.ChoiceField(
@@ -49,6 +54,17 @@ class FieldPermissionSerializer(serializers.Serializer):
         help_text=(
             "The minimum role (Viewer/Commenter/Editor/Admin) allowed to edit this "
             "field. Send null to clear the restriction (make the field unrestricted)."
+        ),
+    )
+    readable_by_role = serializers.ChoiceField(
+        choices=ROLE_CHOICES,
+        allow_null=True,
+        required=False,
+        help_text=(
+            "Story 1.5 visibility threshold: the minimum role allowed to see this field. "
+            "Roles below it never receive the field's value on any read surface and cannot "
+            "filter or sort on it. Send null to make the field visible to all. Omit to "
+            "leave the current visibility unchanged."
         ),
     )
 

@@ -143,4 +143,93 @@ describe('FieldPermissionManagerType', () => {
       type.hasPermission({}, 'database.table.field.write_values', { id: 42 }, 1)
     ).toBe(null)
   })
+
+  // Story 1.5: hidden_field_ids hides a column entirely (false for read op).
+
+  test('hides a field (false) for read op when hidden_field_ids contains it', () => {
+    const registry = testApp.getRegistry()
+    const type = registry.get('permissionManager', 'field_permissions')
+    const permissions = { hidden_field_ids: [42] }
+
+    expect(
+      type.hasPermission(
+        permissions,
+        'database.table.field.read',
+        { id: 42 },
+        1
+      )
+    ).toBe(false)
+  })
+
+  test('defers (null) for read op on a field NOT in hidden_field_ids', () => {
+    const registry = testApp.getRegistry()
+    const type = registry.get('permissionManager', 'field_permissions')
+    const permissions = { hidden_field_ids: [42] }
+
+    expect(
+      type.hasPermission(
+        permissions,
+        'database.table.field.read',
+        { id: 7 },
+        1
+      )
+    ).toBe(null)
+  })
+
+  test('hidden field write op defers (null) — hidden alone does not block writes', () => {
+    const registry = testApp.getRegistry()
+    const type = registry.get('permissionManager', 'field_permissions')
+    const permissions = { hidden_field_ids: [42] }
+
+    expect(
+      type.hasPermission(
+        permissions,
+        'database.table.field.write_values',
+        { id: 42 },
+        1
+      )
+    ).toBe(null)
+  })
+
+  test('restricted_field_ids and hidden_field_ids coexist independently', () => {
+    const registry = testApp.getRegistry()
+    const type = registry.get('permissionManager', 'field_permissions')
+    const permissions = { restricted_field_ids: [10], hidden_field_ids: [20] }
+
+    // Edit-restricted field is blocked for write, defers for read.
+    expect(
+      type.hasPermission(
+        permissions,
+        'database.table.field.write_values',
+        { id: 10 },
+        1
+      )
+    ).toBe(false)
+    expect(
+      type.hasPermission(
+        permissions,
+        'database.table.field.read',
+        { id: 10 },
+        1
+      )
+    ).toBe(null)
+
+    // Hidden field is blocked for read, defers for write.
+    expect(
+      type.hasPermission(
+        permissions,
+        'database.table.field.read',
+        { id: 20 },
+        1
+      )
+    ).toBe(false)
+    expect(
+      type.hasPermission(
+        permissions,
+        'database.table.field.write_values',
+        { id: 20 },
+        1
+      )
+    ).toBe(null)
+  })
 })

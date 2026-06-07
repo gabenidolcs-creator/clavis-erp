@@ -127,16 +127,30 @@ export class FieldPermissionManagerType extends PermissionManagerType {
    * the single source of truth and unrelated permissions are unaffected.
    */
   hasPermission(permissions, operation, context, workspaceId) {
-    const governed = [
+    const editGoverned = [
       'database.table.field.write_values',
       'database.table.field.update',
     ]
     if (
-      governed.includes(operation) &&
+      editGoverned.includes(operation) &&
       context !== null &&
       context !== undefined &&
       Array.isArray(permissions?.restricted_field_ids) &&
       permissions.restricted_field_ids.includes(context.id)
+    ) {
+      return false
+    }
+    // Story 1.5: a field below the actor's visibility threshold is hidden. The backend
+    // also returns `{ hidden_field_ids: [...] }`. Answer `false` for the per-field read
+    // op so the UI can drop the column and disable filtering/sorting on it. Everything
+    // else still DEFERS (null) — the server stays the single source of truth and a hidden
+    // field's value never reaches the client regardless of this hint.
+    if (
+      operation === 'database.table.field.read' &&
+      context !== null &&
+      context !== undefined &&
+      Array.isArray(permissions?.hidden_field_ids) &&
+      permissions.hidden_field_ids.includes(context.id)
     ) {
       return false
     }

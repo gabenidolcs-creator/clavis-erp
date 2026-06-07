@@ -65,6 +65,43 @@ def get_hidden_field_ids_for_view_user(
     return ownership_type.get_hidden_field_ids_for_user(user, view)
 
 
+def get_redacted_field_ids_for_user(
+    user: AbstractUser,
+    table,
+    view: Optional[View] = None,
+) -> Optional[Set[int]]:
+    """Story 1.5: the single set of field ids to redact from a row read for ``user``.
+
+    Unions two independent hidden-field sources into one set so every read surface applies
+    redaction identically (architecture D7 — no per-surface ad-hoc hiding):
+
+    - **Field-permission visibility** (Story 1.5): fields whose ``readable_by_role``
+      threshold is above the actor's effective role, via the central
+      ``FieldPermissionHandler.get_hidden_field_ids`` redactor. Applies whether or not a
+      view is involved — the critical gap the viewless list-rows path otherwise leaves
+      open.
+    - **View-ownership hiding** (pre-existing): fields hidden by the view, when a view is
+      supplied.
+
+    Returns ``None`` when nothing is hidden, so callers can pass it straight to
+    ``exclude_field_ids`` / ``only_search_by_field_ids`` and keep the unredacted fast path
+    unchanged.
+    """
+
+    from baserow.contrib.database.fields.field_permission_handler import (
+        FieldPermissionHandler,
+    )
+
+    hidden: Set[int] = set(FieldPermissionHandler.get_hidden_field_ids(user, table))
+
+    if view is not None:
+        view_hidden = get_hidden_field_ids_for_view_user(user, view)
+        if view_hidden:
+            hidden.update(view_hidden)
+
+    return hidden or None
+
+
 def get_view_filtered_queryset(
     user: AbstractUser,
     view: Type[View],

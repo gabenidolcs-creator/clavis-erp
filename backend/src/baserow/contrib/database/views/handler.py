@@ -1737,6 +1737,14 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         """
 
         workspace = view.table.database.workspace
+        # Inference-oracle guard (Story 1.5): filtering on a field the actor may not see
+        # leaks its value through the presence/count of matching rows. Mirror the
+        # create_sort guard so the field-permission manager can 403 a hidden field. Runs
+        # before the create-filter permission so a hidden field is rejected regardless of
+        # whether the actor may otherwise create filters.
+        CoreHandler().check_permissions(
+            user, ReadFieldOperationType.type, workspace=workspace, context=field
+        )
         CoreHandler().check_permissions(
             user,
             CreateViewFilterOperationType.type,
@@ -1818,6 +1826,12 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
         type_name = type_name if type_name is not None else view_filter.type
         field = field if field is not None else view_filter.field
         value = value if value is not None else view_filter.value
+        # Inference-oracle guard (Story 1.5): an update that points the filter at a field
+        # the actor may not see would leak its value through match presence/count. Check
+        # read permission on the effective (possibly newly-assigned) field.
+        CoreHandler().check_permissions(
+            user, ReadFieldOperationType.type, workspace=workspace, context=field
+        )
         view_filter_type = view_filter_type_registry.get(type_name)
         field_type = field_type_registry.get_by_model(field.specific_class)
 

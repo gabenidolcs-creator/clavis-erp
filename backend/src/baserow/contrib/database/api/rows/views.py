@@ -78,7 +78,7 @@ from baserow.contrib.database.api.views.errors import (
     ERROR_VIEW_FILTER_TYPE_UNSUPPORTED_FIELD,
 )
 from baserow.contrib.database.api.views.utils import (
-    get_hidden_field_ids_for_view_user,
+    get_redacted_field_ids_for_user,
     serialize_single_row_metadata,
 )
 from baserow.contrib.database.field_rules.collector import CascadeUpdatedRows
@@ -425,6 +425,7 @@ class RowsView(APIView):
             for link_row_join in link_row_joins
         }
 
+        view = None
         if view_id:
             view_handler = ViewHandler()
             view = view_handler.get_view_as_user(
@@ -450,6 +451,14 @@ class RowsView(APIView):
             )
             queryset = model.objects.all().enhance_by_fields(**field_kwargs)
 
+        # Story 1.5: redact fields the user may not see. Computed centrally (permission
+        # visibility unioned with any view-ownership hiding) so this viewless list path
+        # applies redaction exactly like the other surfaces. exclude_field_ids overrides
+        # the include= selection in the serializer, so a hidden field can't be requested
+        # back by name; search is restricted to visible fields so a hit/no-hit can't leak
+        # a hidden value (inference oracle).
+        hidden_field_ids = get_redacted_field_ids_for_user(request.user, table, view)
+
         adhoc_filters = AdHocFilters.from_request(
             request, user_field_names=user_field_names
         )
@@ -457,7 +466,18 @@ class RowsView(APIView):
             queryset = adhoc_filters.apply_to_queryset(model, queryset)
 
         if search:
-            queryset = queryset.search_all_fields(search, search_mode=search_mode)
+            only_search_by_field_ids = None
+            if hidden_field_ids:
+                only_search_by_field_ids = [
+                    field_id
+                    for field_id in model._field_objects.keys()
+                    if field_id not in hidden_field_ids
+                ]
+            queryset = queryset.search_all_fields(
+                search,
+                search_mode=search_mode,
+                only_search_by_field_ids=only_search_by_field_ids,
+            )
 
         if order_by:
             queryset = queryset.order_by_fields_string(order_by, user_field_names)
@@ -469,6 +489,7 @@ class RowsView(APIView):
             RowSerializer,
             is_response=True,
             field_ids=[f.id for f in fields] if fields else None,
+            exclude_field_ids=hidden_field_ids,
             user_field_names=user_field_names,
             field_kwargs=field_kwargs,
         )
@@ -630,9 +651,7 @@ class RowsView(APIView):
         except ValidationError as e:
             raise RequestBodyValidationException(detail=e.message)
 
-        hidden_field_ids = (
-            get_hidden_field_ids_for_view_user(request.user, view) if view else None
-        )
+        hidden_field_ids = get_redacted_field_ids_for_user(request.user, table, view)
         serializer_class = get_row_serializer_class(
             model,
             RowSerializer,
@@ -868,9 +887,7 @@ class RowView(APIView):
         model = table.get_model()
         row = RowHandler().get_row(request.user, table, row_id, model, view=view)
 
-        hidden_field_ids = (
-            get_hidden_field_ids_for_view_user(request.user, view) if view else None
-        )
+        hidden_field_ids = get_redacted_field_ids_for_user(request.user, table, view)
         serializer_class = get_row_serializer_class(
             model,
             RowSerializer,
@@ -1043,9 +1060,7 @@ class RowView(APIView):
         except ValidationError as exc:
             raise RequestBodyValidationException(detail=exc.message) from exc
 
-        hidden_field_ids = (
-            get_hidden_field_ids_for_view_user(request.user, view) if view else None
-        )
+        hidden_field_ids = get_redacted_field_ids_for_user(request.user, table, view)
         serializer_class = get_row_serializer_class(
             model,
             RowSerializer,
@@ -1425,9 +1440,7 @@ class BatchRowsView(APIView):
         except ValidationError as exc:
             raise RequestBodyValidationException(detail=exc.message)
 
-        hidden_field_ids = (
-            get_hidden_field_ids_for_view_user(request.user, view) if view else None
-        )
+        hidden_field_ids = get_redacted_field_ids_for_user(request.user, table, view)
         response_row_serializer_class = get_row_serializer_class(
             model,
             RowSerializer,
@@ -1590,9 +1603,7 @@ class BatchRowsView(APIView):
         except ValidationError as e:
             raise RequestBodyValidationException(detail=e.message)
 
-        hidden_field_ids = (
-            get_hidden_field_ids_for_view_user(request.user, view) if view else None
-        )
+        hidden_field_ids = get_redacted_field_ids_for_user(request.user, table, view)
         response_row_serializer_class = get_row_serializer_class(
             model,
             RowSerializer,
@@ -1847,9 +1858,7 @@ class RowAdjacentView(APIView):
         if adjacent_row is None:
             return Response(status=HTTP_204_NO_CONTENT)
 
-        hidden_field_ids = (
-            get_hidden_field_ids_for_view_user(request.user, view) if view else None
-        )
+        hidden_field_ids = get_redacted_field_ids_for_user(request.user, table, view)
         serializer_class = get_row_serializer_class(
             model,
             RowSerializer,

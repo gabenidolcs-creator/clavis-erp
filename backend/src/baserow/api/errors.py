@@ -62,6 +62,16 @@ ERROR_FIELD_EDIT_PROHIBITED = (
     HTTP_403_FORBIDDEN,
     "You are not allowed to edit this restricted field.",
 )
+# Story 1.5: distinct 403 for a field read/visibility restriction. Raised by the
+# inference-oracle guard when an actor below a field's readable_by_role threshold tries to
+# create/update a view filter or sort referencing the hidden field. Mapped globally via
+# api_exception_registry; MRO precedence ensures FieldVisibilityProhibitedError wins over
+# the PermissionException → 401 catch-all. (Normal redaction omits silently — no error.)
+ERROR_FIELD_VISIBILITY_PROHIBITED = (
+    "ERROR_FIELD_VISIBILITY_PROHIBITED",
+    HTTP_403_FORBIDDEN,
+    "You are not allowed to access this hidden field.",
+)
 ERROR_MAX_LOCKS_PER_TRANSACTION_EXCEEDED = (
     "MAX_LOCKS_PER_TRANSACTION_EXCEEDED",
     HTTP_400_BAD_REQUEST,

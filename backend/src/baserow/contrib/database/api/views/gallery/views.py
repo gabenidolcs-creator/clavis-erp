@@ -46,8 +46,8 @@ from baserow.contrib.database.api.views.gallery.serializers import (
 )
 from baserow.contrib.database.api.views.serializers import FieldOptionsField
 from baserow.contrib.database.api.views.utils import (
-    get_hidden_field_ids_for_view_user,
     get_public_view_authorization_token,
+    get_redacted_field_ids_for_user,
     parse_limit_linked_items_params,
 )
 from baserow.contrib.database.fields.exceptions import (
@@ -220,7 +220,9 @@ class GalleryViewView(APIView):
         search_mode = query_params.get("search_mode")
 
         model = view.table.get_model()
-        hidden_field_ids = get_hidden_field_ids_for_view_user(request.user, view)
+        hidden_field_ids = get_redacted_field_ids_for_user(
+            request.user, view.table, view
+        )
 
         only_search_by_field_ids = None
         if hidden_field_ids:

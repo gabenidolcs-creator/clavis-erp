@@ -57,9 +57,9 @@ from baserow.contrib.database.api.views.grid.serializers import (
 )
 from baserow.contrib.database.api.views.serializers import FieldOptionsField
 from baserow.contrib.database.api.views.utils import (
-    get_hidden_field_ids_for_view_user,
     get_public_view_authorization_token,
     get_public_view_filtered_queryset,
+    get_redacted_field_ids_for_user,
     get_view_filtered_queryset,
     paginate_and_serialize_queryset,
     serialize_group_by_fields_metadata,
@@ -249,7 +249,9 @@ class GridViewView(APIView):
         field_ids = get_include_exclude_field_ids(
             view.table, include_fields, exclude_fields
         )
-        hidden_field_ids = get_hidden_field_ids_for_view_user(request.user, view)
+        hidden_field_ids = get_redacted_field_ids_for_user(
+            request.user, view.table, view
+        )
 
         queryset = get_view_filtered_queryset(
             request.user,
@@ -356,7 +358,9 @@ class GridViewView(APIView):
             view.table,
             view,
         )
-        hidden_field_ids = get_hidden_field_ids_for_view_user(request.user, view)
+        hidden_field_ids = get_redacted_field_ids_for_user(
+            request.user, view.table, view
+        )
 
         model = view.table.get_model(field_ids=data["field_ids"])
         results = model.objects.filter(pk__in=data["row_ids"])

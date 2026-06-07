@@ -1047,11 +1047,31 @@ class FieldPermission(models.Model):
     editable_by_role = models.CharField(
         max_length=32,
         choices=ROLE_CHOICES,
+        null=True,
+        blank=True,
+        default=None,
         help_text=(
             "The minimum fixed-tier role (Viewer/Commenter/Editor/Admin) allowed to "
             "edit this field's values and config. Effective roles below this threshold "
-            "are denied writes (HTTP 403) but keep read access. Absence of a row means "
-            "the field is unrestricted."
+            "are denied writes (HTTP 403) but keep read access. Null/absent means the "
+            "field is not edit-restricted (Story 1.5 allows a read-restricted field "
+            "that carries no edit restriction, so the two thresholds are independent). "
+            "Absence of a row means the field is fully unrestricted."
+        ),
+    )
+    readable_by_role = models.CharField(
+        max_length=32,
+        choices=ROLE_CHOICES,
+        null=True,
+        blank=True,
+        default=None,
+        help_text=(
+            "Story 1.5 read/visibility threshold: the minimum fixed-tier role "
+            "(Viewer/Commenter/Editor/Admin) allowed to *see* this field. Effective "
+            "roles below this threshold never receive the field's value on any read "
+            "surface (views, search, REST, WebSocket) and cannot filter or sort on it. "
+            "Null/absent (the default) means the field is visible to all — purely "
+            "additive, independent of editable_by_role."
         ),
     )
 
@@ -1061,5 +1081,6 @@ class FieldPermission(models.Model):
     def __str__(self):
         return (
             f"<FieldPermission field={self.field_id} "
-            f"editable_by_role={self.editable_by_role}>"
+            f"editable_by_role={self.editable_by_role} "
+            f"readable_by_role={self.readable_by_role}>"
         )

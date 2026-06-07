@@ -111,6 +111,37 @@ class FieldEditProhibitedError(PermissionException):
             )
 
 
+class FieldVisibilityProhibitedError(PermissionException):
+    """
+    Raised when a field carries a ``FieldPermission`` read/visibility restriction
+    (Story 1.5, ``readable_by_role``) and the actor's effective role is below the field's
+    threshold, AND the actor tries to *act on* the hidden field in a way that would leak
+    its value — i.e. creating or updating a view filter or sort that references it (the
+    inference-oracle guard).
+
+    A normal row read that merely *contains* a hidden field does NOT raise this — the
+    redaction path silently omits the field. Only the filter/sort guard raises.
+
+    Distinct from the generic ``PermissionDenied``/``PermissionException`` so the API can
+    map it to **HTTP 403** (``ERROR_FIELD_VISIBILITY_PROHIBITED``) via the global
+    ``api_exception_registry``, while the catch-all permission denial stays 401. MRO
+    most-specific-first resolution guarantees this subclass wins over the
+    ``PermissionException`` catch-all.
+    """
+
+    def __init__(self, actor=None, *args, **kwargs):
+        if actor:
+            super().__init__(
+                f"{actor} is prohibited from seeing this hidden field.",
+                *args,
+                **kwargs,
+            )
+        else:
+            super().__init__(
+                "Accessing this hidden field is prohibited.", *args, **kwargs
+            )
+
+
 class WorkspaceDoesNotExist(Exception):
     """Raised when trying to get a workspace that does not exist."""
 

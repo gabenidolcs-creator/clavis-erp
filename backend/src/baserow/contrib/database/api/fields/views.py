@@ -261,8 +261,18 @@ class FieldsView(APIView):
                 request.user, view, base_field_queryset
             )
 
+        # Story 1.5: drop fields the user may not see so the column never renders and no
+        # filter/sort option references it. Uses the same central redactor every read
+        # surface consumes — there is no separate fields-list visibility rule.
+        fields_queryset = base_field_queryset.filter(table=table)
+        hidden_field_ids = FieldPermissionHandler.get_hidden_field_ids(
+            request.user, table
+        )
+        if hidden_field_ids:
+            fields_queryset = fields_queryset.exclude(id__in=hidden_field_ids)
+
         fields = specific_iterator(
-            base_field_queryset.filter(table=table),
+            fields_queryset,
             per_content_type_queryset_hook=(
                 lambda field, queryset: field_type_registry.get_by_model(
                     field
@@ -851,7 +861,13 @@ class FieldPermissionView(APIView):
     def _serialize(self, field) -> Dict[str, Any]:
         permission = FieldPermissionHandler.get_field_permission(field)
         editable_by_role = permission.editable_by_role if permission else None
-        return FieldPermissionSerializer({"editable_by_role": editable_by_role}).data
+        readable_by_role = permission.readable_by_role if permission else None
+        return FieldPermissionSerializer(
+            {
+                "editable_by_role": editable_by_role,
+                "readable_by_role": readable_by_role,
+            }
+        ).data
 
     @extend_schema(
         parameters=[
@@ -927,7 +943,10 @@ class FieldPermissionView(APIView):
     @validate_body(FieldPermissionSerializer)
     def patch(self, request: Request, field_id: int, data: Dict[str, Any]) -> Response:
         field = FieldHandler().get_field(field_id)
-        FieldPermissionHandler.set_field_permission(
-            request.user, field, data["editable_by_role"]
-        )
+        set_kwargs = {"editable_by_role": data["editable_by_role"]}
+        if "readable_by_role" in data:
+            # Only touch visibility when the client supplied it (Story 1.5); otherwise
+            # leave the existing threshold unchanged.
+            set_kwargs["readable_by_role"] = data["readable_by_role"]
+        FieldPermissionHandler.set_field_permission(request.user, field, **set_kwargs)
         return Response(self._serialize(field))

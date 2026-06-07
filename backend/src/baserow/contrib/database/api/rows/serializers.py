@@ -81,7 +81,12 @@ class BatchUpdateRowsSerializer(serializers.Serializer):
 
 
 def serialize_rows_for_response(
-    rows, model, user_field_names=False, many=True, field_ids=None
+    rows,
+    model,
+    user_field_names=False,
+    many=True,
+    field_ids=None,
+    exclude_field_ids=None,
 ):
     return get_row_serializer_class(
         model,
@@ -89,6 +94,7 @@ def serialize_rows_for_response(
         is_response=True,
         user_field_names=user_field_names,
         field_ids=field_ids,
+        exclude_field_ids=exclude_field_ids,
     )(rows, many=many).data
 
 
