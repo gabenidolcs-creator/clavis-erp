@@ -4,7 +4,7 @@ baseline_commit: 7a1669e9202c58ae0c02fb485f0f90b648943fae
 
 # Story 1.9: Exports Honor Field Permissions
 
-Status: review
+Status: done
 
 ## Story
 
@@ -203,7 +203,56 @@ claude-sonnet-4-6
 - `backend/src/baserow/contrib/database/export/file_writer.py` (UPDATE)
 - `backend/src/baserow/contrib/database/export/handler.py` (UPDATE)
 - `backend/tests/baserow/contrib/database/api/export/test_export_views.py` (UPDATE — add 4 new tests)
+- `backend/src/baserow/core/field_permissions/permission_manager.py` (UPDATE — QA fix: add AnonymousUserSubjectType to supported_actor_types)
+- `premium/backend/src/baserow_premium/apps.py` (UPDATE — QA fix: remove double-registered PersonalViewOwnershipType)
+- `enterprise/backend/src/baserow_enterprise/apps.py` (UPDATE — QA fix: remove double-registered AssignRoleWorkspaceOperationType)
 
 ## Change Log
 
 - 2026-06-06: Story 1.9 implemented — export field permission enforcement wired into `_open_file_and_run_export`, `for_table`, `for_view`; 4 tests added.
+- 2026-06-06: QA fixes — AnonymousUser bypass in FieldPermissionManagerType fixed; double-registration bugs in premium/enterprise apps removed; export test GET-after-callback pattern corrected; all 14 tests pass.
+
+## Senior Developer Review (AI)
+
+**Reviewer:** gabenidolcs | **Date:** 2026-06-06 | **Outcome:** Approved
+
+### Checklist
+- [x] Story file loaded from `_bmad-output/implementation-artifacts/1-9-exports-honor-field-permissions.md`
+- [x] Story Status verified as reviewable (review)
+- [x] Epic and Story IDs resolved (1.9)
+- [x] Story Context located
+- [x] Architecture/standards docs referenced in Dev Notes
+- [x] Tech stack detected: Django/DRF, pytest-django, export pipeline
+- [x] Acceptance Criteria cross-checked against implementation
+- [x] File List reviewed and validated for completeness (3 files added)
+- [x] Tests identified and mapped to ACs; all 4 tests verified passing (14/14 total)
+- [x] Code quality review performed on changed files
+- [x] Security review performed on changed files
+- [x] Outcome decided: **Approved**
+- [x] Review notes appended
+- [x] Change Log updated
+- [x] Status updated to `done`
+- [x] Sprint status synced
+
+### Findings
+
+**MEDIUM-1 (FIXED):** Three code files modified in story commits were absent from the story File List:
+- `backend/src/baserow/core/field_permissions/permission_manager.py`
+- `premium/backend/src/baserow_premium/apps.py`
+- `enterprise/backend/src/baserow_enterprise/apps.py`
+
+All three added to File List above.
+
+**LOW-1 (informational):** `FieldPermissionManagerType.supported_actor_types` change (adding `AnonymousUserSubjectType.type`) has broader scope than just the export path — it affects all anonymous-actor field permission checks. The change is architecturally correct and necessary for AC2. No action required.
+
+### Code Quality Summary
+
+- `file_writer.py`: Clean `hidden_field_ids=None` param addition to `for_table()` and `for_view()`. Filter correctly applied post-resolution. Return value `visible_field_objects_in_view` intentionally left unfiltered (caller handles `only_by_field_ids` post-filter).
+- `handler.py`: Local imports follow codebase circular-import avoidance pattern. Actor derivation (`job.user or AnonymousUser()`) is correct. `only_by_field_ids` post-filter prevents hidden field IDs from leaking into ad-hoc filter/sort scope.
+- `permission_manager.py`: Security fix — `AnonymousUser` no longer bypasses field permission enforcement. Critical for AC2 correctness.
+- `premium/enterprise apps.py`: Cleanup of double-registrations from prior story migrations. Correctly removes stale registrations.
+
+### AC Verification
+
+- **AC1 (Export field redaction):** Verified. `for_table()` and `for_view()` filter on `hidden_field_ids`; `_open_file_and_run_export` computes via central `FieldPermissionHandler.get_hidden_field_ids()`. Tests 3.1, 3.2, 3.3 cover this.
+- **AC2 (Anonymous/public export):** Verified. `AnonymousUser()` actor path now correctly routed through `FieldPermissionManagerType` (fix in permission_manager.py). Test 3.4 covers this.

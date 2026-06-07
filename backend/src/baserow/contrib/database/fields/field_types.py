@@ -897,7 +897,6 @@ class CurrencyFieldType(NumberFieldType):
         return values
 
 
-
 class RatingFieldType(FieldType):
     type = "rating"
     model_class = RatingField
