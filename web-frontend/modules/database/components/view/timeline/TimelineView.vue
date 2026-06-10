@@ -12,7 +12,7 @@
             <span class="timeline-view__tick-label">{{ tick.label }}</span>
           </div>
         </div>
-        <div class="timeline-view__rows">
+        <div ref="rowsTrack" class="timeline-view__rows">
           <div
             v-for="row in scheduledRows"
             :key="'lane-' + row.id"
@@ -20,9 +20,21 @@
           >
             <div
               class="timeline-view__bar"
+              :class="{
+                'timeline-view__bar--draggable': canDragBars,
+                'timeline-view__bar--dragging': row._.dragging,
+              }"
               :style="barStyle(row)"
               @click="rowClick(row)"
+              @mousedown="onBarMouseDown(row, 'move', $event)"
             >
+              <div
+                v-if="canDragBars"
+                class="timeline-view__resize-handle timeline-view__resize-handle--start"
+                @mousedown.stop.prevent="
+                  onBarMouseDown(row, 'resize-start', $event)
+                "
+              ></div>
               <RowCard
                 :fields="cardFields"
                 :row="row"
@@ -30,6 +42,13 @@
                 :cover-image-field="coverImageField"
                 class="timeline-view__card"
               ></RowCard>
+              <div
+                v-if="canDragBars"
+                class="timeline-view__resize-handle timeline-view__resize-handle--end"
+                @mousedown.stop.prevent="
+                  onBarMouseDown(row, 'resize-end', $event)
+                "
+              ></div>
             </div>
           </div>
         </div>
@@ -313,6 +332,77 @@ export function barGeometry(start, end, rangeStart, totalUnits, timescale) {
   }
 }
 
+/**
+ * Snaps a continuous horizontal pixel drag to a whole number of timescale
+ * units. `axisWidthPx` is the pixel width of the bar track, `totalUnits` the
+ * number of timescale units it spans, so `unitPx = axisWidthPx / totalUnits`
+ * is the pixels-per-unit and `Math.round(deltaPx / unitPx)` is how many whole
+ * units the cursor has travelled. Returns `0` (no-op) when either denominator
+ * is non-positive so a missing track measurement never divides by zero. Kept
+ * pure so the unit tests assert the maths without a DOM. (Story 3.7)
+ */
+export function pixelsToUnits(deltaPx, axisWidthPx, totalUnits) {
+  if (axisWidthPx <= 0 || totalUnits <= 0) {
+    return 0
+  }
+  const unitPx = axisWidthPx / totalUnits
+  return Math.round(deltaPx / unitPx)
+}
+
+/**
+ * The date-value builder for a move/resize: parses `oldValue` in the user's
+ * local frame (the SAME frame `parseTimelineValue` positions bars in — never
+ * `moment.utc`, so a shifted bar lands on the unit the user sees even across a
+ * month/DST boundary), shifts it by `deltaUnits` of `unit`, then serialises it
+ * back into the canonical store shape: a date-only field returns `YYYY-MM-DD`;
+ * a datetime field returns a UTC ISO string preserving its original time-of-day
+ * (only the date part moves). Returns `null` for an empty origin value (a
+ * scheduled bar always has both dates, but guard anyway). The round-trip
+ * invariant `parseTimelineValue(shiftDateValue(field, v, n, unit))` equals
+ * `parseTimelineValue(v).add(n, unit)`. (Story 3.7, mirrors 3.5 dateValueForDay)
+ */
+export function shiftDateValue(field, oldValue, deltaUnits, unit) {
+  const m = parseTimelineValue(oldValue)
+  if (m === null) {
+    return null
+  }
+  m.add(deltaUnits, unit)
+  if (!field.date_include_time) {
+    return m.format('YYYY-MM-DD')
+  }
+  return m.utc().format()
+}
+
+/**
+ * Keeps a resize from inverting the bar by clamping `deltaUnits` so the dragged
+ * endpoint never crosses the opposite one. The minimum bar is a single unit
+ * (start and end snapped into the same unit), matching `barGeometry`'s
+ * reversed-range → 1-unit clamp. `resize-start` may move the start right at most
+ * onto the end's unit (positive delta clamped to the whole-unit span); dragging
+ * it left to grow the bar is unbounded. `resize-end` is the mirror: it may move
+ * the end left at most onto the start's unit (negative delta clamped to the
+ * negated span); dragging right to grow is unbounded. Returns the clamped
+ * integer delta (0 ⇒ the caller treats it as a no-op). (Story 3.7)
+ */
+export function clampResizeUnits(mode, oldStart, oldEnd, deltaUnits, unit) {
+  const start = parseTimelineValue(oldStart)
+  const end = parseTimelineValue(oldEnd)
+  if (start === null || end === null) {
+    return 0
+  }
+  const startSnap = moment(start).startOf(unit)
+  const endSnap = moment(end).startOf(unit)
+  // Whole units between start and end (>= 0 for a normal, non-reversed bar).
+  const span = Math.max(0, endSnap.diff(startSnap, unit))
+  if (mode === 'resize-start') {
+    // New start at most onto the end's unit (delta <= span); growing left free.
+    // `+ 0` normalises a `-0` result to `0`.
+    return Math.min(deltaUnits, span) + 0
+  }
+  // resize-end: new end at most onto the start's unit (delta >= -span).
+  return Math.max(deltaUnits, -span) + 0
+}
+
 export default {
   name: 'TimelineView',
   components: { RowCard, RowEditModal },
@@ -347,6 +437,18 @@ export default {
   data() {
     return {
       showHiddenFieldsInRowModal: false,
+      // While a pointer-drag is active this holds
+      // `{ row, mode, startX, deltaUnits }` where
+      // `mode ∈ { 'move', 'resize-start', 'resize-end' }`; `null` when idle.
+      dragState: null,
+      // Transient pixel offset applied to the dragged bar during a `move` for
+      // visual feedback only — never written to the store. Cleared on release.
+      dragVisualPx: 0,
+      // Bar-track pixel width cached on `mousedown` (the px→unit denominator).
+      axisWidthCache: 0,
+      // Set true once a drag actually moves so the trailing `@click` does not
+      // also open the row modal; consumed and cleared by `rowClick`.
+      suppressClick: false,
     }
   },
   computed: {
@@ -385,6 +487,23 @@ export default {
     },
     timescale() {
       return this.view.timescale || 'month'
+    },
+    /**
+     * Whether the bars expose a move/resize affordance. Mirrors
+     * `KanbanView.canDrag` / Calendar `canDragDate`, but a timeline move writes
+     * BOTH date cells so it requires BOTH `start_date_field` and
+     * `end_date_field` to be present AND writable for the current user. A
+     * read-only view, an unconfigured field, or either date field being
+     * non-writable disables the affordance; Epic 1's field-permission layer
+     * remains the authoritative server-side backstop. (AC #5)
+     */
+    canDragBars() {
+      if (this.readOnly || !this.startDateField || !this.endDateField) {
+        return false
+      }
+      return [this.startDateField, this.endDateField].every((field) =>
+        this.$registry.get('field', field.type).canWriteFieldValues(field)
+      )
     },
     today() {
       return moment.tz(getUserTimeZone())
@@ -476,6 +595,12 @@ export default {
       this.populateAndEditRow(this.row)
     }
   },
+  beforeUnmount() {
+    // Leak guard: a drag in flight when the view unmounts would otherwise leave
+    // the document-level listeners attached.
+    window.removeEventListener('mousemove', this.onMouseMove)
+    window.removeEventListener('mouseup', this.onMouseUp)
+  },
   methods: {
     /**
      * The inline style positioning a row's bar on the axis. Delegates to the
@@ -494,7 +619,171 @@ export default {
         this.totalUnits,
         this.timescale
       )
-      return { left: `${left}%`, width: `${width}%` }
+      const style = { left: `${left}%`, width: `${width}%` }
+      // During an active `move` drag, translate the bar by the raw pixel delta
+      // for live feedback. This is a local style only — the store value (and
+      // therefore the committed position) is untouched until release.
+      if (
+        this.dragState &&
+        this.dragState.mode === 'move' &&
+        this.dragState.row &&
+        this.dragState.row.id === row.id &&
+        this.dragVisualPx !== 0
+      ) {
+        style.transform = `translateX(${this.dragVisualPx}px)`
+      }
+      return style
+    },
+    /**
+     * The pixel width of the bar track — the denominator that converts a pixel
+     * drag into whole timescale units. The axis and the rows share the same
+     * horizontal extent; the rows track has zero horizontal padding.
+     */
+    axisWidthPx() {
+      return this.$refs.rowsTrack?.clientWidth || 0
+    },
+    /**
+     * Starts a pointer-drag on a bar. `mode` is `move` (bar body) or
+     * `resize-start`/`resize-end` (an edge handle). Bails when the bars are not
+     * draggable. Caches the track width, seeds `dragState`, flags the row as
+     * dragging, and attaches the `document`-level move/up listeners so the drag
+     * keeps tracking when the cursor leaves the bar. (AC #1, #2, #5)
+     */
+    onBarMouseDown(row, mode, event) {
+      // Only a primary-button press starts a drag, and only when the bars are
+      // draggable. A non-primary button or a non-draggable bar (read-only view
+      // or a non-writable date field) attaches no listeners and prevents no
+      // default — the click falls through to open the row as before.
+      if (event.button !== 0 || !this.canDragBars) {
+        return
+      }
+      // Suppress native text-selection/focus for the duration of a real drag
+      // only (the bar's `@mousedown` carries no `.prevent` so a read-only bar's
+      // default behaviour is untouched).
+      event.preventDefault()
+      this.axisWidthCache = this.axisWidthPx()
+      this.dragState = { row, mode, startX: event.clientX, deltaUnits: 0 }
+      this.dragVisualPx = 0
+      this.suppressClick = false
+      row._.dragging = true
+      window.addEventListener('mousemove', this.onMouseMove)
+      window.addEventListener('mouseup', this.onMouseUp)
+    },
+    /**
+     * Tracks the cursor during a drag, converting the accumulated pixel delta
+     * into whole timescale units. Stores the snapped `deltaUnits` on
+     * `dragState` and (for a move) the raw pixel offset for the transient
+     * visual. No request fires during the move. Once the drag actually moves a
+     * unit, `suppressClick` is set so the trailing click does not open the row.
+     */
+    onMouseMove(event) {
+      if (!this.dragState) {
+        return
+      }
+      const deltaPx = event.clientX - this.dragState.startX
+      const deltaUnits = pixelsToUnits(
+        deltaPx,
+        this.axisWidthCache,
+        this.totalUnits
+      )
+      this.dragState.deltaUnits = deltaUnits
+      if (this.dragState.mode === 'move') {
+        this.dragVisualPx = deltaPx
+      }
+      if (deltaUnits !== 0) {
+        this.suppressClick = true
+      }
+    },
+    /**
+     * Ends a drag: detaches the listeners, clears the drag state and the
+     * transient offset, and commits when the cursor moved a non-zero number of
+     * units. A zero-unit release (dropped where it started) is a no-op — no
+     * request, no flicker (AC #1/#2). Re-checks `canDragBars` before committing
+     * in case permission changed mid-drag. Move → atomic two-field commit;
+     * resize → single-field commit.
+     */
+    onMouseUp() {
+      window.removeEventListener('mousemove', this.onMouseMove)
+      window.removeEventListener('mouseup', this.onMouseUp)
+      const state = this.dragState
+      this.dragState = null
+      this.dragVisualPx = 0
+      if (state && state.row) {
+        state.row._.dragging = false
+      }
+      if (!state || !state.row || state.deltaUnits === 0) {
+        return
+      }
+      if (!this.canDragBars) {
+        return
+      }
+      if (state.mode === 'move') {
+        this.onCommitMove(state.row, state.deltaUnits)
+      } else {
+        this.onCommitResize(state.row, state.mode, state.deltaUnits)
+      }
+    },
+    /**
+     * Commits a move: shifts BOTH date cells by the same delta (preserving the
+     * span) and writes them in ONE `updateRowValues` (plural) dispatch so the
+     * change is a single `batchUpdate` → one WebSocket broadcast (AC #3) → one
+     * rollback unit (AC #4). The optimistic write re-positions the bar
+     * reactively via the `barStyle` computed; a failure rolls both cells back
+     * together and surfaces via `notifyIf`. (AC #1)
+     */
+    async onCommitMove(row, deltaUnits) {
+      const unit = timelineUnit(this.timescale)
+      const startField = this.startDateField
+      const endField = this.endDateField
+      const oldStart = row[`field_${startField.id}`]
+      const oldEnd = row[`field_${endField.id}`]
+      const newStart = shiftDateValue(startField, oldStart, deltaUnits, unit)
+      const newEnd = shiftDateValue(endField, oldEnd, deltaUnits, unit)
+      try {
+        await this.$store.dispatch(
+          this.storePrefix + 'view/timeline/updateRowValues',
+          {
+            table: this.table,
+            view: this.view,
+            fields: this.fields,
+            row,
+            values: { [startField.id]: newStart, [endField.id]: newEnd },
+            oldValues: { [startField.id]: oldStart, [endField.id]: oldEnd },
+          }
+        )
+      } catch (error) {
+        notifyIf(error, 'field')
+      }
+    },
+    /**
+     * Commits a resize: clamps the delta so the bar never inverts (minimum
+     * 1-unit bar), then writes ONLY the dragged endpoint through the existing
+     * single-field `updateValue` path — the opposite cell is untouched (AC #2).
+     * A clamp that collapses the move to zero units is a no-op.
+     */
+    async onCommitResize(row, mode, deltaUnits) {
+      const unit = timelineUnit(this.timescale)
+      const startField = this.startDateField
+      const endField = this.endDateField
+      const oldStart = row[`field_${startField.id}`]
+      const oldEnd = row[`field_${endField.id}`]
+      const clamped = clampResizeUnits(mode, oldStart, oldEnd, deltaUnits, unit)
+      if (clamped === 0) {
+        return
+      }
+      let field
+      let value
+      let oldValue
+      if (mode === 'resize-start') {
+        field = startField
+        oldValue = oldStart
+        value = shiftDateValue(startField, oldStart, clamped, unit)
+      } else {
+        field = endField
+        oldValue = oldEnd
+        value = shiftDateValue(endField, oldEnd, clamped, unit)
+      }
+      await this.updateValue({ field, row, value, oldValue })
     },
     async updateValue({ field, row, value, oldValue }) {
       try {
@@ -515,6 +804,13 @@ export default {
       }
     },
     rowClick(row) {
+      // A pointer-drag fires a trailing `click` after `mouseup`; if the drag
+      // actually moved, swallow it so the modal does not open. A plain click
+      // (no drag) leaves `suppressClick` false and opens the row as before.
+      if (this.suppressClick) {
+        this.suppressClick = false
+        return
+      }
       this.$refs.rowEditModal.show(row.id)
       this.$emit('selected-row', row)
     },

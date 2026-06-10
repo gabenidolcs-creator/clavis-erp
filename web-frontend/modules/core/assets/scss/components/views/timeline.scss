@@ -65,8 +65,57 @@
   cursor: pointer;
 }
 
+// A bar offers a grab affordance only when the view is editable and both date
+// fields are writable (Story 3.7 `canDragBars`). Overrides the default
+// `cursor: pointer` set on `.timeline-view__bar` above.
+.timeline-view__bar--draggable {
+  cursor: grab;
+}
+
+// While a pointer-drag is in flight the bar is raised above its neighbours and
+// shows the grabbing cursor.
+.timeline-view__bar--dragging {
+  z-index: 2;
+  cursor: grabbing;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  opacity: 0.9;
+}
+
+// The two edge handles that start a resize. Absolutely positioned thin strips
+// inside the bar; each captures its own `mousedown` (`pointer-events: auto`)
+// while the bar body keeps handling the move/click elsewhere. Visible on hover.
+.timeline-view__resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  z-index: 1;
+  cursor: ew-resize;
+  opacity: 0;
+  pointer-events: auto;
+
+  .timeline-view__bar:hover & {
+    opacity: 1;
+  }
+}
+
+.timeline-view__resize-handle--start {
+  left: 0;
+}
+
+.timeline-view__resize-handle--end {
+  right: 0;
+}
+
 .timeline-view__card {
   width: 100%;
+}
+
+// The card inside a bar must not swallow the bar's move `mousedown` / click or
+// the edge handles' presses — let those events fall through to the bar body and
+// handles. The tray card (`--tray`) keeps its own pointer events for its click.
+.timeline-view__bar .timeline-view__card {
+  pointer-events: none;
 }
 
 .timeline-view__card--tray {

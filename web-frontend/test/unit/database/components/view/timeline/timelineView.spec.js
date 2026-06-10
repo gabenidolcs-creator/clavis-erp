@@ -10,6 +10,9 @@ import TimelineView, {
   axisUnitCount,
   computeTicks,
   barGeometry,
+  pixelsToUnits,
+  shiftDateValue,
+  clampResizeUnits,
 } from '@baserow/modules/database/components/view/timeline/TimelineView'
 import TimelineViewHeader from '@baserow/modules/database/components/view/timeline/TimelineViewHeader'
 
@@ -530,5 +533,310 @@ describe('TimelineViewHeader dispatch', () => {
     const vm = makeVm({ hasPermission: false })
     await vm.orderFieldOptions({ order: [5, 6] })
     expect(vm.dispatched[0].payload.readOnly).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Story 3.7 — Reschedule and resize Timeline bars
+// ---------------------------------------------------------------------------
+
+// pixelsToUnits snaps a continuous pixel drag to whole timescale units; the
+// denominator is the bar-track width / the unit count. Guards divide-by-zero.
+describe('pixelsToUnits', () => {
+  // 300px track over 3 units → 100px per unit.
+  test('a full unit-width delta is one unit', () => {
+    expect(pixelsToUnits(100, 300, 3)).toBe(1)
+    expect(pixelsToUnits(200, 300, 3)).toBe(2)
+  })
+
+  test('rounds a partial unit to the nearest whole unit', () => {
+    expect(pixelsToUnits(40, 300, 3)).toBe(0) // 0.4 → 0
+    expect(pixelsToUnits(60, 300, 3)).toBe(1) // 0.6 → 1
+    expect(pixelsToUnits(50, 300, 3)).toBe(1) // 0.5 → 1 (round half up)
+  })
+
+  test('a negative delta moves the bar backwards', () => {
+    expect(pixelsToUnits(-100, 300, 3)).toBe(-1)
+    expect(pixelsToUnits(-200, 300, 3)).toBe(-2)
+  })
+
+  test('returns 0 when a denominator is non-positive (no divide-by-zero)', () => {
+    expect(pixelsToUnits(150, 0, 3)).toBe(0)
+    expect(pixelsToUnits(150, 300, 0)).toBe(0)
+    expect(pixelsToUnits(150, -10, 3)).toBe(0)
+  })
+})
+
+// shiftDateValue is the date-value builder. The round-trip keystone:
+// parseTimelineValue(shiftDateValue(field, v, n, unit)) === parse(v).add(n, unit).
+describe('shiftDateValue', () => {
+  const dateOnly = { date_include_time: false }
+  const dateTime = { date_include_time: true }
+
+  test('shifts a date-only value by whole days/weeks/months', () => {
+    expect(shiftDateValue(dateOnly, '2026-06-10', 3, 'day')).toBe('2026-06-13')
+    expect(shiftDateValue(dateOnly, '2026-06-10', 1, 'isoWeek')).toBe(
+      '2026-06-17'
+    )
+    expect(shiftDateValue(dateOnly, '2026-06-10', -2, 'day')).toBe('2026-06-08')
+  })
+
+  test('a month shift snaps to the shorter month end (boundary keystone)', () => {
+    // Jan 31 + 1 month → Feb 28 (moment clamps to the month end).
+    expect(shiftDateValue(dateOnly, '2026-01-31', 1, 'month')).toBe(
+      '2026-02-28'
+    )
+  })
+
+  test('date-only round-trips through parseTimelineValue in the local frame', () => {
+    const result = shiftDateValue(dateOnly, '2026-06-10', 5, 'day')
+    const expected = parseTimelineValue('2026-06-10').add(5, 'day')
+    expect(parseTimelineValue(result).isSame(expected, 'day')).toBe(true)
+  })
+
+  test('a datetime value preserves its time-of-day and only moves the date', () => {
+    const old = '2026-06-10T08:30:00Z'
+    const result = shiftDateValue(dateTime, old, 2, 'day')
+    const expected = parseTimelineValue(old).add(2, 'day')
+    // Same instant as the original shifted by 2 days — time-of-day carried.
+    expect(parseTimelineValue(result).isSame(expected)).toBe(true)
+  })
+
+  test('returns null for an empty origin value', () => {
+    expect(shiftDateValue(dateOnly, '', 1, 'day')).toBe(null)
+    expect(shiftDateValue(dateOnly, null, 1, 'day')).toBe(null)
+  })
+})
+
+// clampResizeUnits keeps a resize from inverting the bar (minimum 1-unit bar).
+describe('clampResizeUnits', () => {
+  // A 2-day span: start 2026-06-10, end 2026-06-12.
+  const start = '2026-06-10'
+  const end = '2026-06-12'
+
+  test('resize-start dragged right past the end clamps to a 1-unit bar', () => {
+    // delta 5 would put the start beyond the end → clamped to the span (2),
+    // landing the start on the end's unit (a single-unit bar).
+    expect(clampResizeUnits('resize-start', start, end, 5, 'day')).toBe(2)
+  })
+
+  test('resize-start dragged left to grow the bar passes through unchanged', () => {
+    expect(clampResizeUnits('resize-start', start, end, -3, 'day')).toBe(-3)
+  })
+
+  test('resize-end dragged left past the start clamps to a 1-unit bar', () => {
+    expect(clampResizeUnits('resize-end', start, end, -5, 'day')).toBe(-2)
+  })
+
+  test('resize-end dragged right to grow the bar passes through unchanged', () => {
+    expect(clampResizeUnits('resize-end', start, end, 4, 'day')).toBe(4)
+  })
+
+  test('an in-bounds resize is unchanged', () => {
+    expect(clampResizeUnits('resize-start', start, end, 1, 'day')).toBe(1)
+  })
+
+  test('a 1-unit bar cannot be shrunk further in either direction', () => {
+    expect(clampResizeUnits('resize-start', start, start, 3, 'day')).toBe(0)
+    expect(clampResizeUnits('resize-end', start, start, -3, 'day')).toBe(0)
+  })
+
+  test('returns 0 when either endpoint is empty', () => {
+    expect(clampResizeUnits('resize-start', '', end, 2, 'day')).toBe(0)
+    expect(clampResizeUnits('resize-end', start, '', 2, 'day')).toBe(0)
+  })
+})
+
+// canDragBars gates the move/resize affordance: editable view AND both date
+// fields present and writable. Driven at the computed level (no mount).
+describe('TimelineView.canDragBars (AC #5)', () => {
+  const writableField = (id) => ({ id, type: 'date', _writable: true })
+  const lockedField = (id) => ({ id, type: 'date', _writable: false })
+
+  const makeVm = ({
+    readOnly = false,
+    startDateField = writableField(5),
+    endDateField = writableField(6),
+  } = {}) => {
+    const vm = {
+      readOnly,
+      startDateField,
+      endDateField,
+      $registry: {
+        get: () => ({ canWriteFieldValues: (f) => f._writable }),
+      },
+    }
+    Object.defineProperty(vm, 'canDragBars', {
+      get: TimelineView.computed.canDragBars,
+    })
+    return vm
+  }
+
+  test('true when the view is editable and both date fields are writable', () => {
+    expect(makeVm().canDragBars).toBe(true)
+  })
+
+  test('false when the view is read-only', () => {
+    expect(makeVm({ readOnly: true }).canDragBars).toBe(false)
+  })
+
+  test('false when either date field is unset', () => {
+    expect(makeVm({ startDateField: null }).canDragBars).toBe(false)
+    expect(makeVm({ endDateField: null }).canDragBars).toBe(false)
+  })
+
+  test('false when EITHER date field is not writable', () => {
+    expect(makeVm({ startDateField: lockedField(5) }).canDragBars).toBe(false)
+    expect(makeVm({ endDateField: lockedField(6) }).canDragBars).toBe(false)
+  })
+})
+
+// The commit handlers reuse the existing optimistic store paths: a MOVE writes
+// both date cells in one plural `updateRowValues`; a RESIZE writes only the
+// dragged endpoint via the single-field `updateValue`. Driven at method level.
+describe('TimelineView move/resize commit (AC #1, #2, #3)', () => {
+  const startField = { id: 5, type: 'date', date_include_time: false }
+  const endField = { id: 6, type: 'date', date_include_time: false }
+
+  const makeVm = ({ dispatch = null } = {}) => {
+    const dispatched = []
+    const recordingDispatch = (action, payload) => {
+      dispatched.push({ action, payload })
+      return Promise.resolve()
+    }
+    const vm = {
+      storePrefix: 'page/',
+      table: { id: 1 },
+      view: { id: 2 },
+      fields: [startField, endField],
+      timescale: 'day',
+      startDateField: startField,
+      endDateField: endField,
+      dispatched,
+      $store: { dispatch: dispatch || recordingDispatch },
+    }
+    vm.updateValue = TimelineView.methods.updateValue.bind(vm)
+    vm.onCommitMove = TimelineView.methods.onCommitMove.bind(vm)
+    vm.onCommitResize = TimelineView.methods.onCommitResize.bind(vm)
+    return vm
+  }
+
+  test('onCommitMove writes BOTH cells in ONE updateRowValues, preserving the span (AC #1/#3)', async () => {
+    const vm = makeVm()
+    const row = { id: 10, field_5: '2026-06-10', field_6: '2026-06-12' }
+    await vm.onCommitMove(row, 2)
+
+    expect(vm.dispatched).toHaveLength(1)
+    expect(vm.dispatched[0].action).toBe('page/view/timeline/updateRowValues')
+    expect(vm.dispatched[0].payload.values).toEqual({
+      5: '2026-06-12',
+      6: '2026-06-14',
+    })
+    expect(vm.dispatched[0].payload.oldValues).toEqual({
+      5: '2026-06-10',
+      6: '2026-06-12',
+    })
+    // Duration preserved: 2-day span before and after the move.
+    const span = parseTimelineValue(vm.dispatched[0].payload.values[6]).diff(
+      parseTimelineValue(vm.dispatched[0].payload.values[5]),
+      'day'
+    )
+    expect(span).toBe(2)
+  })
+
+  test('a failed move is caught and surfaced via notifyIf (AC #4)', async () => {
+    const notifyIf = vi.fn()
+    const rejectingDispatch = () => Promise.reject({ handler: { notifyIf } })
+    const vm = makeVm({ dispatch: rejectingDispatch })
+    await expect(
+      vm.onCommitMove(
+        { id: 1, field_5: '2026-06-10', field_6: '2026-06-12' },
+        1
+      )
+    ).resolves.toBeUndefined()
+    expect(notifyIf).toHaveBeenCalledWith('field')
+  })
+
+  test('onCommitResize (resize-start) writes ONLY the start field (AC #2)', async () => {
+    const vm = makeVm()
+    const row = { id: 10, field_5: '2026-06-10', field_6: '2026-06-14' }
+    await vm.onCommitResize(row, 'resize-start', 2)
+
+    expect(vm.dispatched).toHaveLength(1)
+    expect(vm.dispatched[0].action).toBe('page/view/timeline/updateRowValue')
+    expect(vm.dispatched[0].payload.field).toBe(startField)
+    expect(vm.dispatched[0].payload.value).toBe('2026-06-12')
+    expect(vm.dispatched[0].payload.oldValue).toBe('2026-06-10')
+  })
+
+  test('onCommitResize (resize-end) writes ONLY the end field (AC #2)', async () => {
+    const vm = makeVm()
+    const row = { id: 10, field_5: '2026-06-10', field_6: '2026-06-12' }
+    await vm.onCommitResize(row, 'resize-end', 2)
+
+    expect(vm.dispatched).toHaveLength(1)
+    expect(vm.dispatched[0].action).toBe('page/view/timeline/updateRowValue')
+    expect(vm.dispatched[0].payload.field).toBe(endField)
+    expect(vm.dispatched[0].payload.value).toBe('2026-06-14')
+    expect(vm.dispatched[0].payload.oldValue).toBe('2026-06-12')
+  })
+
+  test('onCommitResize is a no-op when the clamp collapses the move', async () => {
+    const vm = makeVm()
+    // 1-unit bar dragged inward → clamp to 0 → no dispatch.
+    const row = { id: 10, field_5: '2026-06-10', field_6: '2026-06-10' }
+    await vm.onCommitResize(row, 'resize-start', 3)
+    expect(vm.dispatched).toHaveLength(0)
+  })
+})
+
+// onMouseUp ends a drag: a zero-unit release is a no-op, a moved release
+// dispatches the right commit, and a permission loss mid-drag aborts the commit.
+describe('TimelineView.onMouseUp lifecycle (AC #1, #2, #5)', () => {
+  const makeVm = ({ deltaUnits, mode, canDragBars = true }) => {
+    const vm = {
+      dragState: {
+        row: { id: 1, _: { dragging: true } },
+        mode,
+        startX: 0,
+        deltaUnits,
+      },
+      dragVisualPx: 12,
+      canDragBars,
+      onCommitMove: vi.fn(),
+      onCommitResize: vi.fn(),
+    }
+    vm.onMouseUp = TimelineView.methods.onMouseUp.bind(vm)
+    return vm
+  }
+
+  test('a zero-unit release commits nothing and clears the drag state', () => {
+    const vm = makeVm({ deltaUnits: 0, mode: 'move' })
+    vm.onMouseUp()
+    expect(vm.onCommitMove).not.toHaveBeenCalled()
+    expect(vm.onCommitResize).not.toHaveBeenCalled()
+    expect(vm.dragState).toBe(null)
+    expect(vm.dragVisualPx).toBe(0)
+  })
+
+  test('a moved release commits a move with the snapped delta', () => {
+    const vm = makeVm({ deltaUnits: 2, mode: 'move' })
+    const row = vm.dragState.row
+    vm.onMouseUp()
+    expect(vm.onCommitMove).toHaveBeenCalledWith(row, 2)
+    expect(row._.dragging).toBe(false)
+  })
+
+  test('a moved release commits a resize for an edge drag', () => {
+    const vm = makeVm({ deltaUnits: -1, mode: 'resize-start' })
+    const row = vm.dragState.row
+    vm.onMouseUp()
+    expect(vm.onCommitResize).toHaveBeenCalledWith(row, 'resize-start', -1)
+  })
+
+  test('a permission loss mid-drag aborts the commit (AC #5)', () => {
+    const vm = makeVm({ deltaUnits: 2, mode: 'move', canDragBars: false })
+    vm.onMouseUp()
+    expect(vm.onCommitMove).not.toHaveBeenCalled()
   })
 })

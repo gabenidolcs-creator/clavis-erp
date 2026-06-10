@@ -7,7 +7,7 @@ import {
   deleteAllNonPrimaryFieldsFromTable,
   getFieldsForTable,
 } from "../../fixtures/database/field";
-import { createRow } from "../../fixtures/database/rows";
+import { createRow, listRows } from "../../fixtures/database/rows";
 import {
   createTimelineView,
   createViewFilter,
@@ -307,5 +307,305 @@ test.describe("Timeline view", () => {
     await expect(barCard.filter({ hasText: "End" })).toHaveCount(1);
     await expect(barCard.filter({ hasText: "Name" })).toHaveCount(0);
     await expect(barCard.filter({ hasText: "Start" })).toHaveCount(0);
+  });
+
+  test("moving a bar shifts BOTH date cells by the dragged units, preserving the span (AC #1, #3, #4)", async ({
+    page,
+    goto,
+    workspacePage,
+  }) => {
+    // Day zoom so one tick == one day == one drag unit.
+    const { database, table, startField, endField, view } = await setupTimeline(
+      workspacePage,
+      "day",
+    );
+
+    // A 3-day span (day0..day2 inclusive) so the axis has 3 day ticks.
+    await createRow(workspacePage.user, table, {
+      Start: dayKey(0),
+      End: dayKey(2),
+    });
+
+    const tablePage = new TablePage({ page, goto });
+    tablePage.pageUrl = `database/${database.id}/table/${table.id}/${view.id}`;
+    await tablePage.goto();
+
+    const bar = page.locator(".timeline-view__bar");
+    await expect(bar).toHaveCount(1);
+
+    // One day tick gives the pixel width of a single drag unit.
+    const tickBox = await page
+      .locator(".timeline-view__tick")
+      .first()
+      .boundingBox();
+    const barBox = await bar.boundingBox();
+    if (tickBox === null || barBox === null) {
+      throw new Error("Could not resolve tick/bar bounding boxes");
+    }
+    const unitPx = tickBox.width;
+
+    // Continuous pointer-drag (there is no native drop cell): press the bar
+    // body, move exactly one unit-width to the right, release. The bar moves
+    // forward by one whole day.
+    await page.mouse.move(
+      barBox.x + barBox.width / 2,
+      barBox.y + barBox.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      barBox.x + barBox.width / 2 + unitPx,
+      barBox.y + barBox.height / 2,
+      { steps: 12 },
+    );
+    await page.mouse.up();
+
+    // Both cells advanced by one day and the span (2 days between them) is
+    // preserved — read fresh from the backend (the move went through the shared
+    // optimistic update path → batchUpdate → broadcast, AC #3).
+    await expect(async () => {
+      const rows = await listRows(workspacePage.user, table);
+      expect(rows[0][`field_${startField.id}`]).toBe(dayKey(1));
+      expect(rows[0][`field_${endField.id}`]).toBe(dayKey(3));
+    }).toPass();
+
+    // Still exactly one bar; the optimistic write re-positioned it reactively.
+    await expect(bar).toHaveCount(1);
+
+    // Reload — the new dates persist server-side.
+    await tablePage.goto();
+    await expect(page.locator(".timeline-view__bar")).toHaveCount(1);
+  });
+
+  test("resizing the right edge changes ONLY the end date, widening the bar (AC #2, #4)", async ({
+    page,
+    goto,
+    workspacePage,
+  }) => {
+    const { database, table, startField, endField, view } = await setupTimeline(
+      workspacePage,
+      "day",
+    );
+
+    // A 2-day span (day0..day1) so the right edge has room to grow.
+    await createRow(workspacePage.user, table, {
+      Start: dayKey(0),
+      End: dayKey(1),
+    });
+
+    const tablePage = new TablePage({ page, goto });
+    tablePage.pageUrl = `database/${database.id}/table/${table.id}/${view.id}`;
+    await tablePage.goto();
+
+    const bar = page.locator(".timeline-view__bar");
+    await expect(bar).toHaveCount(1);
+
+    const tickBox = await page
+      .locator(".timeline-view__tick")
+      .first()
+      .boundingBox();
+    const handleBox = await page
+      .locator(".timeline-view__resize-handle--end")
+      .boundingBox();
+    if (tickBox === null || handleBox === null) {
+      throw new Error("Could not resolve tick/resize-handle bounding boxes");
+    }
+    const unitPx = tickBox.width;
+
+    // Drag the right edge handle one unit to the right → end +1 day; start
+    // untouched (AC #2).
+    await page.mouse.move(
+      handleBox.x + handleBox.width / 2,
+      handleBox.y + handleBox.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      handleBox.x + handleBox.width / 2 + unitPx,
+      handleBox.y + handleBox.height / 2,
+      { steps: 12 },
+    );
+    await page.mouse.up();
+
+    // Only the end advanced; the start is unchanged (AC #2).
+    await expect(async () => {
+      const rows = await listRows(workspacePage.user, table);
+      expect(rows[0][`field_${startField.id}`]).toBe(dayKey(0));
+      expect(rows[0][`field_${endField.id}`]).toBe(dayKey(2));
+    }).toPass();
+
+    // Reload — the resized end date persists.
+    await tablePage.goto();
+    await expect(page.locator(".timeline-view__bar")).toHaveCount(1);
+  });
+
+  test("resizing the left edge changes ONLY the start date, widening the bar (AC #2, #4)", async ({
+    page,
+    goto,
+    workspacePage,
+  }) => {
+    const { database, table, startField, endField, view } = await setupTimeline(
+      workspacePage,
+      "day",
+    );
+
+    // A 2-day span starting at day1 so the left edge has room to grow to day0.
+    await createRow(workspacePage.user, table, {
+      Start: dayKey(1),
+      End: dayKey(2),
+    });
+
+    const tablePage = new TablePage({ page, goto });
+    tablePage.pageUrl = `database/${database.id}/table/${table.id}/${view.id}`;
+    await tablePage.goto();
+
+    const bar = page.locator(".timeline-view__bar");
+    await expect(bar).toHaveCount(1);
+
+    const tickBox = await page
+      .locator(".timeline-view__tick")
+      .first()
+      .boundingBox();
+    const handleBox = await page
+      .locator(".timeline-view__resize-handle--start")
+      .boundingBox();
+    if (tickBox === null || handleBox === null) {
+      throw new Error("Could not resolve tick/resize-handle bounding boxes");
+    }
+    const unitPx = tickBox.width;
+
+    // Drag the left edge handle one unit to the LEFT → start -1 day; end
+    // untouched (AC #2). Only the dragged endpoint is written.
+    await page.mouse.move(
+      handleBox.x + handleBox.width / 2,
+      handleBox.y + handleBox.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      handleBox.x + handleBox.width / 2 - unitPx,
+      handleBox.y + handleBox.height / 2,
+      { steps: 12 },
+    );
+    await page.mouse.up();
+
+    // Only the start moved back one day; the end is unchanged (AC #2).
+    await expect(async () => {
+      const rows = await listRows(workspacePage.user, table);
+      expect(rows[0][`field_${startField.id}`]).toBe(dayKey(0));
+      expect(rows[0][`field_${endField.id}`]).toBe(dayKey(2));
+    }).toPass();
+
+    // Reload — the resized start date persists.
+    await tablePage.goto();
+    await expect(page.locator(".timeline-view__bar")).toHaveCount(1);
+  });
+
+  test("a resize dragged past the opposite edge clamps to a 1-unit bar instead of inverting (AC #2)", async ({
+    page,
+    goto,
+    workspacePage,
+  }) => {
+    const { database, table, startField, endField, view } = await setupTimeline(
+      workspacePage,
+      "day",
+    );
+
+    // A 2-day span (day0..day1). Dragging the right edge far LEFT past the
+    // start would invert the bar; the clamp keeps a minimum 1-unit bar.
+    await createRow(workspacePage.user, table, {
+      Start: dayKey(0),
+      End: dayKey(1),
+    });
+
+    const tablePage = new TablePage({ page, goto });
+    tablePage.pageUrl = `database/${database.id}/table/${table.id}/${view.id}`;
+    await tablePage.goto();
+
+    const bar = page.locator(".timeline-view__bar");
+    await expect(bar).toHaveCount(1);
+
+    const tickBox = await page
+      .locator(".timeline-view__tick")
+      .first()
+      .boundingBox();
+    const handleBox = await page
+      .locator(".timeline-view__resize-handle--end")
+      .boundingBox();
+    if (tickBox === null || handleBox === null) {
+      throw new Error("Could not resolve tick/resize-handle bounding boxes");
+    }
+    const unitPx = tickBox.width;
+
+    // Drag the right edge handle three units to the LEFT — that would put the
+    // end two days before the start. The resize clamp pins the end to the start
+    // unit (a 1-unit bar), never producing a reversed/zero-width bar.
+    await page.mouse.move(
+      handleBox.x + handleBox.width / 2,
+      handleBox.y + handleBox.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      handleBox.x + handleBox.width / 2 - unitPx * 3,
+      handleBox.y + handleBox.height / 2,
+      { steps: 12 },
+    );
+    await page.mouse.up();
+
+    // The end is clamped to the start's day (1-unit bar); the start is
+    // untouched. The bar never inverts (AC #2 clamp keystone).
+    await expect(async () => {
+      const rows = await listRows(workspacePage.user, table);
+      expect(rows[0][`field_${startField.id}`]).toBe(dayKey(0));
+      expect(rows[0][`field_${endField.id}`]).toBe(dayKey(0));
+    }).toPass();
+
+    // Still exactly one (non-inverted) bar on the axis.
+    await expect(bar).toHaveCount(1);
+  });
+
+  test("releasing a bar where it started is a no-op — no request, dates unchanged (AC #1)", async ({
+    page,
+    goto,
+    workspacePage,
+  }) => {
+    const { database, table, startField, endField, view } = await setupTimeline(
+      workspacePage,
+      "day",
+    );
+
+    await createRow(workspacePage.user, table, {
+      Start: dayKey(0),
+      End: dayKey(2),
+    });
+
+    const tablePage = new TablePage({ page, goto });
+    tablePage.pageUrl = `database/${database.id}/table/${table.id}/${view.id}`;
+    await tablePage.goto();
+
+    const bar = page.locator(".timeline-view__bar");
+    await expect(bar).toHaveCount(1);
+
+    const barBox = await bar.boundingBox();
+    if (barBox === null) {
+      throw new Error("Could not resolve bar bounding box");
+    }
+
+    // Press the bar body and release it on the same spot (a sub-unit jitter
+    // that snaps to a net zero-unit delta). No row-update request fires.
+    const cx = barBox.x + barBox.width / 2;
+    const cy = barBox.y + barBox.height / 2;
+    await page.mouse.move(cx, cy);
+    await page.mouse.down();
+    await page.mouse.move(cx + 2, cy, { steps: 4 });
+    await page.mouse.move(cx, cy, { steps: 4 });
+    await page.mouse.up();
+
+    // The dates are exactly what they were seeded as — the zero-unit release
+    // committed nothing (AC #1 no-op).
+    await expect(async () => {
+      const rows = await listRows(workspacePage.user, table);
+      expect(rows[0][`field_${startField.id}`]).toBe(dayKey(0));
+      expect(rows[0][`field_${endField.id}`]).toBe(dayKey(2));
+    }).toPass();
+
+    await expect(bar).toHaveCount(1);
   });
 });
