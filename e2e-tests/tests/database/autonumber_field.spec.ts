@@ -74,4 +74,33 @@ test.describe("Autonumber field tests", () => {
       page.locator(".grid-view__cell.active input")
     ).toHaveCount(0);
   });
+
+  test("Autonumber cell displays numeric value for backfilled rows", async ({
+    page,
+    goto,
+    workspacePage,
+  }) => {
+    const database = await createDatabase(
+      workspacePage.user,
+      "autonumberValueDisplayDb",
+      workspacePage.workspace
+    );
+    const table = await createTable(workspacePage.user, "Items", database);
+    await deleteAllNonPrimaryFieldsFromTable(workspacePage.user, table);
+    await createField(
+      workspacePage.user,
+      "Row ID",
+      "autonumber",
+      {},
+      table
+    );
+
+    const tablePage = new TablePage({ page, goto });
+    await tablePage.goToTable(table);
+
+    // createTable seeds 2 example rows; autonumber backfills them as 1, 2
+    await expect(
+      tablePage.firstNonPrimaryCellWrappingColumnDiv.locator(".grid-field-number")
+    ).toHaveText("1");
+  });
 });
