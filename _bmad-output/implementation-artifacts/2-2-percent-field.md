@@ -4,7 +4,7 @@ baseline_commit: 0d2b942d0
 
 # Story 2.2: Percent Field
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -276,7 +276,8 @@ claude-sonnet-4-6
 - PercentFieldType: prepare_values() locks number_suffix=% and number_prefix="" regardless of API input
 - Ruff import order fixed: PercentField/PercentFieldType placed after Password* (alphabetical)
 - FieldPercentSubForm.vue: delegates to FieldNumberSubForm; prefix/suffix inputs visible but overridden by backend (UX debt noted)
-- 10 backend tests pass, 8 frontend tests pass, no regressions in currency or number field tests
+- 10 backend tests pass, 9 frontend tests pass (8 original + getIconClass gap fix from QA), no regressions in currency or number field tests
+- QA session added: getIconClass test to percentFieldType.spec.js, 3 Playwright E2E tests (percent_field.spec.ts)
 
 ### File List
 
@@ -290,7 +291,61 @@ claude-sonnet-4-6
 - web-frontend/modules/database/components/field/FieldPercentSubForm.vue
 - web-frontend/locales/en.json
 - web-frontend/test/unit/database/percentFieldType.spec.js
+- e2e-tests/tests/database/percent_field.spec.ts
 
 ## Change Log
 
 - 2026-06-07: Implemented Story 2.2 — PercentField model + migration, PercentFieldType backend, registration in apps.py and plugin.js, FieldPercentSubForm.vue, i18n percent key, 10 backend tests (all pass), 8 frontend tests (all pass), ruff lint clean.
+- 2026-06-09: QA pass — added getIconClass gap test (frontend 8→9), added 3 Playwright E2E tests (percent_field.spec.ts). All layers green: 10/10 backend, 9/9 frontend, E2E coverage confirmed.
+- 2026-06-09: Senior Developer Review (AI) — APPROVED. No CRITICAL issues. M1 (QA files uncommitted) auto-fixed. L1 (File List missing E2E) auto-fixed. L2 (stale test count) auto-fixed. L3 (spurious AlterField in migration) and L4 (prefix/suffix UX debt) accepted as documented. Status → done.
+
+## Senior Developer Review (AI)
+
+**Reviewer:** AI (claude-sonnet-4-6) | **Date:** 2026-06-09 | **Outcome:** APPROVED
+
+### AC Verification
+
+| AC | Status | Evidence |
+|----|--------|---------|
+| AC1 — Percent Field creates/configures/stores correctly | IMPLEMENTED | `PercentFieldType` inherits `NumberFieldType`; `prepare_values()` enforces suffix; `test_percent_field_creates_with_suffix_enforced` + `test_percent_field_api_round_trip` pass |
+| AC2 — `%` suffix always appended, no user override | IMPLEMENTED | `prepare_values()` hard-sets `number_suffix="%"` and `number_prefix=""` after `super()`; 4 test variants confirm |
+| AC3 — Sort/filter numeric, not lexical | IMPLEMENTED | No `get_order_by_field_string` override; `test_percent_field_sorts_numeric` confirms 9 before 10 |
+| AC4 — Field config API round-trip | IMPLEMENTED | `test_percent_field_api_round_trip` covers POST/GET/PATCH cycle; `number_decimal_places` round-trips correctly |
+
+### Findings
+
+**M1 — QA-session files not committed** (AUTO-FIXED)
+- `percentFieldType.spec.js` had 1 uncommitted test (`getIconClass`)
+- `e2e-tests/tests/database/percent_field.spec.ts` was untracked
+- Test summaries were untracked
+- Fix: all committed in QA review commit
+
+**L1 — Story File List missing E2E spec** (AUTO-FIXED)
+- `e2e-tests/tests/database/percent_field.spec.ts` added to File List
+
+**L2 — Completion Notes stale test count** (AUTO-FIXED)
+- "8 frontend tests" corrected to "9 frontend tests"
+
+**L3 — Migration bundles unrelated AlterField** (ACCEPTED)
+- `0217_percentfield_alter_formview_mode.py` includes spurious `AlterField` on `formview.mode`
+- Same Django behavior as `0216_currencyfield_alter_formview_mode.py`; removing would cause Django to regenerate it
+- Documented in Dev Notes
+
+**L4 — FieldPercentSubForm shows prefix/suffix inputs** (ACCEPTED)
+- `FieldNumberSubForm` renders prefix/suffix inputs visible to user
+- Backend `prepare_values()` silently overrides to `%` and `""`; no data integrity risk
+- Documented as UX debt in story Dev Notes; `hidePrefixSuffix` prop is future improvement
+
+### Code Quality
+
+- `PercentField` model: correct MTI subclass with `class Meta: app_label = "database"` ✅
+- `PercentFieldType.prepare_values()`: calls `super()` first, then enforces suffix ✅
+- Ruff import order: `PercentField`/`PercentFieldType` alphabetically after `Password*` ✅
+- Frontend `PercentFieldType`: extends `NumberFieldType`, `getType()` returns `'percent'` ✅
+- `toHumanReadableString`: sets `displayField` defensively, handles null/undefined/empty ✅
+- `FieldPercentSubForm.vue`: correct delegation pattern, `allowedValues=[]`, `values={}` ✅
+- Plugin.js registration: single `register` call, no double-registration ✅
+
+### Security
+
+No security concerns. No user input concatenated to SQL. `prepare_values()` enforces suffix regardless of API input (defensive). MTI subclass adds no new attack surface.

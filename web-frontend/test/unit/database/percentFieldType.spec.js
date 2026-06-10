@@ -93,4 +93,8 @@ describe('PercentFieldType', () => {
     const result = fieldType.toHumanReadableString(field, '1234.56')
     expect(result).toBe('1,234.56%')
   })
+
+  test('getIconClass returns iconoir-percentage', () => {
+    expect(PercentFieldType.getIconClass()).toBe('iconoir-percentage')
+  })
 })
