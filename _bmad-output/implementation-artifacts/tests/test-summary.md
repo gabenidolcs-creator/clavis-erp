@@ -1,64 +1,90 @@
-# Test Automation Summary — Story 3.7 (Reschedule and resize Timeline bars)
+# Test Automation Summary — Story 3.9: Define Task Dependencies with Cycle Prevention
 
-**Feature:** Pointer-drag move + edge-resize of Timeline bars (core, Bucket A clean-room).
-**Workflow:** bmad-qa-generate-e2e-tests — generate/verify tests, auto-apply discovered gaps.
-**Engineer role:** QA automation (test generation only — no code review / story validation).
+**Workflow:** bmad-qa-generate-e2e-tests
+**Role:** QA automation engineer (test generation only — no code review / story validation)
 **Date:** 2026-06-10
+**Baseline commit:** 787cbd22c (Story 3.8 Gantt spine)
+**Framework:** pytest/pytest-django (backend), Vitest (frontend), Playwright (e2e)
 
-## Test Framework
+## Acceptance Criteria under test
 
-- **Frontend unit:** Vitest (`web-frontend/test/...`) — method/computed-level + pure-fn pattern (NO `testApp.mount(TimelineView)`; premium store last-wins → OOM).
-- **E2E:** Playwright (`e2e-tests/tests/...`) — continuous pointer-drag via `mouse.move`/`down`/`up`. OSS-only CI lane; authored, not run locally (needs Docker stack).
-- **API:** none added — ZERO backend story. Move/resize reuses the existing `updateRowValues`/`updateValue` → `batchUpdate` → `RowHandler` path, already covered by backend row-update suites. No new endpoint to test.
+- **AC #1** — Persisted directed edge (`predecessor → successor`) survives reload and renders as a connector line.
+- **AC #2** — Cycle prevention across **all** mutation paths: interactive create, restore-from-trash, import.
 
-## Generated / Verified Tests
+## Gap analysis
 
-### Unit (`web-frontend/test/unit/database/components/view/timeline/timelineView.spec.js`)
-- [x] 70/70 passing (41 pre-existing 3.6 + 29 Story 3.7). Verified green this run.
-- Covers: `pixelsToUnits`, `shiftDateValue` (local-frame, month/boundary, datetime time-of-day), `clampResizeUnits` (both directions, past-edge, 1-unit floor, empty), `canDragBars` (readOnly / null field / non-writable), `onCommitMove` (atomic plural `updateRowValues`), `onCommitResize` (single-field, resize-start vs resize-end), rollback `notifyIf`, `onMouseUp` no-op + permission-loss abort.
+The implementing dev work already shipped thorough backend + frontend tests. The single
+discovered coverage gap was the **E2E spec**: `e2e-tests/tests/database/gantt_view.spec.ts`
+held only Story 3.8 render scenarios and **zero Story 3.9 dependency/connector coverage**.
+Two E2E scenarios were authored to close it (AC #1 draw+reload, AC #2 cycle reject).
 
-### E2E (`e2e-tests/tests/database/timeline_view.spec.ts`) — 10 scenarios
-Pre-existing (3.6 + 3.7 happy):
-- [x] render bars/tray + config persist (AC #1, #2)
-- [x] zoom switch persist (AC #3)
-- [x] longer span = wider bar (AC #2)
-- [x] view filters honored (AC #1)
-- [x] card-face visibility vs date-driving field (AC #5)
-- [x] **move** shifts BOTH cells, span preserved (AC #1, #3, #4)
-- [x] **resize right edge** → only end date (AC #2, #4)
+## Generated / verified tests
 
-Added this run (gap-fill, auto-applied):
-- [x] **resize LEFT edge → only start date**, bar widens (AC #2) — symmetric half was untested.
-- [x] **resize past opposite edge clamps to 1-unit bar** (no inversion) (AC #2) — clamp keystone at E2E level.
-- [x] **zero-unit release = no-op** — dates unchanged, no request (AC #1).
+### E2E Tests (NEW — authored this workflow, author-only per Task 10)
 
-## Coverage vs Acceptance Criteria
+- [x] `e2e-tests/tests/database/gantt_view.spec.ts`
+  - **AC #1** — "draws a dependency connector between two task bars via the predecessor
+    picker and persists it on reload": opens task B's bar → predecessor picker
+    (`.gantt-view__dependencies-add` Dropdown) → selects A → asserts the Frappe Gantt
+    connector `path[data-from][data-to]` in the `.arrow` layer → reloads → connector still
+    rendered (re-fetched server edge).
+  - **AC #2** — "rejects a dependency that would close a cycle with a clear error and adds
+    no connector": precondition A→B drawn; opens A; attempts to add B as predecessor (B→A
+    closes the cycle) → asserts the `ganttView.cycleRejectedTitle` toast
+    ("Dependency would create a cycle") and that **no** reverse connector was added (only
+    the original A→B arrow remains).
+  - Selectors derived from the live implementation: bar `.bar-wrapper[data-id]`, picker
+    `.gantt-view__dependencies` / `.gantt-view__dependencies-add .dropdown__selected`,
+    candidate `.select__item-name-text[title=...]`, connector
+    `.gantt-view__host .arrow path[data-from][data-to]`, toast `.toast__title`.
+  - **Not run locally** (needs the Docker e2e stack; `e2e-tests/` has no local
+    tsconfig/node_modules). Formatted with `web-frontend/node_modules/.bin/prettier`
+    (clean).
 
-| AC | Unit | E2E |
+### Backend API Tests (pre-existing — verified GREEN)
+
+- [x] `backend/tests/baserow/contrib/database/api/views/gantt/test_gantt_dependency_views.py`
+  - POST create + fresh GET reload proof (AC #1), POST cycle → 400 `ERROR_TASK_DEPENDENCY_CYCLE`
+    (AC #2), duplicate → 400 `ERROR_TASK_DEPENDENCY_ALREADY_EXISTS`, DELETE → 204,
+    delete-missing → 404 `ERROR_TASK_DEPENDENCY_DOES_NOT_EXIST`, non-member → 400
+    `ERROR_USER_NOT_IN_GROUP`.
+
+### Backend Handler / cycle-engine Tests (pre-existing — verified GREEN)
+
+- [x] `backend/tests/baserow/contrib/database/view/gantt/test_task_dependency_handler.py`
+  - create persists + unique idempotency, self-loop rejected, direct cycle, long-chain
+    cycle, missing-row, non-FS type rejected, delete, list, permanent-row-delete cleanup
+    (both sides), **restore-from-trash revalidation** (drops cyclic edge + acyclic no-op),
+    **import_serialized cycle rejection** + acyclic export/import round-trip. All three
+    AR-8 non-interactive paths covered (AC #2 teeth).
+
+### Frontend Unit Tests (pre-existing — verified GREEN)
+
+- [x] `web-frontend/test/unit/database/components/view/gantt/ganttView.spec.js`
+  - live `dependenciesForRow` seam (predecessor-id string / empty), picker `addPredecessor`
+    dispatch with correct ids, cycle rejection → clear toast (no rethrow), `removeDependency`
+    dispatch, **readOnly/permission guard** (add + remove are no-ops when `canEditDependencies`
+    is false), store `createDependency`/`deleteDependency` optimistic add/remove with rollback
+    on the cycle 400.
+
+## Run results
+
+| Suite | Command | Result |
 |---|---|---|
-| #1 Move preserves duration + zero no-op | ✅ | ✅ (move + no-op added) |
-| #2 Resize only dragged endpoint + clamp | ✅ | ✅ (resize-end + **resize-start added** + **clamp added**) |
-| #3 Real-time broadcast | ✅ (one `updateRowValues`) | ✅ (DB read after move) |
-| #4 Optimistic + rollback | ✅ (`notifyIf`) | ⚠️ indirect (no E2E permission-denial harness) |
-| #5 Permission / read-only gate | ✅ (`canDragBars` all branches) | ⚠️ unit-only (see gaps) |
+| Backend handler + API | `uv run pytest tests/.../view/gantt/ tests/.../api/views/gantt/test_gantt_dependency_views.py` (default profile, test DB :5431) | **19 passed** |
+| Frontend gantt unit | `yarn vitest run test/unit/database/components/view/gantt/` | **39 passed** |
+| E2E | author-only — not run (Docker stack required) | authored, prettier-clean |
 
-## Gaps Not Auto-Applied (rationale)
+## Coverage
 
-- **AC #4 rollback at E2E level** — requires injecting a backend field-permission denial mid-drag; no existing E2E fixture sets a per-field write-deny. Fully covered at unit level (`a failed move is caught and surfaced via notifyIf`). Backend rollback path covered by `bufferedRows` suites.
-- **AC #5 read-only / non-writable → no handles at E2E level** — making a view `readOnly` (viewer role / shared link) is not reachable through current e2e fixtures without new auth scaffolding. Exhaustively covered at unit level (`canDragBars` readOnly / null / non-writable branches). Deferred to avoid over-engineering per skill "Keep It Simple".
+- AC #1 (persist + reload + connector render): backend API ✅, frontend seam ✅, E2E ✅
+- AC #2 interactive cycle: handler ✅, API ✅, frontend toast/rollback ✅, E2E ✅
+- AC #2 restore-from-trash cycle: handler ✅ (E2E impractical — backend-only path)
+- AC #2 import cycle: handler ✅ (E2E impractical — backend-only path)
+- Permanent-delete edge cleanup: handler ✅
 
-## Coverage Metrics
+## Next steps
 
-- Unit pure-fn + handler: 7/7 net-new units (`pixelsToUnits`, `shiftDateValue`, `clampResizeUnits`, `canDragBars`, `onCommitMove`, `onCommitResize`, `onMouseUp`).
-- E2E scenarios: 10 total (3 added this run).
-- ACs with executable E2E happy-path: 1, 2, 3 fully; 4, 5 unit-only (documented).
-
-## Validation
-
-- Unit: `web-frontend/node_modules/.bin/vitest run test/unit/database/components/view/timeline/timelineView.spec.js` → **70 passed**.
-- E2E: Prettier `--check` clean (formatted via web-frontend prettier — `e2e-tests/` has no local prettier). Runs in OSS-only CI lane (not local — Docker stack).
-
-## Next Steps
-
-- Run the new E2E scenarios in the OSS-only CI lane.
-- If an E2E permission-deny fixture is added later, lift AC #4/#5 from unit-only to E2E.
+- Run the E2E scenario in CI (Docker e2e lane) — the only suite not exercised locally.
+- Optional future coverage: an API test asserting the **public** Gantt payload surfaces
+  dependency edges read-only (`has_public_info=True` parity, story Task 4) — not an AC gate.

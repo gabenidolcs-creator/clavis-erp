@@ -813,6 +813,16 @@ class DatabaseConfig(AppConfig):
 
         def _on_rows_created(sender, rows, table, model, **kwargs):
             _recompute_running_counts(table)
+            # Restoring a trashed row re-sends rows_created. While the row was
+            # trashed the dependency graph may have mutated so that its edges now
+            # close a cycle; re-validate and drop any offending edge (AR-8).
+            from baserow.contrib.database.views.gantt.handler import (
+                TaskDependencyHandler,
+            )
+
+            TaskDependencyHandler().revalidate_on_rows_restored(
+                table, [row.id for row in rows]
+            )
 
         def _on_rows_deleted(sender, rows, table, model, **kwargs):
             _recompute_running_counts(table)

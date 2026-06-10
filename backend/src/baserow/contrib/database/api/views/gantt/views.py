@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from baserow.api.decorators import (
     allowed_includes,
     map_exceptions,
+    validate_body,
     validate_query_parameters,
 )
 from baserow.api.errors import ERROR_USER_NOT_IN_GROUP
@@ -42,7 +43,9 @@ from baserow.contrib.database.api.views.errors import (
     ERROR_VIEW_FILTER_TYPE_UNSUPPORTED_FIELD,
 )
 from baserow.contrib.database.api.views.gantt.serializers import (
+    CreateTaskDependencySerializer,
     GanttViewFieldOptionsSerializer,
+    TaskDependencySerializer,
 )
 from baserow.contrib.database.api.views.serializers import FieldOptionsField
 from baserow.contrib.database.api.views.utils import (
@@ -65,6 +68,14 @@ from baserow.contrib.database.views.exceptions import (
     ViewFilterTypeNotAllowedForField,
 )
 from baserow.contrib.database.views.filters import AdHocFilters
+from baserow.contrib.database.views.gantt.exceptions import (
+    InvalidTaskDependencyType,
+    TaskDependencyAlreadyExists,
+    TaskDependencyCycle,
+    TaskDependencyDoesNotExist,
+    TaskDependencyRowDoesNotExist,
+)
+from baserow.contrib.database.views.gantt.handler import TaskDependencyHandler
 from baserow.contrib.database.views.handler import ViewHandler
 from baserow.contrib.database.views.models import GanttView
 from baserow.contrib.database.views.operations import ListViewRowsOperationType
@@ -73,7 +84,14 @@ from baserow.contrib.database.views.signals import view_loaded
 from baserow.contrib.database.views.utils import check_permissions_with_view_fallback
 from baserow.core.exceptions import UserNotInWorkspace
 
-from .errors import ERROR_GANTT_DOES_NOT_EXIST
+from .errors import (
+    ERROR_GANTT_DOES_NOT_EXIST,
+    ERROR_INVALID_TASK_DEPENDENCY_TYPE,
+    ERROR_TASK_DEPENDENCY_ALREADY_EXISTS,
+    ERROR_TASK_DEPENDENCY_CYCLE,
+    ERROR_TASK_DEPENDENCY_DOES_NOT_EXIST,
+    ERROR_TASK_DEPENDENCY_ROW_DOES_NOT_EXIST,
+)
 from .pagination import GanttLimitOffsetPagination
 
 
@@ -531,3 +549,202 @@ class PublicGanttViewRowsView(APIView):
             response.data.update(**serializer_class(view, context=context).data)
 
         return response
+
+
+class GanttViewDependenciesView(APIView):
+    permission_classes = (AllowAny,)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="view_id",
+                location=OpenApiParameter.PATH,
+                type=OpenApiTypes.INT,
+                description="Returns the dependency edges of this gantt view's table.",
+            ),
+        ],
+        tags=["Database table gantt view"],
+        operation_id="list_database_table_gantt_view_dependencies",
+        description=(
+            "Lists all the task dependency edges (predecessor -> successor) of the "
+            "table related to the provided gantt `view_id`. These edges are "
+            "rendered as connector lines between the bars in the Gantt view."
+        ),
+        responses={
+            200: TaskDependencySerializer(many=True),
+            400: get_error_schema(["ERROR_USER_NOT_IN_GROUP"]),
+            404: get_error_schema(["ERROR_GANTT_DOES_NOT_EXIST"]),
+        },
+    )
+    @map_exceptions(
+        {
+            UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
+            ViewDoesNotExist: ERROR_GANTT_DOES_NOT_EXIST,
+        }
+    )
+    def get(self, request: Request, view_id: int) -> Response:
+        """Lists the dependency edges for the gantt view's table."""
+
+        view = ViewHandler().get_view_as_user(request.user, view_id, GanttView)
+        dependencies = TaskDependencyHandler().list_dependencies(
+            request.user, view.table
+        )
+        return Response(TaskDependencySerializer(dependencies, many=True).data)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="view_id",
+                location=OpenApiParameter.PATH,
+                type=OpenApiTypes.INT,
+                description="Creates a dependency edge in this gantt view's table.",
+            ),
+        ],
+        tags=["Database table gantt view"],
+        operation_id="create_database_table_gantt_view_dependency",
+        description=(
+            "Creates a new task dependency edge (predecessor -> successor) in the "
+            "table related to the provided gantt `view_id`. The edge is rejected "
+            "with a clear error if it would introduce a cycle, already exists, or "
+            "references a missing row."
+        ),
+        request=CreateTaskDependencySerializer,
+        responses={
+            200: TaskDependencySerializer,
+            400: get_error_schema(
+                [
+                    "ERROR_USER_NOT_IN_GROUP",
+                    "ERROR_TASK_DEPENDENCY_CYCLE",
+                    "ERROR_TASK_DEPENDENCY_ALREADY_EXISTS",
+                    "ERROR_ROW_DOES_NOT_EXIST",
+                    "ERROR_INVALID_TASK_DEPENDENCY_TYPE",
+                ]
+            ),
+            404: get_error_schema(["ERROR_GANTT_DOES_NOT_EXIST"]),
+        },
+    )
+    @map_exceptions(
+        {
+            UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
+            ViewDoesNotExist: ERROR_GANTT_DOES_NOT_EXIST,
+            TaskDependencyCycle: ERROR_TASK_DEPENDENCY_CYCLE,
+            TaskDependencyAlreadyExists: ERROR_TASK_DEPENDENCY_ALREADY_EXISTS,
+            TaskDependencyRowDoesNotExist: ERROR_TASK_DEPENDENCY_ROW_DOES_NOT_EXIST,
+            InvalidTaskDependencyType: ERROR_INVALID_TASK_DEPENDENCY_TYPE,
+        }
+    )
+    @validate_body(CreateTaskDependencySerializer, return_validated=True)
+    def post(self, request: Request, view_id: int, data) -> Response:
+        """Creates a dependency edge (cycle-checked) for the gantt view's table."""
+
+        view = ViewHandler().get_view_as_user(request.user, view_id, GanttView)
+        dependency = TaskDependencyHandler().create_dependency(
+            request.user,
+            view.table,
+            data["predecessor_row_id"],
+            data["successor_row_id"],
+            data.get("dependency_type", "FS"),
+        )
+        return Response(TaskDependencySerializer(dependency).data)
+
+
+class GanttViewDependencyView(APIView):
+    permission_classes = (AllowAny,)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="view_id",
+                location=OpenApiParameter.PATH,
+                type=OpenApiTypes.INT,
+                description="The gantt view the dependency belongs to.",
+            ),
+            OpenApiParameter(
+                name="dependency_id",
+                location=OpenApiParameter.PATH,
+                type=OpenApiTypes.INT,
+                description="The id of the dependency edge to delete.",
+            ),
+        ],
+        tags=["Database table gantt view"],
+        operation_id="delete_database_table_gantt_view_dependency",
+        description=(
+            "Deletes the task dependency edge related to the provided "
+            "`dependency_id` in the gantt `view_id`'s table."
+        ),
+        responses={
+            204: None,
+            400: get_error_schema(["ERROR_USER_NOT_IN_GROUP"]),
+            404: get_error_schema(
+                [
+                    "ERROR_GANTT_DOES_NOT_EXIST",
+                    "ERROR_TASK_DEPENDENCY_DOES_NOT_EXIST",
+                ]
+            ),
+        },
+    )
+    @map_exceptions(
+        {
+            UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
+            ViewDoesNotExist: ERROR_GANTT_DOES_NOT_EXIST,
+            TaskDependencyDoesNotExist: ERROR_TASK_DEPENDENCY_DOES_NOT_EXIST,
+        }
+    )
+    def delete(self, request: Request, view_id: int, dependency_id: int) -> Response:
+        """Deletes a dependency edge from the gantt view's table."""
+
+        handler = TaskDependencyHandler()
+        view = ViewHandler().get_view_as_user(request.user, view_id, GanttView)
+        dependency = handler.get_dependency(view.table, dependency_id)
+        handler.delete_dependency(request.user, dependency)
+        return Response(status=204)
+
+
+class PublicGanttViewDependenciesView(APIView):
+    permission_classes = (AllowAny,)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="slug",
+                location=OpenApiParameter.PATH,
+                type=OpenApiTypes.STR,
+                description="Returns the dependency edges of the public gantt view.",
+            ),
+        ],
+        tags=["Database table gantt view"],
+        operation_id="public_list_database_table_gantt_view_dependencies",
+        description=(
+            "Lists the task dependency edges of a publicly shared gantt view so a "
+            "shared Gantt renders the connector lines read-only. No create or "
+            "delete is allowed on a public view."
+        ),
+        responses={
+            200: TaskDependencySerializer(many=True),
+            401: get_error_schema(["ERROR_NO_AUTHORIZATION_TO_PUBLICLY_SHARED_VIEW"]),
+            404: get_error_schema(["ERROR_GANTT_DOES_NOT_EXIST"]),
+        },
+    )
+    @map_exceptions(
+        {
+            ViewDoesNotExist: ERROR_GANTT_DOES_NOT_EXIST,
+            NoAuthorizationToPubliclySharedView: (
+                ERROR_NO_AUTHORIZATION_TO_PUBLICLY_SHARED_VIEW
+            ),
+        }
+    )
+    def get(self, request: Request, slug: str) -> Response:
+        """Lists the dependency edges for a publicly shared gantt view."""
+
+        view = ViewHandler().get_public_view_by_slug(
+            request.user,
+            slug,
+            GanttView,
+            authorization_token=get_public_view_authorization_token(request),
+        )
+        # Public access already authorized by the slug lookup; read the edges
+        # directly so an anonymous viewer can render the connectors.
+        from baserow.contrib.database.views.gantt.models import TaskDependency
+
+        dependencies = TaskDependency.objects.filter(table=view.table)
+        return Response(TaskDependencySerializer(dependencies, many=True).data)

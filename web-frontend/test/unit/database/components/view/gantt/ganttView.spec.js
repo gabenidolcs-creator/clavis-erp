@@ -5,6 +5,7 @@ import GanttView, {
   ganttViewMode,
 } from '@baserow/modules/database/components/view/gantt/GanttView'
 import GanttViewHeader from '@baserow/modules/database/components/view/gantt/GanttViewHeader'
+import * as ganttStore from '@baserow/modules/database/store/view/gantt'
 
 describe('GanttViewType', () => {
   let testApp
@@ -183,6 +184,8 @@ describe('GanttView.ganttTasks mapping (AC #2, #3)', () => {
   const makeVm = ({ allRows }) => {
     const vm = {
       allRows,
+      // No edges in the mapping fixtures → every task's `dependencies` is ''.
+      dependencies: [],
       startDateField: startField,
       endDateField: endField,
       primaryField,
@@ -210,7 +213,12 @@ describe('GanttView.ganttTasks mapping (AC #2, #3)', () => {
   test('maps a scheduled row to a task with YYYY-MM-DD dates and no day drift', () => {
     const vm = makeVm({
       allRows: [
-        { id: 1, field_5: '2026-06-10', field_6: '2026-06-12', field_9: 'Plan' },
+        {
+          id: 1,
+          field_5: '2026-06-10',
+          field_6: '2026-06-12',
+          field_9: 'Plan',
+        },
       ],
     })
     expect(vm.ganttTasks).toEqual([
@@ -244,13 +252,182 @@ describe('GanttView.ganttTasks mapping (AC #2, #3)', () => {
   })
 })
 
-// dependenciesForRow is the Story 3.9 seam: it always returns '' today so the
-// render call has no dependency edges yet. (AC #3)
-describe('GanttView.dependenciesForRow (Story 3.9 seam, AC #3)', () => {
-  test('always returns an empty string', () => {
-    const dependenciesForRow = GanttView.methods.dependenciesForRow
-    expect(dependenciesForRow.call({}, { id: 1 })).toBe('')
-    expect(dependenciesForRow.call({}, { id: 2 })).toBe('')
+// dependenciesForRow is the now-live Story 3.9 seam: for a row it returns the
+// comma-separated predecessor ids of every edge whose successor IS that row, in
+// the order Frappe Gantt draws arrows from. (AC #1, AC #3)
+describe('GanttView.dependenciesForRow (Story 3.9 seam, AC #1/#3)', () => {
+  const bind = (dependencies) =>
+    GanttView.methods.dependenciesForRow.bind({ dependencies })
+
+  test('returns the predecessor ids for edges ending at the row', () => {
+    const dependenciesForRow = bind([
+      { predecessor_row_id: 1, successor_row_id: 3 },
+      { predecessor_row_id: 2, successor_row_id: 3 },
+      { predecessor_row_id: 9, successor_row_id: 4 },
+    ])
+    expect(dependenciesForRow({ id: 3 })).toBe('1,2')
+    expect(dependenciesForRow({ id: 4 })).toBe('9')
+  })
+
+  test('returns an empty string when the row has no predecessors', () => {
+    expect(bind([])({ id: 1 })).toBe('')
+    expect(
+      bind([{ predecessor_row_id: 1, successor_row_id: 2 }])({ id: 1 })
+    ).toBe('')
+  })
+})
+
+// The predecessor picker (Story 3.9 draw affordance) dispatches the store's
+// optimistic create/delete actions with the right row ids, is guarded by
+// `canEditDependencies`, and translates a cycle rejection into a clear toast.
+describe('GanttView predecessor-picker affordance (Story 3.9, AC #1/#2)', () => {
+  const makeVm = ({ canEdit = true, dispatch } = {}) => {
+    const dispatched = []
+    const recording = (action, payload) => {
+      dispatched.push({ action, payload })
+      return Promise.resolve()
+    }
+    const vm = {
+      canEditDependencies: canEdit,
+      openRow: { id: 3 },
+      storePrefix: 'page/',
+      view: { id: 2 },
+      dispatched,
+      $store: { dispatch: dispatch || recording },
+      $t: (key) => key,
+    }
+    vm.addPredecessor = GanttView.methods.addPredecessor.bind(vm)
+    vm.removeDependency = GanttView.methods.removeDependency.bind(vm)
+    return vm
+  }
+
+  test('addPredecessor dispatches createDependency with predecessor→open row ids', async () => {
+    const vm = makeVm()
+    await vm.addPredecessor(1)
+    expect(vm.dispatched).toHaveLength(1)
+    expect(vm.dispatched[0].action).toBe('page/view/gantt/createDependency')
+    expect(vm.dispatched[0].payload).toEqual({
+      viewId: 2,
+      predecessorRowId: 1,
+      successorRowId: 3,
+    })
+  })
+
+  test('addPredecessor is a no-op when editing is not allowed', async () => {
+    const vm = makeVm({ canEdit: false })
+    await vm.addPredecessor(1)
+    expect(vm.dispatched).toHaveLength(0)
+  })
+
+  test('a cycle rejection surfaces a clear toast and does not rethrow', async () => {
+    const toasts = []
+    const dispatch = (action, payload) => {
+      if (action === 'toast/error') {
+        toasts.push(payload)
+        return Promise.resolve()
+      }
+      return Promise.reject({
+        handler: { code: 'ERROR_TASK_DEPENDENCY_CYCLE' },
+      })
+    }
+    const vm = makeVm({ dispatch })
+    await expect(vm.addPredecessor(1)).resolves.toBeUndefined()
+    expect(toasts).toHaveLength(1)
+    expect(toasts[0].title).toBe('ganttView.cycleRejectedTitle')
+  })
+
+  test('removeDependency dispatches deleteDependency with the edge id', async () => {
+    const vm = makeVm()
+    await vm.removeDependency({ id: 77 })
+    expect(vm.dispatched[0].action).toBe('page/view/gantt/deleteDependency')
+    expect(vm.dispatched[0].payload).toEqual({ viewId: 2, dependencyId: 77 })
+  })
+
+  test('removeDependency is a no-op when editing is not allowed', async () => {
+    const vm = makeVm({ canEdit: false })
+    await vm.removeDependency({ id: 77 })
+    expect(vm.dispatched).toHaveLength(0)
+  })
+})
+
+// The gantt store's createDependency action optimistically adds the edge and
+// rolls it back on a cycle 400; deleteDependency removes optimistically and
+// restores on failure. (Story 3.9, AC #1/#2)
+describe('gantt store dependency actions (Story 3.9, AC #1/#2)', () => {
+  const makeCtx = (initial = []) => {
+    const s = { ...ganttStore.state(), dependencies: [...initial] }
+    const commit = (name, payload) => ganttStore.mutations[name](s, payload)
+    const getters = {
+      getDependencies: s.dependencies,
+    }
+    // getDependencies must reflect the live array; redefine as a getter.
+    Object.defineProperty(getters, 'getDependencies', {
+      get: () => s.dependencies,
+    })
+    return { s, ctx: { commit, getters } }
+  }
+
+  test('createDependency persists the server edge on success', async () => {
+    const { s, ctx } = makeCtx()
+    const client = {
+      post: () =>
+        Promise.resolve({
+          data: {
+            id: 5,
+            predecessor_row_id: 1,
+            successor_row_id: 2,
+            dependency_type: 'FS',
+          },
+        }),
+    }
+    await ganttStore.actions.createDependency.call({ $client: client }, ctx, {
+      viewId: 2,
+      predecessorRowId: 1,
+      successorRowId: 2,
+    })
+    expect(s.dependencies).toEqual([
+      {
+        id: 5,
+        predecessor_row_id: 1,
+        successor_row_id: 2,
+        dependency_type: 'FS',
+      },
+    ])
+  })
+
+  test('createDependency rolls back the optimistic edge on a cycle 400', async () => {
+    const { s, ctx } = makeCtx()
+    const client = {
+      post: () =>
+        Promise.reject({ handler: { code: 'ERROR_TASK_DEPENDENCY_CYCLE' } }),
+    }
+    await expect(
+      ganttStore.actions.createDependency.call({ $client: client }, ctx, {
+        viewId: 2,
+        predecessorRowId: 1,
+        successorRowId: 2,
+      })
+    ).rejects.toBeDefined()
+    // The optimistic edge (temp id -1) is gone; state is unchanged.
+    expect(s.dependencies).toEqual([])
+  })
+
+  test('deleteDependency restores the edge when the server delete fails', async () => {
+    const edge = {
+      id: 9,
+      predecessor_row_id: 1,
+      successor_row_id: 2,
+      dependency_type: 'FS',
+    }
+    const { s, ctx } = makeCtx([edge])
+    const client = { delete: () => Promise.reject(new Error('boom')) }
+    await expect(
+      ganttStore.actions.deleteDependency.call({ $client: client }, ctx, {
+        viewId: 2,
+        dependencyId: 9,
+      })
+    ).rejects.toBeDefined()
+    expect(s.dependencies).toEqual([edge])
   })
 })
 

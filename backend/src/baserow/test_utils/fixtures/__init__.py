@@ -28,6 +28,7 @@ from .service import ServiceFixtures
 from .settings import SettingsFixtures
 from .snapshots import SnapshotFixtures
 from .table import TableFixtures
+from .task_dependency import TaskDependencyFixtures
 from .template import TemplateFixtures
 from .token import TokenFixtures
 from .user import UserFixtures
@@ -81,6 +82,7 @@ class Fixtures(
     DashboardDataSourceFixtures,
     WidgetFixtures,
     MCPFixtures,
+    TaskDependencyFixtures,
 ):
     def __init__(self, fake=None):
         self.fake = fake

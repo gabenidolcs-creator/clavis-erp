@@ -325,4 +325,164 @@ test.describe("Gantt view", () => {
     await expect(trayCard.filter({ hasText: "Name" })).toHaveCount(0);
     await expect(trayCard.filter({ hasText: "Start" })).toHaveCount(0);
   });
+
+  // Story 3.9 — Task Dependencies with cycle prevention. The Gantt instance is
+  // `readonly: true` (Frappe Gantt exposes no draw handle when read-only), so
+  // the v1 draw affordance is the explicit "Predecessors" picker that appears
+  // for the open task row (`.gantt-view__dependencies`). Clicking a bar opens
+  // that row (popup side-effect → row modal + picker), and the picker's
+  // `.gantt-view__dependencies-add` Dropdown creates a `predecessor → open row`
+  // edge. The lib then draws the connector as a `<path data-from data-to>` in
+  // its `.arrow` SVG layer from the comma-separated predecessor string the live
+  // 3.9 seam (`dependenciesForRow`) now returns. Per story 3.9 Task 10 these
+  // are AUTHORED but NOT run locally (they need the Docker e2e stack).
+
+  test("draws a dependency connector between two task bars via the predecessor picker and persists it on reload (AC #1)", async ({
+    page,
+    goto,
+    workspacePage,
+  }) => {
+    const { database, table, view } = await setupGantt(workspacePage, "day");
+
+    // Three fully-dated rows → three bars, each addressable by the row id the
+    // lib stamps on its `.bar-wrapper[data-id]` group.
+    const rowA = await createRow(workspacePage.user, table, {
+      Name: "Task A",
+      Start: dayKey(0),
+      End: dayKey(1),
+    });
+    const rowB = await createRow(workspacePage.user, table, {
+      Name: "Task B",
+      Start: dayKey(2),
+      End: dayKey(3),
+    });
+    const rowC = await createRow(workspacePage.user, table, {
+      Name: "Task C",
+      Start: dayKey(4),
+      End: dayKey(5),
+    });
+
+    const tablePage = new TablePage({ page, goto });
+    tablePage.pageUrl = `database/${database.id}/table/${table.id}/${view.id}`;
+    await tablePage.goto();
+
+    // All three bars render; no dependency arrows exist yet.
+    await expect(page.locator(".gantt-view__host .bar-wrapper")).toHaveCount(3);
+    await expect(page.locator(".gantt-view__host .arrow path")).toHaveCount(0);
+
+    // Open task B by clicking its bar — the `popup_on: 'click'` side-effect
+    // opens the row and reveals the predecessor picker for the open row.
+    await page
+      .locator(`.gantt-view__host .bar-wrapper[data-id="${rowB.id}"]`)
+      .click();
+    await expect(page.locator(".gantt-view__dependencies")).toBeVisible();
+
+    // Draw A → B: select "Task A" as a predecessor of the open row B through the
+    // picker Dropdown (open it, then pick the candidate by its primary name).
+    await page
+      .locator(".gantt-view__dependencies-add .dropdown__selected")
+      .click();
+    await page
+      .locator(
+        '.gantt-view__dependencies-add .select__item-name-text[title="Task A"]',
+      )
+      .click();
+
+    // The connector arrow renders from A's bar to B's bar — the lib draws a
+    // `<path data-from data-to>` in its `.arrow` layer from the predecessor
+    // string the live seam now returns for B (AC #1 connector render).
+    await expect(
+      page.locator(
+        `.gantt-view__host .arrow path[data-from="${rowA.id}"][data-to="${rowB.id}"]`,
+      ),
+    ).toHaveCount(1);
+
+    // Reload — the edge is persisted server-side and re-fetched on init, so the
+    // same connector renders again without re-opening the row (AC #1 reload).
+    await tablePage.goto();
+    await expect(
+      page.locator(
+        `.gantt-view__host .arrow path[data-from="${rowA.id}"][data-to="${rowB.id}"]`,
+      ),
+    ).toHaveCount(1);
+
+    // rowC is referenced to keep its id in scope for clarity (third bar).
+    expect(rowC.id).toBeTruthy();
+  });
+
+  test("rejects a dependency that would close a cycle with a clear error and adds no connector (AC #2)", async ({
+    page,
+    goto,
+    workspacePage,
+  }) => {
+    const { database, table, view } = await setupGantt(workspacePage, "day");
+
+    const rowA = await createRow(workspacePage.user, table, {
+      Name: "Task A",
+      Start: dayKey(0),
+      End: dayKey(1),
+    });
+    const rowB = await createRow(workspacePage.user, table, {
+      Name: "Task B",
+      Start: dayKey(2),
+      End: dayKey(3),
+    });
+
+    const tablePage = new TablePage({ page, goto });
+    tablePage.pageUrl = `database/${database.id}/table/${table.id}/${view.id}`;
+    await tablePage.goto();
+
+    await expect(page.locator(".gantt-view__host .bar-wrapper")).toHaveCount(2);
+
+    // Precondition: draw A → B through the picker so the graph holds one edge.
+    await page
+      .locator(`.gantt-view__host .bar-wrapper[data-id="${rowB.id}"]`)
+      .click();
+    await expect(page.locator(".gantt-view__dependencies")).toBeVisible();
+    await page
+      .locator(".gantt-view__dependencies-add .dropdown__selected")
+      .click();
+    await page
+      .locator(
+        '.gantt-view__dependencies-add .select__item-name-text[title="Task A"]',
+      )
+      .click();
+    await expect(
+      page.locator(
+        `.gantt-view__host .arrow path[data-from="${rowA.id}"][data-to="${rowB.id}"]`,
+      ),
+    ).toHaveCount(1);
+
+    // Now open task A and attempt to add B as A's predecessor — that edge B → A
+    // closes the cycle A → B → A and the backend must reject it.
+    await page
+      .locator(`.gantt-view__host .bar-wrapper[data-id="${rowA.id}"]`)
+      .click();
+    await expect(page.locator(".gantt-view__dependencies")).toBeVisible();
+    await page
+      .locator(".gantt-view__dependencies-add .dropdown__selected")
+      .click();
+    await page
+      .locator(
+        '.gantt-view__dependencies-add .select__item-name-text[title="Task B"]',
+      )
+      .click();
+
+    // A clear cycle error toast surfaces (the create action maps
+    // ERROR_TASK_DEPENDENCY_CYCLE to the `ganttView.cycleRejectedTitle` toast)
+    // and the optimistic edge is rolled back (AC #2 clear error).
+    await expect(
+      page.locator(".toast__title", {
+        hasText: "Dependency would create a cycle",
+      }),
+    ).toBeVisible();
+
+    // No reverse connector was added — only the original A → B arrow remains.
+    await expect(
+      page.locator(
+        `.gantt-view__host .arrow path[data-from="${rowB.id}"][data-to="${rowA.id}"]`,
+      ),
+    ).toHaveCount(0);
+    await expect(page.locator(".gantt-view__host .arrow path")).toHaveCount(1);
+  });
 });

@@ -4,6 +4,55 @@
       <div class="gantt-view__main">
         <div ref="ganttHost" class="gantt-view__host"></div>
       </div>
+      <!--
+        Story 3.9 draw affordance. Frappe Gantt is `readonly` (no lib draw
+        handle — drag is 3.10), so the explicit predecessor picker is the v1
+        way to draw an edge. It targets the currently-open task row and lists
+        every existing predecessor (removable) plus the other scheduled rows as
+        candidates. Selecting a candidate creates a `predecessor → open row`
+        edge through the store's optimistic action.
+      -->
+      <div v-if="openRow" class="gantt-view__dependencies">
+        <div class="gantt-view__dependencies-header">
+          {{ $t('ganttView.predecessorsTitle') }}
+        </div>
+        <ul
+          v-if="openRowPredecessors.length"
+          class="gantt-view__dependencies-list"
+        >
+          <li
+            v-for="item in openRowPredecessors"
+            :key="item.dependency.id"
+            class="gantt-view__dependencies-item"
+          >
+            <span class="gantt-view__dependencies-name">{{ item.name }}</span>
+            <a
+              v-if="canEditDependencies"
+              class="gantt-view__dependencies-remove"
+              @click="removeDependency(item.dependency)"
+            >
+              <i class="iconoir-cancel"></i>
+            </a>
+          </li>
+        </ul>
+        <p v-else class="gantt-view__dependencies-empty">
+          {{ $t('ganttView.noPredecessors') }}
+        </p>
+        <Dropdown
+          v-if="canEditDependencies && availablePredecessorRows.length"
+          :value="null"
+          class="gantt-view__dependencies-add"
+          :show-search="true"
+          @input="addPredecessor($event)"
+        >
+          <DropdownItem
+            v-for="candidate in availablePredecessorRows"
+            :key="candidate.id"
+            :name="rowName(candidate)"
+            :value="candidate.id"
+          ></DropdownItem>
+        </Dropdown>
+      </div>
       <div v-if="unscheduledRows.length > 0" class="gantt-view__unscheduled">
         <div class="gantt-view__unscheduled-header">
           {{ $t('ganttView.unscheduled') }}
@@ -282,6 +331,83 @@ export default {
         `${this.storePrefix}view/gantt/getActiveSearchTerm`
       ]
     },
+    /**
+     * The table's `TaskDependency` edges from the store. `ganttTasks` reads
+     * these via `dependenciesForRow`, so this computed sits in that reactive
+     * chain and the existing `ganttTasks` watch repaints the connectors when an
+     * edge is added or removed. (Story 3.9 AC #1)
+     */
+    dependencies() {
+      return this.$store.getters[
+        `${this.storePrefix}view/gantt/getDependencies`
+      ]
+    },
+    /**
+     * The row whose modal is currently open (the picker target), or null.
+     */
+    openRow() {
+      return this.row
+    },
+    /**
+     * Editing edges follows the same permission gate as editing a row value:
+     * not read-only and the principal can update rows in this table/view.
+     */
+    canEditDependencies() {
+      return (
+        !this.readOnly &&
+        (this.$hasPermission(
+          'database.table.update_row',
+          this.table,
+          this.database.workspace.id
+        ) ||
+          this.$hasPermission(
+            'database.table.view.update_row',
+            this.view,
+            this.database.workspace.id
+          ))
+      )
+    },
+    /**
+     * The open row's predecessors as `{ dependency, name }` items, resolved
+     * from the edges whose `successor_row_id` is the open row.
+     */
+    openRowPredecessors() {
+      if (!this.openRow) {
+        return []
+      }
+      return this.dependencies
+        .filter((edge) => edge.successor_row_id === this.openRow.id)
+        .map((edge) => {
+          const predecessor = this.allRows.find(
+            (r) => r.id === edge.predecessor_row_id
+          )
+          return {
+            dependency: edge,
+            name: predecessor
+              ? this.rowName(predecessor)
+              : `#${edge.predecessor_row_id}`,
+          }
+        })
+    },
+    /**
+     * Candidate predecessors for the open row: every other scheduled row that
+     * is not already a predecessor and is not the open row itself. The backend
+     * is the cycle authority, so non-immediate cycles are still offered here and
+     * rejected on create with a clear error.
+     */
+    availablePredecessorRows() {
+      if (!this.openRow) {
+        return []
+      }
+      const existing = new Set(
+        this.openRowPredecessors.map(
+          (item) => item.dependency.predecessor_row_id
+        )
+      )
+      return this.scheduledRows.filter(
+        (r) => r.id !== this.openRow.id && !existing.has(r.id)
+      )
+    },
   },
   watch: {
     row: {
@@ -350,12 +476,70 @@ export default {
     },
     /**
      * The dependency edges for a row's task, as the comma-separated predecessor
-     * id string Frappe Gantt expects. THIS IS THE STORY 3.9 SEAM: today there
-     * are no `TaskDependency` edges so it always returns `''`. Story 3.9 swaps
-     * in the real predecessor ids here without touching the render call. (AC #3)
+     * id string Frappe Gantt expects. STORY 3.9 SEAM (now live): every edge
+     * whose `successor_row_id` is this row contributes its `predecessor_row_id`
+     * to the string the lib draws arrows from. Empty string when the row has no
+     * predecessors. The render call shape is untouched. (AC #1, AC #3)
      */
-    dependenciesForRow() {
-      return ''
+    dependenciesForRow(row) {
+      return this.dependencies
+        .filter((edge) => edge.successor_row_id === row.id)
+        .map((edge) => edge.predecessor_row_id)
+        .join(',')
+    },
+    /**
+     * Draws a `predecessor → open row` edge through the store's optimistic
+     * action. A cycle/exists rejection rolls back the optimistic edge in the
+     * store; here we translate the structured error into a clear toast naming
+     * the cause. Guarded by `canEditDependencies` so a read-only/insufficient-
+     * permission principal cannot mutate edges.
+     */
+    async addPredecessor(predecessorRowId) {
+      if (!this.canEditDependencies || !this.openRow) {
+        return
+      }
+      try {
+        await this.$store.dispatch(
+          this.storePrefix + 'view/gantt/createDependency',
+          {
+            viewId: this.view.id,
+            predecessorRowId,
+            successorRowId: this.openRow.id,
+          }
+        )
+      } catch (error) {
+        if (
+          error.handler &&
+          error.handler.code === 'ERROR_TASK_DEPENDENCY_CYCLE'
+        ) {
+          this.$store.dispatch('toast/error', {
+            title: this.$t('ganttView.cycleRejectedTitle'),
+            message: this.$t('ganttView.cycleRejectedMessage'),
+          })
+        } else {
+          notifyIf(error, 'view')
+        }
+      }
+    },
+    /**
+     * Removes an edge through the store's optimistic delete (restored on
+     * failure). Guarded by `canEditDependencies`.
+     */
+    async removeDependency(dependency) {
+      if (!this.canEditDependencies) {
+        return
+      }
+      try {
+        await this.$store.dispatch(
+          this.storePrefix + 'view/gantt/deleteDependency',
+          {
+            viewId: this.view.id,
+            dependencyId: dependency.id,
+          }
+        )
+      } catch (error) {
+        notifyIf(error, 'view')
+      }
     },
     /**
      * Lazily builds the Frappe Gantt instance once both date fields are set and

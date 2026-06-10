@@ -740,7 +740,12 @@
   },
   "ganttView": {
     "unscheduled": "Unscheduled",
-    "noDateFields": "Pick a start and end date field to position the bars on the gantt."
+    "noDateFields": "Pick a start and end date field to position the bars on the gantt.",
+    "predecessorsTitle": "Predecessors",
+    "noPredecessors": "No predecessors yet.",
+    "addPredecessor": "Add a predecessor",
+    "cycleRejectedTitle": "Dependency would create a cycle",
+    "cycleRejectedMessage": "This link was rejected because it would create a circular dependency between the tasks."
   },
   "gridViewHide": {
     "hideField": "Hide Fields | 1 hidden field | {count} hidden fields"

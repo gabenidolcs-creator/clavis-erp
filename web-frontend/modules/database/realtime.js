@@ -684,4 +684,27 @@ export const registerRealtimeEvents = (realtime) => {
       ruleId: data.rule.id,
     })
   })
+
+  // Story 3.9: Gantt TaskDependency edges are broadcast to the table page group
+  // (they are table-scoped). Only the gantt buffered-rows store holds them, so
+  // reconcile only when a gantt view is the selected view on the page; the store
+  // actions are idempotent. Dispatching to `page/view/gantt/` is safe because
+  // that module is registered exactly when a gantt view is selected.
+  realtime.registerEvent('task_dependency_created', ({ store }, data) => {
+    const selected = store.getters['view/getSelected']
+    if (selected !== undefined && selected.type === 'gantt') {
+      store.dispatch('page/view/gantt/dependencyCreated', {
+        dependency: data.dependency,
+      })
+    }
+  })
+
+  realtime.registerEvent('task_dependency_deleted', ({ store }, data) => {
+    const selected = store.getters['view/getSelected']
+    if (selected !== undefined && selected.type === 'gantt') {
+      store.dispatch('page/view/gantt/dependencyDeleted', {
+        dependencyId: data.dependency_id,
+      })
+    }
+  })
 }

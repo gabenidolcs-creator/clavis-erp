@@ -199,6 +199,14 @@ class DatabaseApplicationType(ApplicationType):
                     exported_field_rule = field_rules_handler.export_rule(rule)
                     serialized_field_rules.append(exported_field_rule)
 
+            from baserow.contrib.database.views.gantt.handler import (
+                TaskDependencyHandler,
+            )
+
+            serialized_task_dependencies = TaskDependencyHandler().export_serialized(
+                table
+            )
+
             structure = DatabaseExportSerializedStructure.table(
                 id=table.id,
                 name=table.name,
@@ -208,6 +216,7 @@ class DatabaseApplicationType(ApplicationType):
                 rows=serialized_rows,
                 data_sync=serialized_data_sync,
                 field_rules=serialized_field_rules,
+                task_dependencies=serialized_task_dependencies,
             )
 
             for serialized_structure in serialization_processor_registry.get_all():
@@ -609,7 +618,33 @@ class DatabaseApplicationType(ApplicationType):
 
         self._import_field_rules(serialized_tables, id_mapping, import_export_config)
 
+        self._import_task_dependencies(serialized_tables, id_mapping)
+
         return imported_tables
+
+    def _import_task_dependencies(self, serialized_tables, id_mapping):
+        """
+        Import the Gantt ``TaskDependency`` edges for every table. Rows are
+        imported keeping their original ids, so the predecessor/successor row ids
+        round-trip unchanged; an explicit id map is still threaded through in case
+        a future import path remaps row ids. The whole imported edge set is
+        validated acyclic before commit (a cyclic batch is rejected).
+        """
+
+        from baserow.contrib.database.views.gantt.handler import (
+            TaskDependencyHandler,
+        )
+
+        row_id_mapping = id_mapping.get("database_table_rows")
+        handler = TaskDependencyHandler()
+        for serialized_table in serialized_tables:
+            serialized_dependencies = serialized_table.get("task_dependencies")
+            if not serialized_dependencies:
+                continue
+            table = serialized_table["_object"]
+            handler.import_serialized(
+                table, serialized_dependencies, row_id_mapping
+            )
 
     def _import_extra_metadata(
         self, serialized_tables, id_mapping, import_export_config

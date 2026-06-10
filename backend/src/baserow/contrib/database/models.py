@@ -17,6 +17,7 @@ from .fields.models import (
 )
 from .table.models import Table
 from .tokens.models import Token, TokenPermission
+from .views.gantt.models import TaskDependency
 from .views.models import (
     FormView,
     FormViewFieldOptions,
@@ -64,6 +65,7 @@ __all__ = [
     "TableWebhookCall",
     "FieldDependency",
     "FieldRule",
+    "TaskDependency",
 ]
 
 

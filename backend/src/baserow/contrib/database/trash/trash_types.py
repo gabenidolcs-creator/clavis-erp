@@ -381,9 +381,18 @@ class RowTrashableItemType(TrashableItemType):
         )
 
     def permanently_delete_item(self, row, trash_item_lookup_cache=None):
+        from baserow.contrib.database.views.gantt.handler import (
+            TaskDependencyHandler,
+        )
+
         RichTextFieldMention.objects.filter(
             table_id=row.baserow_table_id, row_id=row.id
         ).delete()
+        # Drop any Gantt dependency edges that referenced this row (as
+        # predecessor or successor); mirrors the RichTextFieldMention cleanup.
+        TaskDependencyHandler().delete_dependencies_for_row(
+            row.baserow_table_id, row.id
+        )
         row.delete()
 
     def lookup_trashed_item(
@@ -519,6 +528,10 @@ class RowsTrashableItemType(TrashableItemType):
         table_model.objects.filter(id__in=item_to_trash.row_ids).update(trashed=True)
 
     def permanently_delete_item(self, trashed_item, trash_item_lookup_cache=None):
+        from baserow.contrib.database.views.gantt.handler import (
+            TaskDependencyHandler,
+        )
+
         table_model = self._get_table_model(trashed_item.table_id)
         delete_qs = table_model.objects_and_trash.filter(id__in=trashed_item.row_ids)
         delete_qs._raw_delete(using=router.db_for_write(delete_qs.model))
@@ -527,6 +540,10 @@ class RowsTrashableItemType(TrashableItemType):
             table_id=trashed_item.table_id,
             row_id__in=trashed_item.row_ids,
         ).delete()
+        # Drop Gantt dependency edges referencing any of the deleted rows.
+        TaskDependencyHandler().delete_dependencies_for_rows(
+            trashed_item.table_id, trashed_item.row_ids
+        )
 
     def lookup_trashed_item(
         self, trashed_entry: TrashEntry, trash_item_lookup_cache=None

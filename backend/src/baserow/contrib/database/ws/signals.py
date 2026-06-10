@@ -8,6 +8,10 @@ from .field_rules.signals import (
 from .fields.signals import field_created, field_deleted, field_updated
 from .rows.signals import rows_created, rows_deleted, rows_updated
 from .table.signals import table_created, table_deleted, table_updated
+from .views.gantt.signals import (  # noqa: F401
+    task_dependency_created,
+    task_dependency_deleted,
+)
 from .views.rows.signals import (
     views_before_rows_delete,
     views_before_rows_update,
