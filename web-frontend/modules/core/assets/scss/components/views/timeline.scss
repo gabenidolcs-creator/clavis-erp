@@ -1,0 +1,116 @@
+.timeline-view {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: $white;
+
+  @include absolute(0);
+}
+
+.timeline-view__main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.timeline-view__axis {
+  position: relative;
+  flex: 0 0 auto;
+  height: 32px;
+  border-bottom: 1px solid $palette-neutral-200;
+}
+
+.timeline-view__tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  border-left: 1px solid $palette-neutral-200;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.timeline-view__tick-label {
+  color: $palette-neutral-700;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.timeline-view__rows {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.timeline-view__row {
+  position: relative;
+  height: 44px;
+  border-bottom: 1px solid $palette-neutral-100;
+}
+
+.timeline-view__bar {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  min-width: 24px;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  background-color: $palette-blue-50;
+  border: 1px solid $palette-blue-200;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.timeline-view__card {
+  width: 100%;
+}
+
+.timeline-view__card--tray {
+  width: auto;
+  cursor: pointer;
+}
+
+.timeline-view__unscheduled {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 0 0 auto;
+  max-height: 30%;
+  padding: 12px;
+  border-top: 1px solid $palette-neutral-200;
+  background-color: $palette-neutral-50;
+}
+
+.timeline-view__unscheduled-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: $palette-neutral-700;
+  font-weight: 600;
+}
+
+.timeline-view__unscheduled-count {
+  font-size: 12px;
+}
+
+.timeline-view__unscheduled-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.timeline-view__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.timeline-view__empty-text {
+  color: $palette-neutral-700;
+}

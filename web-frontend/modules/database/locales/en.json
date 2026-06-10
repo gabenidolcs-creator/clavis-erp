@@ -712,9 +712,22 @@
     "week": "Week",
     "customizeCards": "Customize cards"
   },
+  "timelineViewHeader": {
+    "positionBy": "Position by",
+    "startDateField": "Start date field",
+    "endDateField": "End date field",
+    "day": "Day",
+    "week": "Week",
+    "month": "Month",
+    "customizeCards": "Customize cards"
+  },
   "calendarView": {
     "unscheduled": "Unscheduled",
     "noDateField": "Pick a date field to position the cards on the calendar."
+  },
+  "timelineView": {
+    "unscheduled": "Unscheduled",
+    "noDateFields": "Pick a start and end date field to position the bars on the timeline."
   },
   "gridViewHide": {
     "hideField": "Hide Fields | 1 hidden field | {count} hidden fields"

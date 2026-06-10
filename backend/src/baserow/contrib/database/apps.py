@@ -351,6 +351,7 @@ class DatabaseConfig(AppConfig):
             GalleryViewType,
             GridViewType,
             KanbanViewType,
+            TimelineViewType,
         )
 
         view_type_registry.register(GridViewType())
@@ -365,6 +366,7 @@ class DatabaseConfig(AppConfig):
         if "baserow_premium" not in settings.INSTALLED_APPS:
             view_type_registry.register(KanbanViewType())
             view_type_registry.register(CalendarViewType())
+            view_type_registry.register(TimelineViewType())
         view_type_registry.register(FormViewType())
 
         from .views.view_filters import (

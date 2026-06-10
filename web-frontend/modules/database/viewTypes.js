@@ -8,6 +8,8 @@ import KanbanView from '@baserow/modules/database/components/view/kanban/KanbanV
 import KanbanViewHeader from '@baserow/modules/database/components/view/kanban/KanbanViewHeader'
 import CalendarView from '@baserow/modules/database/components/view/calendar/CalendarView'
 import CalendarViewHeader from '@baserow/modules/database/components/view/calendar/CalendarViewHeader'
+import TimelineView from '@baserow/modules/database/components/view/timeline/TimelineView'
+import TimelineViewHeader from '@baserow/modules/database/components/view/timeline/TimelineViewHeader'
 import FormView from '@baserow/modules/database/components/view/form/FormView'
 import FormViewHeader from '@baserow/modules/database/components/view/form/FormViewHeader'
 import {
@@ -1431,6 +1433,98 @@ export class CalendarViewType extends BaseBufferedRowViewTypeMixin(ViewType) {
     // deleted field so the calendar does not point at a field that no longer
     // exists.
     this._setFieldToNull(context, field, 'date_field')
+    this._setFieldToNull(context, field, 'end_date_field')
+    await context.dispatch(
+      storePrefix + 'view/' + this.getType() + '/forceDeleteFieldOptions',
+      field.id,
+      {
+        root: true,
+      }
+    )
+  }
+}
+
+export class TimelineViewType extends BaseBufferedRowViewTypeMixin(ViewType) {
+  static getType() {
+    return 'timeline'
+  }
+
+  getIconClass() {
+    return 'baserow-icon-timeline'
+  }
+
+  getColorClass() {
+    return 'color-success'
+  }
+
+  getName() {
+    const { $i18n: i18n } = this.app
+    return i18n.t('viewType.timeline')
+  }
+
+  getHeaderComponent() {
+    return TimelineViewHeader
+  }
+
+  getComponent() {
+    return TimelineView
+  }
+
+  canFilter() {
+    return true
+  }
+
+  canSort() {
+    return true
+  }
+
+  canShare() {
+    return true
+  }
+
+  canShowRowModal() {
+    return true
+  }
+
+  getDefaultFieldOptionValues() {
+    // The default values should be the same as in the `TimelineViewFieldOptions`
+    // model in the backend to stay consistent.
+    return {
+      hidden: true,
+      order: maxPossibleOrderValue,
+    }
+  }
+
+  async afterFieldUpdated(
+    { dispatch, rootGetters },
+    field,
+    oldField,
+    fieldType,
+    storePrefix
+  ) {
+    // If a positioning field is changed to a type that can no longer represent
+    // a date, the timeline can no longer place bars by it, so the
+    // `start_date_field` and `end_date_field` references must be cleared.
+    if (!fieldType.canRepresentDate(field)) {
+      this._setFieldToNull({ dispatch, rootGetters }, field, 'start_date_field')
+      this._setFieldToNull({ dispatch, rootGetters }, field, 'end_date_field')
+    }
+    await dispatch(
+      storePrefix + 'view/timeline/updateSearch',
+      {
+        fields: rootGetters['field/getAll'],
+      },
+      {
+        root: true,
+      }
+    )
+  }
+
+  async afterFieldDeleted(context, field, fieldType, storePrefix = '') {
+    // Clear the date references on any timeline view that depended on the
+    // deleted field so the timeline does not point at a field that no longer
+    // exists.
+    this._setFieldToNull(context, field, 'start_date_field')
     this._setFieldToNull(context, field, 'end_date_field')
     await context.dispatch(
       storePrefix + 'view/' + this.getType() + '/forceDeleteFieldOptions',

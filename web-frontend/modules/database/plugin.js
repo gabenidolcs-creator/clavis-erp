@@ -13,6 +13,7 @@ import {
   GalleryViewType,
   KanbanViewType,
   CalendarViewType,
+  TimelineViewType,
   FormViewType,
 } from '@baserow/modules/database/viewTypes'
 import {
@@ -431,6 +432,10 @@ export default defineNuxtPlugin({
     // registered.
     $registry.register('view', new KanbanViewType(context))
     $registry.register('view', new CalendarViewType(context))
+    // Premium ships its own Timeline view that registers later and overrides
+    // this one (last registration wins). In OSS-only builds only this core
+    // view is registered.
+    $registry.register('view', new TimelineViewType(context))
     $registry.register('view', new FormViewType(context))
     $registry.register('viewFilter', new EqualViewFilterType(context))
     $registry.register('viewFilter', new NotEqualViewFilterType(context))

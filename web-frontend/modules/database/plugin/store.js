@@ -7,6 +7,7 @@ import gridStore from '@baserow/modules/database/store/view/grid'
 import galleryStore from '@baserow/modules/database/store/view/gallery'
 import kanbanStore from '@baserow/modules/database/store/view/kanban'
 import calendarStore from '@baserow/modules/database/store/view/calendar'
+import timelineStore from '@baserow/modules/database/store/view/timeline'
 import formStore from '@baserow/modules/database/store/view/form'
 import rowModal from '@baserow/modules/database/store/rowModal'
 import publicStore from '@baserow/modules/database/store/view/public'
@@ -69,12 +70,14 @@ export default defineNuxtPlugin({
       $store.registerModuleNuxtSafe('page/view/gallery', galleryStore)
       $store.registerModuleNuxtSafe('page/view/kanban', kanbanStore)
       $store.registerModuleNuxtSafe('page/view/calendar', calendarStore)
+      $store.registerModuleNuxtSafe('page/view/timeline', timelineStore)
       $store.registerModuleNuxtSafe('page/view/form', formStore)
       $store.registerModuleNuxtSafe('page/view/public', publicStore)
       $store.registerModuleNuxtSafe('template/view/grid', gridStore)
       $store.registerModuleNuxtSafe('template/view/gallery', galleryStore)
       $store.registerModuleNuxtSafe('template/view/kanban', kanbanStore)
       $store.registerModuleNuxtSafe('template/view/calendar', calendarStore)
+      $store.registerModuleNuxtSafe('template/view/timeline', timelineStore)
       $store.registerModuleNuxtSafe('template/view/form', formStore)
     }
   },

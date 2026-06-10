@@ -352,6 +352,7 @@
     "gallery": "Gallery",
     "kanban": "Kanban",
     "calendar": "Calendar",
+    "timeline": "Timeline",
     "form": "Form",
     "sharing": {
       "linkName": "view",

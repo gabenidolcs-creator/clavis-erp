@@ -913,6 +913,101 @@ class CalendarViewFieldOptions(HierarchicalModelMixin, models.Model):
         unique_together = ("calendar_view", "field")
 
 
+class TimelineView(View):
+    # The free, clean-room Timeline view lives in the always-loaded core
+    # `database` app. In open-core builds the premium plugin also defines a
+    # `TimelineView` model (table `database_timelineview`). Both model classes
+    # are loaded by Django regardless of which view type wins the registry, so
+    # the core model is given a distinct table name and non-clashing reverse
+    # accessors to avoid `fields.E304/E305` reverse-accessor clashes and
+    # migration table collisions.
+    view_ptr = models.OneToOneField(
+        View,
+        on_delete=models.CASCADE,
+        parent_link=True,
+        primary_key=True,
+        serialize=False,
+        related_name="core_timeline_view",
+    )
+    field_options = models.ManyToManyField(
+        Field,
+        through="TimelineViewFieldOptions",
+        # Disable the `Field` -> timeline reverse accessor; the premium Timeline
+        # view defines its own and the default name would clash.
+        related_name="+",
+    )
+    start_date_field = models.ForeignKey(
+        Field,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="core_timeline_view_start_date_field",
+        help_text="The date field positioning the left edge of each bar on the "
+        "timeline. A row is only rendered as a bar when both the start and end "
+        "date fields have a value; otherwise it is shown in the unscheduled tray.",
+    )
+    end_date_field = models.ForeignKey(
+        Field,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="core_timeline_view_end_date_field",
+        help_text="The date field positioning the right edge of each bar on the "
+        "timeline. A row is only rendered as a bar when both the start and end "
+        "date fields have a value; otherwise it is shown in the unscheduled tray.",
+    )
+    timescale = models.CharField(
+        max_length=8,
+        choices=[("day", "day"), ("week", "week"), ("month", "month")],
+        default="month",
+        help_text="The persisted zoom level of the time axis: day, week or month.",
+    )
+
+    class Meta:
+        # Distinct table so the core (free) Timeline does not collide with the
+        # premium Timeline (`database_timelineview`) in open-core builds.
+        db_table = "database_coretimelineview"
+
+
+class TimelineViewFieldOptionsManager(models.Manager):
+    """
+    The View can be trashed and the field options are not deleted, therefore
+    we need to filter out the trashed views.
+    """
+
+    def get_queryset(self):
+        trashed_Q = Q(timeline_view__trashed=True) | Q(field__trashed=True)
+        return super().get_queryset().filter(~trashed_Q)
+
+
+class TimelineViewFieldOptions(HierarchicalModelMixin, models.Model):
+    objects = TimelineViewFieldOptionsManager()
+    objects_and_trash = models.Manager()
+
+    timeline_view = models.ForeignKey(TimelineView, on_delete=models.CASCADE)
+    # Disable the `Field` -> options reverse accessor; the premium Timeline
+    # field options model defines its own and the default name would clash.
+    field = models.ForeignKey(Field, on_delete=models.CASCADE, related_name="+")
+    hidden = models.BooleanField(
+        default=True,
+        help_text="Whether or not the field should be hidden in the card.",
+    )
+    # The default value is the maximum value of the small integer field because a newly
+    # created field must always be last.
+    order = models.SmallIntegerField(
+        default=32767,
+        help_text="The order that the field has in the form. Lower value is first.",
+    )
+
+    def get_parent(self):
+        return self.timeline_view
+
+    class Meta:
+        db_table = "database_coretimelineviewfieldoptions"
+        ordering = ("order", "field_id")
+        unique_together = ("timeline_view", "field")
+
+
 class FormView(View):
     field_options = models.ManyToManyField(Field, through="FormViewFieldOptions")
     title = models.TextField(

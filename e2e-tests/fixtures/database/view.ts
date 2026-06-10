@@ -56,6 +56,30 @@ export async function createCalendarView(
   );
 }
 
+/**
+ * Thin convenience wrapper that creates a core Timeline view already positioned
+ * by the given start and end date fields, plus an optional persisted zoom level
+ * (`timescale`). Mirrors the generic `createView` call the Calendar e2e helper
+ * makes, keeping the timeline spec readable.
+ */
+export async function createTimelineView(
+  user: User,
+  name: string,
+  startDateFieldId: number | null,
+  endDateFieldId: number | null,
+  table: Table,
+  timescale: string | null = null,
+): Promise<View> {
+  const settings: any = {
+    start_date_field: startDateFieldId,
+    end_date_field: endDateFieldId,
+  };
+  if (timescale !== null) {
+    settings.timescale = timescale;
+  }
+  return createView(user, name, "timeline", settings, table);
+}
+
 export async function updateView(
   user: User,
   view: View,
