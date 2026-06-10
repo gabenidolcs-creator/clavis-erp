@@ -696,6 +696,14 @@
   "galleryViewHeader": {
     "customizeCards": "Customize cards"
   },
+  "kanbanViewHeader": {
+    "stackBy": "Stack by",
+    "customizeCards": "Customize cards"
+  },
+  "kanbanView": {
+    "uncategorized": "Uncategorized",
+    "noSingleSelectField": "Pick a single select field to group the cards into columns."
+  },
   "gridViewHide": {
     "hideField": "Hide Fields | 1 hidden field | {count} hidden fields"
   },

@@ -37,6 +37,9 @@ from baserow.contrib.database.api.views.grid.errors import (
 from baserow.contrib.database.api.views.grid.serializers import (
     GridViewFieldOptionsSerializer,
 )
+from baserow.contrib.database.api.views.kanban.serializers import (
+    KanbanViewFieldOptionsSerializer,
+)
 from baserow.contrib.database.fields.exceptions import (
     FieldNotInTable,
     IncompatibleField,
@@ -69,6 +72,8 @@ from .models import (
     GalleryViewFieldOptions,
     GridView,
     GridViewFieldOptions,
+    KanbanView,
+    KanbanViewFieldOptions,
     View,
 )
 from .registries import ViewType, form_view_mode_registry, view_filter_type_registry
@@ -601,6 +606,300 @@ class GalleryViewType(ViewType):
     def after_field_delete(self, field: Field) -> None:
         if isinstance(field, FileField):
             GalleryView.objects.filter(card_cover_image_field_id=field.id).update(
+                card_cover_image_field_id=None
+            )
+
+
+class KanbanViewType(ViewType):
+    type = "kanban"
+    model_class = KanbanView
+    field_options_model_class = KanbanViewFieldOptions
+    field_options_serializer_class = KanbanViewFieldOptionsSerializer
+    allowed_fields = ["single_select_field", "card_cover_image_field"]
+    field_options_allowed_fields = ["hidden", "order"]
+    serializer_field_names = ["single_select_field", "card_cover_image_field"]
+    serializer_field_overrides = {
+        "single_select_field": serializers.PrimaryKeyRelatedField(
+            queryset=Field.objects.all(),
+            required=False,
+            default=None,
+            allow_null=True,
+            help_text="The single select field by which the rows are grouped into "
+            "columns. Rows without a value are shown in the 'Uncategorized' column.",
+        ),
+        "card_cover_image_field": serializers.PrimaryKeyRelatedField(
+            queryset=Field.objects.all(),
+            required=False,
+            default=None,
+            allow_null=True,
+            help_text="References a file field of which the first image must be shown "
+            "as card cover image.",
+        ),
+    }
+    api_exceptions_map = {
+        FieldNotInTable: ERROR_FIELD_NOT_IN_TABLE,
+        IncompatibleField: ERROR_INCOMPATIBLE_FIELD,
+    }
+    can_decorate = True
+    can_share = True
+    has_public_info = True
+
+    def get_api_urls(self):
+        from baserow.contrib.database.api.views.kanban import urls as api_urls
+
+        return [
+            path("kanban/", include(api_urls, namespace=self.type)),
+        ]
+
+    def prepare_values(self, values, table, user):
+        """
+        Check if the provided single select field is a single select field that
+        belongs to the same table, and that the optional card cover image field
+        belongs to the same table.
+        """
+
+        name = "single_select_field"
+        if values.get(name, None) is not None:
+            if isinstance(values[name], int):
+                values[name] = Field.objects.get(pk=values[name])
+
+            field_type = field_type_registry.get_by_model(values[name].specific)
+            if field_type.type != "single_select":
+                raise IncompatibleField(
+                    "The provided field cannot be used to group the kanban view, "
+                    "because it is not a single select field."
+                )
+            elif values[name].table_id != table.id:
+                raise FieldNotInTable(
+                    "The provided single select field id does not belong to the "
+                    "kanban view's table."
+                )
+
+        name = "card_cover_image_field"
+        if values.get(name, None) is not None:
+            if isinstance(values[name], int):
+                values[name] = Field.objects.get(pk=values[name])
+
+            field_type = field_type_registry.get_by_model(values[name].specific)
+            if not field_type.can_represent_files(values[name]):
+                raise IncompatibleField(
+                    "The provided field cannot be used as a card cover image field."
+                )
+            elif values[name].table_id != table.id:
+                raise FieldNotInTable(
+                    "The provided file select field id does not belong to the kanban "
+                    "view's table."
+                )
+
+        return super().prepare_values(values, table, user)
+
+    def after_fields_type_change(self, fields):
+        # If the grouping field is changed to a type that is no longer a single
+        # select field, the single_select_field must be nulled out so the board
+        # does not reference a dangling grouping field.
+        fields_not_single_select = [
+            field
+            for field in fields
+            if field_type_registry.get_by_model(field.specific_class).type
+            != "single_select"
+        ]
+        if len(fields_not_single_select) > 0:
+            KanbanView.objects.filter(
+                single_select_field_id__in=[f.id for f in fields_not_single_select]
+            ).update(single_select_field_id=None)
+
+        # Mirror the gallery behaviour for the optional card cover image field.
+        fields_cannot_represent_files = [
+            field
+            for field in fields
+            if not field_type_registry.get_by_model(
+                field.specific_class
+            ).can_represent_files(field)
+        ]
+        if len(fields_cannot_represent_files) > 0:
+            KanbanView.objects.filter(
+                card_cover_image_field_id__in=[
+                    f.id for f in fields_cannot_represent_files
+                ]
+            ).update(card_cover_image_field_id=None)
+
+    def export_serialized(
+        self,
+        kanban: View,
+        import_export_config: ImportExportConfig,
+        cache: Dict,
+        files_zip: Optional[ExportZipFile] = None,
+        storage: Optional[Storage] = None,
+    ):
+        """
+        Adds the serialized kanban view options to the exported dict.
+        """
+
+        serialized = super().export_serialized(
+            kanban, import_export_config, cache, files_zip, storage
+        )
+
+        if kanban.single_select_field_id:
+            serialized["single_select_field_id"] = kanban.single_select_field_id
+        if kanban.card_cover_image_field_id:
+            serialized["card_cover_image_field_id"] = kanban.card_cover_image_field_id
+
+        serialized_field_options = []
+        for field_option in kanban.get_field_options():
+            serialized_field_options.append(
+                {
+                    "id": field_option.id,
+                    "field_id": field_option.field_id,
+                    "hidden": field_option.hidden,
+                    "order": field_option.order,
+                }
+            )
+
+        serialized["field_options"] = serialized_field_options
+        return serialized
+
+    def import_serialized(
+        self,
+        table: Table,
+        serialized_values: Dict[str, Any],
+        import_export_config: ImportExportConfig,
+        id_mapping: Dict[str, Any],
+        cache: Dict,
+        files_zip: Optional[ZipFile] = None,
+        storage: Optional[Storage] = None,
+    ) -> Optional[View]:
+        """
+        Imports the serialized kanban view field options.
+        """
+
+        serialized_copy = serialized_values.copy()
+
+        if serialized_copy.get("single_select_field_id", None):
+            serialized_copy["single_select_field_id"] = id_mapping["database_fields"][
+                serialized_copy["single_select_field_id"]
+            ]
+        if serialized_copy.get("card_cover_image_field_id", None):
+            serialized_copy["card_cover_image_field_id"] = id_mapping[
+                "database_fields"
+            ][serialized_copy["card_cover_image_field_id"]]
+
+        field_options = serialized_copy.pop("field_options")
+
+        kanban_view = super().import_serialized(
+            table,
+            serialized_copy,
+            import_export_config,
+            id_mapping,
+            cache,
+            files_zip,
+            storage,
+        )
+
+        if kanban_view is not None:
+            if "database_kanban_view_field_options" not in id_mapping:
+                id_mapping["database_kanban_view_field_options"] = {}
+
+            for field_option in field_options:
+                field_option_copy = field_option.copy()
+                field_option_id = field_option_copy.pop("id")
+                field_option_copy["field_id"] = id_mapping["database_fields"][
+                    field_option["field_id"]
+                ]
+                field_option_object = KanbanViewFieldOptions.objects.create(
+                    kanban_view=kanban_view, **field_option_copy
+                )
+                id_mapping["database_kanban_view_field_options"][field_option_id] = (
+                    field_option_object.id
+                )
+
+        return kanban_view
+
+    def view_created(self, view):
+        """
+        When a kanban view is created, we want to set the first three fields as
+        visible.
+        """
+
+        field_options = view.get_field_options(create_if_missing=True).order_by(
+            "-field__primary", "field__id"
+        )
+        ids_to_update = [f.id for f in field_options[0:3]]
+
+        if ids_to_update:
+            KanbanViewFieldOptions.objects.filter(id__in=ids_to_update).update(
+                hidden=False
+            )
+
+    def export_prepared_values(self, view: KanbanView) -> Dict[str, Any]:
+        """
+        Add `single_select_field` and `card_cover_image_field` to the exportable
+        fields.
+
+        :param view: The kanban view to export.
+        :return: The prepared values.
+        """
+
+        values = super().export_prepared_values(view)
+        values["single_select_field"] = view.single_select_field_id
+        values["card_cover_image_field"] = view.card_cover_image_field_id
+
+        return values
+
+    def get_visible_field_options_in_order(self, kanban_view: KanbanView):
+        return (
+            kanban_view.get_field_options(create_if_missing=True)
+            .filter(
+                Q(hidden=False)
+                | Q(field__id=kanban_view.single_select_field_id)
+                | Q(field__id=kanban_view.card_cover_image_field_id)
+            )
+            .order_by("order", "field__id")
+        )
+
+    def get_hidden_fields(
+        self,
+        view: KanbanView,
+        field_ids_to_check: Optional[List[int]] = None,
+    ) -> Set[int]:
+        hidden_field_ids = set()
+        fields = view.table.field_set.all()
+        field_options = view.kanbanviewfieldoptions_set.all()
+
+        if field_ids_to_check is not None:
+            fields = [f for f in fields if f.id in field_ids_to_check]
+
+        for field in fields:
+            # The grouping field and the card cover image field are always visible.
+            if field.id == view.single_select_field_id:
+                continue
+            if field.id == view.card_cover_image_field_id:
+                continue
+
+            # Find corresponding field option
+            field_option_matching = None
+            for field_option in field_options:
+                if field_option.field_id == field.id:
+                    field_option_matching = field_option
+
+            # A field is considered hidden, if it is explicitly hidden
+            # or if the field options don't exist
+            if field_option_matching is None or field_option_matching.hidden:
+                hidden_field_ids.add(field.id)
+
+        return hidden_field_ids
+
+    def enhance_queryset(self, queryset):
+        return queryset.prefetch_related("kanbanviewfieldoptions_set")
+
+    def after_field_delete(self, field: Field) -> None:
+        # Null the grouping field reference so the board does not point at a
+        # trashed field. SET_NULL on the FK only fires on a hard delete, but
+        # Baserow trashes (soft-deletes) fields, so this must be done explicitly.
+        KanbanView.objects.filter(single_select_field_id=field.id).update(
+            single_select_field_id=None
+        )
+        if isinstance(field, FileField):
+            KanbanView.objects.filter(card_cover_image_field_id=field.id).update(
                 card_cover_image_field_id=None
             )
 

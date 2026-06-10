@@ -4,9 +4,14 @@ import GridView from '@baserow/modules/database/components/view/grid/GridView'
 import GridViewHeader from '@baserow/modules/database/components/view/grid/GridViewHeader'
 import GalleryView from '@baserow/modules/database/components/view/gallery/GalleryView'
 import GalleryViewHeader from '@baserow/modules/database/components/view/gallery/GalleryViewHeader'
+import KanbanView from '@baserow/modules/database/components/view/kanban/KanbanView'
+import KanbanViewHeader from '@baserow/modules/database/components/view/kanban/KanbanViewHeader'
 import FormView from '@baserow/modules/database/components/view/form/FormView'
 import FormViewHeader from '@baserow/modules/database/components/view/form/FormViewHeader'
-import { FileFieldType } from '@baserow/modules/database/fieldTypes'
+import {
+  FileFieldType,
+  SingleSelectFieldType,
+} from '@baserow/modules/database/fieldTypes'
 import {
   filterVisibleFieldsFunction,
   isAdhocFiltering,
@@ -1228,6 +1233,110 @@ export class GalleryViewType extends BaseBufferedRowViewTypeMixin(ViewType) {
     // We want to loop over all gallery views that we have in the store and check if
     // they were depending on this deleted field. If that's case, we can set it to null
     // because it doesn't exist anymore.
+    this._setFieldToNull(context, field, 'card_cover_image_field')
+    await context.dispatch(
+      storePrefix + 'view/' + this.getType() + '/forceDeleteFieldOptions',
+      field.id,
+      {
+        root: true,
+      }
+    )
+  }
+}
+
+export class KanbanViewType extends BaseBufferedRowViewTypeMixin(ViewType) {
+  static getType() {
+    return 'kanban'
+  }
+
+  getIconClass() {
+    return 'baserow-icon-kanban'
+  }
+
+  getColorClass() {
+    return 'color-success'
+  }
+
+  getName() {
+    const { $i18n: i18n } = this.app
+    return i18n.t('viewType.kanban')
+  }
+
+  getHeaderComponent() {
+    return KanbanViewHeader
+  }
+
+  getComponent() {
+    return KanbanView
+  }
+
+  canFilter() {
+    return true
+  }
+
+  canSort() {
+    return true
+  }
+
+  canShare() {
+    return true
+  }
+
+  canShowRowModal() {
+    return true
+  }
+
+  getDefaultFieldOptionValues() {
+    // The default values should be the same as in the `KanbanViewFieldOptions`
+    // model in the backend to stay consistent.
+    return {
+      hidden: true,
+      order: maxPossibleOrderValue,
+    }
+  }
+
+  async afterFieldUpdated(
+    { dispatch, rootGetters },
+    field,
+    oldField,
+    fieldType,
+    storePrefix
+  ) {
+    // If the grouping single-select field is changed to another type, the
+    // board can no longer group by it, so the `single_select_field` reference
+    // must be cleared. The optional cover image field mirrors gallery.
+    const singleSelectType = SingleSelectFieldType.getType()
+    if (oldField.type === singleSelectType && field.type !== singleSelectType) {
+      this._setFieldToNull(
+        { dispatch, rootGetters },
+        field,
+        'single_select_field'
+      )
+    }
+    const fileType = FileFieldType.getType()
+    if (oldField.type === fileType && field.type !== fileType) {
+      this._setFieldToNull(
+        { dispatch, rootGetters },
+        field,
+        'card_cover_image_field'
+      )
+    }
+    await dispatch(
+      storePrefix + 'view/kanban/updateSearch',
+      {
+        fields: rootGetters['field/getAll'],
+      },
+      {
+        root: true,
+      }
+    )
+  }
+
+  async afterFieldDeleted(context, field, fieldType, storePrefix = '') {
+    // Clear the grouping/cover references on any kanban view that depended on
+    // the deleted field so the board does not point at a field that no longer
+    // exists.
+    this._setFieldToNull(context, field, 'single_select_field')
     this._setFieldToNull(context, field, 'card_cover_image_field')
     await context.dispatch(
       storePrefix + 'view/' + this.getType() + '/forceDeleteFieldOptions',

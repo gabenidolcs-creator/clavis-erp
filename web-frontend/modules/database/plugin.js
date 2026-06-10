@@ -11,6 +11,7 @@ import {
 import {
   GridViewType,
   GalleryViewType,
+  KanbanViewType,
   FormViewType,
 } from '@baserow/modules/database/viewTypes'
 import {
@@ -422,6 +423,12 @@ export default defineNuxtPlugin({
 
     $registry.register('view', new GridViewType(context))
     $registry.register('view', new GalleryViewType(context))
+    // The free, clean-room Kanban view lives in core. In open-core builds that
+    // also ship the premium plugin, the premium Kanban view registers later and
+    // overrides this one in the registry (last registration wins), so the
+    // premium board takes precedence. In OSS-only builds only this core view is
+    // registered.
+    $registry.register('view', new KanbanViewType(context))
     $registry.register('view', new FormViewType(context))
     $registry.register('viewFilter', new EqualViewFilterType(context))
     $registry.register('viewFilter', new NotEqualViewFilterType(context))

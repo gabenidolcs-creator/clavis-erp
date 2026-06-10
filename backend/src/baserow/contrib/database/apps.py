@@ -345,10 +345,23 @@ class DatabaseConfig(AppConfig):
         action_type_registry.register(DuplicateFieldActionType())
         action_type_registry.register(ChangePrimaryFieldActionType())
 
-        from .views.view_types import FormViewType, GalleryViewType, GridViewType
+        from .views.view_types import (
+            FormViewType,
+            GalleryViewType,
+            GridViewType,
+            KanbanViewType,
+        )
 
         view_type_registry.register(GridViewType())
         view_type_registry.register(GalleryViewType())
+        # The free, clean-room Kanban view lives in core. In open-core builds that
+        # still ship the premium plugin, the premium Kanban view (type "kanban")
+        # registers itself and takes precedence, so we only register the core view
+        # when the premium plugin is not installed to avoid a duplicate-type clash.
+        from django.conf import settings
+
+        if "baserow_premium" not in settings.INSTALLED_APPS:
+            view_type_registry.register(KanbanViewType())
         view_type_registry.register(FormViewType())
 
         from .views.view_filters import (

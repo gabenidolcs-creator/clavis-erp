@@ -5,6 +5,7 @@ import viewStore from '@baserow/modules/database/store/view'
 import fieldStore from '@baserow/modules/database/store/field'
 import gridStore from '@baserow/modules/database/store/view/grid'
 import galleryStore from '@baserow/modules/database/store/view/gallery'
+import kanbanStore from '@baserow/modules/database/store/view/kanban'
 import formStore from '@baserow/modules/database/store/view/form'
 import rowModal from '@baserow/modules/database/store/rowModal'
 import publicStore from '@baserow/modules/database/store/view/public'
@@ -65,10 +66,12 @@ export default defineNuxtPlugin({
       $store.registerModuleNuxtSafe('fieldRules', fieldRulesStore)
       $store.registerModuleNuxtSafe('page/view/grid', gridStore)
       $store.registerModuleNuxtSafe('page/view/gallery', galleryStore)
+      $store.registerModuleNuxtSafe('page/view/kanban', kanbanStore)
       $store.registerModuleNuxtSafe('page/view/form', formStore)
       $store.registerModuleNuxtSafe('page/view/public', publicStore)
       $store.registerModuleNuxtSafe('template/view/grid', gridStore)
       $store.registerModuleNuxtSafe('template/view/gallery', galleryStore)
+      $store.registerModuleNuxtSafe('template/view/kanban', kanbanStore)
       $store.registerModuleNuxtSafe('template/view/form', formStore)
     }
   },

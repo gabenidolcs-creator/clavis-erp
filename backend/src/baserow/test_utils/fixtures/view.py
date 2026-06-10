@@ -12,6 +12,8 @@ from baserow.contrib.database.views.models import (
     GalleryViewFieldOptions,
     GridView,
     GridViewFieldOptions,
+    KanbanView,
+    KanbanViewFieldOptions,
     ViewDecoration,
     ViewFilter,
     ViewFilterGroup,
@@ -116,6 +118,33 @@ class ViewFixtures:
     def create_gallery_view_field_option(self, gallery_view, field, **kwargs):
         field_options, _ = GalleryViewFieldOptions.objects.update_or_create(
             gallery_view=gallery_view, field=field, defaults=kwargs
+        )
+        return field_options
+
+    def create_kanban_view(self, user=None, create_options=True, **kwargs):
+        if "table" not in kwargs:
+            kwargs["table"] = self.create_database_table(user=user)
+
+        if "name" not in kwargs:
+            kwargs["name"] = self.fake.name()
+
+        if "order" not in kwargs:
+            kwargs["order"] = 0
+
+        kanban_view = KanbanView.objects.create(**kwargs)
+        if create_options:
+            self.create_kanban_view_field_options(kanban_view)
+        return kanban_view
+
+    def create_kanban_view_field_options(self, kanban_view, **kwargs):
+        return [
+            self.create_kanban_view_field_option(kanban_view, field, **kwargs)
+            for field in Field.objects.filter(table=kanban_view.table)
+        ]
+
+    def create_kanban_view_field_option(self, kanban_view, field, **kwargs):
+        field_options, _ = KanbanViewFieldOptions.objects.update_or_create(
+            kanban_view=kanban_view, field=field, defaults=kwargs
         )
         return field_options
 

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-06
-last_updated: 2026-06-09T20:23:00Z
+last_updated: 2026-06-09T21:35:00Z
 project: clavis-erp
 project_key: NOKEY
 tracking_system: file-system
@@ -56,17 +56,17 @@ development_status:
   epic-1-retrospective: optional
 
   # Epic 2: Richer Field Types
-  epic-2: backlog
+  epic-2: done
   2-1-currency-field: done
   2-2-percent-field: done
   2-3-barcode-field: done
   2-4-autonumber-field: done
   2-5-running-count-field: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
 
   # Epic 3: Visualize Data Multiple Ways
-  epic-3: backlog
-  3-1-create-and-configure-a-kanban-view: backlog
+  epic-3: in-progress
+  3-1-create-and-configure-a-kanban-view: done
   3-2-drag-a-kanban-card-between-columns: backlog
   3-3-configure-kanban-card-appearance: backlog
   3-4-create-and-configure-a-calendar-view: backlog

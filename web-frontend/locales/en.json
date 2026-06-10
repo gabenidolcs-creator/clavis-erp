@@ -350,6 +350,7 @@
   "viewType": {
     "grid": "Grid",
     "gallery": "Gallery",
+    "kanban": "Kanban",
     "form": "Form",
     "sharing": {
       "linkName": "view",

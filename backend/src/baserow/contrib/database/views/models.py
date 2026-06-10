@@ -740,6 +740,92 @@ class GalleryViewFieldOptions(HierarchicalModelMixin, models.Model):
         unique_together = ("gallery_view", "field")
 
 
+class KanbanView(View):
+    # The free, clean-room Kanban view lives in the always-loaded core `database`
+    # app. In open-core builds the premium plugin also defines a `KanbanView`
+    # model (table `database_kanbanview`). Both model classes are loaded by Django
+    # regardless of which view type wins the registry, so the core model is given
+    # a distinct table name and non-clashing reverse accessors to avoid
+    # `fields.E304/E305` reverse-accessor clashes and migration table collisions.
+    view_ptr = models.OneToOneField(
+        View,
+        on_delete=models.CASCADE,
+        parent_link=True,
+        primary_key=True,
+        serialize=False,
+        related_name="core_kanban_view",
+    )
+    field_options = models.ManyToManyField(
+        Field,
+        through="KanbanViewFieldOptions",
+        # Disable the `Field` -> kanban reverse accessor; the premium Kanban view
+        # defines its own and the default name (`kanbanview_set`) would clash.
+        related_name="+",
+    )
+    single_select_field = models.ForeignKey(
+        Field,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="core_kanban_view_single_select_field",
+        help_text="The single select field by which the rows are grouped into "
+        "columns. Rows without a value are shown in the 'Uncategorized' column.",
+    )
+    card_cover_image_field = models.ForeignKey(
+        Field,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="core_kanban_view_card_cover_field",
+        help_text="References a file field of which the first image must be shown as "
+        "card cover image.",
+    )
+
+    class Meta:
+        # Distinct table so the core (free) Kanban does not collide with the
+        # premium Kanban (`database_kanbanview`) in open-core builds.
+        db_table = "database_corekanbanview"
+
+
+class KanbanViewFieldOptionsManager(models.Manager):
+    """
+    The View can be trashed and the field options are not deleted, therefore
+    we need to filter out the trashed views.
+    """
+
+    def get_queryset(self):
+        trashed_Q = Q(kanban_view__trashed=True) | Q(field__trashed=True)
+        return super().get_queryset().filter(~trashed_Q)
+
+
+class KanbanViewFieldOptions(HierarchicalModelMixin, models.Model):
+    objects = KanbanViewFieldOptionsManager()
+    objects_and_trash = models.Manager()
+
+    kanban_view = models.ForeignKey(KanbanView, on_delete=models.CASCADE)
+    # Disable the `Field` -> options reverse accessor; the premium Kanban field
+    # options model defines its own and the default name would clash.
+    field = models.ForeignKey(Field, on_delete=models.CASCADE, related_name="+")
+    hidden = models.BooleanField(
+        default=True,
+        help_text="Whether or not the field should be hidden in the card.",
+    )
+    # The default value is the maximum value of the small integer field because a newly
+    # created field must always be last.
+    order = models.SmallIntegerField(
+        default=32767,
+        help_text="The order that the field has in the form. Lower value is first.",
+    )
+
+    def get_parent(self):
+        return self.kanban_view
+
+    class Meta:
+        db_table = "database_corekanbanviewfieldoptions"
+        ordering = ("order", "field_id")
+        unique_together = ("kanban_view", "field")
+
+
 class FormView(View):
     field_options = models.ManyToManyField(Field, through="FormViewFieldOptions")
     title = models.TextField(
