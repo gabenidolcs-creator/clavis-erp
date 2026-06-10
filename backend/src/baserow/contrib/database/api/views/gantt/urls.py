@@ -3,6 +3,8 @@ from django.urls import re_path
 from .views import (
     GanttViewDependenciesView,
     GanttViewDependencyView,
+    GanttViewRescheduleApplyView,
+    GanttViewReschedulePreviewView,
     GanttViewView,
     PublicGanttViewDependenciesView,
     PublicGanttViewRowsView,
@@ -20,6 +22,16 @@ urlpatterns = [
         r"(?P<view_id>[0-9]+)/dependencies/(?P<dependency_id>[0-9]+)/$",
         GanttViewDependencyView.as_view(),
         name="dependency",
+    ),
+    re_path(
+        r"(?P<view_id>[0-9]+)/reschedule/preview/$",
+        GanttViewReschedulePreviewView.as_view(),
+        name="reschedule_preview",
+    ),
+    re_path(
+        r"(?P<view_id>[0-9]+)/reschedule/apply/$",
+        GanttViewRescheduleApplyView.as_view(),
+        name="reschedule_apply",
     ),
     re_path(r"(?P<view_id>[0-9]+)/$", GanttViewView.as_view(), name="list"),
     re_path(

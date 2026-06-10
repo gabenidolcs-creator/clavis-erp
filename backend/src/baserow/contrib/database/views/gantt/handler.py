@@ -1,7 +1,10 @@
-from typing import Dict, Iterable, List, Optional, Tuple
+import dataclasses
+from datetime import timedelta
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from django.db import transaction
 
+from baserow.contrib.database.fields.models import Field
 from baserow.contrib.database.rows.operations import (
     ReadDatabaseRowOperationType,
     UpdateDatabaseRowOperationType,
@@ -9,6 +12,7 @@ from baserow.contrib.database.rows.operations import (
 from baserow.contrib.database.table.models import Table
 from baserow.core.handler import CoreHandler
 
+from . import date_utils
 from .exceptions import (
     InvalidTaskDependencyType,
     TaskDependencyAlreadyExists,
@@ -27,6 +31,33 @@ ALLOWED_DEPENDENCY_TYPES = {"FS"}
 # whole cycle layer works on these tuples so the create path and the batch
 # (restore / import) paths share ONE verified graph implementation.
 Edge = Tuple[int, int]
+
+
+@dataclasses.dataclass
+class CascadePlan:
+    """
+    The result of :meth:`TaskDependencyHandler.compute_cascade` (Story 3.10 /
+    FR-10). Pure data — no DB handle — so the preview endpoint can return it and
+    the apply endpoint can recompute one under a lock.
+
+    ``rows_values`` is the ordered batch handed verbatim to
+    ``UpdateRowsActionType.do`` (predecessor first, then each shifted successor);
+    each item is ``{"id": row_id, "field_<start_id>": iso, "field_<end_id>":
+    iso}``. ``affected`` carries the per-successor before/after dates the prompt
+    shows; ``cascade_count`` is its length — the transitive dependent count
+    computed BEFORE any write (AC #1).
+    """
+
+    rows_values: List[Dict[str, Any]]
+    affected: List[Dict[str, Any]]
+
+    @property
+    def affected_successor_ids(self) -> List[int]:
+        return [a["row_id"] for a in self.affected]
+
+    @property
+    def cascade_count(self) -> int:
+        return len(self.affected)
 
 
 def _build_adjacency(edges: Iterable[Edge]) -> Dict[int, List[int]]:
@@ -148,6 +179,282 @@ class TaskDependencyHandler:
                 "predecessor_row_id", "successor_row_id"
             )
         )
+
+    def _load_fs_edges(self, table: Table) -> List[Edge]:
+        """
+        FS-only edge set for the cascade walk. v1 only cascades finish-to-start
+        edges (``successor.start >= predecessor.end``); any other type is ignored
+        here exactly as it is rejected at create time. [Source: 3.10 Task 1 FS-only]
+        """
+
+        return list(
+            TaskDependency.objects.filter(
+                table=table, dependency_type="FS"
+            ).values_list("predecessor_row_id", "successor_row_id")
+        )
+
+    # -- cascade reschedule (Story 3.10 / FR-10) --------------------------
+
+    def _load_row_dates(
+        self,
+        table: Table,
+        row_ids: Iterable[int],
+        start_date_field: Field,
+        end_date_field: Field,
+        model=None,
+    ) -> Dict[int, Dict[str, Any]]:
+        """
+        Read the raw start/end cell values for ``row_ids`` keyed by row id. Pure
+        read — the values are handed to the DB-free date math in ``date_utils``.
+        """
+
+        if model is None:
+            model = table.get_model()
+        start_attr = f"field_{start_date_field.id}"
+        end_attr = f"field_{end_date_field.id}"
+        rows = model.objects.filter(id__in=list(row_ids))
+        return {
+            row.id: {
+                "start": getattr(row, start_attr),
+                "end": getattr(row, end_attr),
+            }
+            for row in rows
+        }
+
+    def compute_cascade(
+        self,
+        table: Table,
+        start_date_field: Field,
+        end_date_field: Field,
+        predecessor_row_id: int,
+        new_start: Any,
+        new_end: Any,
+        model=None,
+    ) -> CascadePlan:
+        """
+        Compute the forward FS cascade triggered by moving ``predecessor_row_id``
+        to ``(new_start, new_end)`` — WITHOUT writing anything (AC #1 preview).
+
+        Walks the ``predecessor -> successors`` adjacency breadth-first. A
+        successor ``s`` of a node whose new end is ``E`` is shifted iff
+        ``s.start < E`` (FS violated); it then moves forward by ``delta = E -
+        s.start`` so ``s.new_start == E`` (its start lands exactly on the
+        predecessor's new end), and ``s.new_end = s.end + delta`` (**duration
+        preserved**). The shift cascades transitively to ``s``'s own successors.
+
+        A diamond (a node reachable by two paths implying different deltas) is
+        shifted **once by the MAX required delta** — never double-counted —
+        because each node's delta is relaxed upward to the largest constraint
+        any predecessor imposes before its own successors are evaluated. The
+        graph is acyclic (enforced on every mutation by 3.9), so the relaxation
+        terminates.
+
+        The delta is a whole ``timedelta`` applied through ``date_utils`` so a
+        date-only field round-trips as ``YYYY-MM-DD`` and a datetime field keeps
+        its time-of-day, matching 3.7's ``shiftDateValue`` at month/DST
+        boundaries.
+        """
+
+        if model is None:
+            model = table.get_model()
+
+        start_attr = f"field_{start_date_field.id}"
+        end_attr = f"field_{end_date_field.id}"
+        start_has_time = start_date_field.date_include_time
+        end_has_time = end_date_field.date_include_time
+
+        edges = self._load_fs_edges(table)
+        adjacency = _build_adjacency(edges)
+
+        # Every node that participates in the (sub)graph reachable from the moved
+        # predecessor — load their current dates once.
+        involved: set = {predecessor_row_id}
+        frontier = [predecessor_row_id]
+        while frontier:
+            node = frontier.pop()
+            for successor in adjacency.get(node, ()):
+                if successor not in involved:
+                    involved.add(successor)
+                    frontier.append(successor)
+        dates = self._load_row_dates(
+            table, involved, start_date_field, end_date_field, model=model
+        )
+
+        # `delta[id]` is the forward timedelta a row is shifted by, measured from
+        # its ORIGINAL position. The predecessor is the trigger: its new dates are
+        # given directly (a resize may change its duration), so it is not part of
+        # `delta`.
+        new_end_dt = date_utils.to_datetime(new_end, end_has_time)
+        delta: Dict[int, timedelta] = {}
+
+        def effective_end_dt(node: int):
+            if node == predecessor_row_id:
+                return new_end_dt
+            row = dates.get(node)
+            if row is None:
+                return None
+            base = date_utils.to_datetime(row["end"], end_has_time)
+            if base is None:
+                return None
+            return base + delta.get(node, timedelta(0))
+
+        # Relax forward from the predecessor breadth-first; re-enqueue any
+        # successor whose required delta grows, so the MAX constraint wins
+        # (diamond-safe). Bounded by the acyclic graph.
+        queue = [predecessor_row_id]
+        while queue:
+            node = queue.pop(0)
+            node_end = effective_end_dt(node)
+            if node_end is None:
+                continue
+            for successor in adjacency.get(node, ()):
+                row = dates.get(successor)
+                if row is None:
+                    continue
+                succ_start_dt = date_utils.to_datetime(row["start"], start_has_time)
+                if succ_start_dt is None:
+                    continue
+                # Required forward shift so this successor starts no earlier than
+                # the predecessor's (new) end.
+                required = node_end - succ_start_dt
+                if required <= timedelta(0):
+                    continue  # not violated by this predecessor
+                if required > delta.get(successor, timedelta(0)):
+                    delta[successor] = required
+                    queue.append(successor)
+
+        # Build the ordered batch: predecessor first, then each shifted successor.
+        rows_values: List[Dict[str, Any]] = [
+            {
+                "id": predecessor_row_id,
+                start_attr: date_utils.format_value(
+                    date_utils.to_datetime(new_start, start_has_time), start_has_time
+                )
+                if new_start not in (None, "")
+                else None,
+                end_attr: date_utils.format_value(new_end_dt, end_has_time)
+                if new_end_dt is not None
+                else None,
+            }
+        ]
+        affected: List[Dict[str, Any]] = []
+        for successor_id, succ_delta in delta.items():
+            row = dates[successor_id]
+            new_s = date_utils.shift_value(row["start"], succ_delta, start_has_time)
+            new_e = date_utils.shift_value(row["end"], succ_delta, end_has_time)
+            rows_values.append(
+                {"id": successor_id, start_attr: new_s, end_attr: new_e}
+            )
+            affected.append(
+                {
+                    "row_id": successor_id,
+                    "current_start": date_utils.format_value(
+                        date_utils.to_datetime(row["start"], start_has_time),
+                        start_has_time,
+                    )
+                    if row["start"] not in (None, "")
+                    else None,
+                    "current_end": date_utils.format_value(
+                        date_utils.to_datetime(row["end"], end_has_time), end_has_time
+                    )
+                    if row["end"] not in (None, "")
+                    else None,
+                    "new_start": new_s,
+                    "new_end": new_e,
+                }
+            )
+
+        return CascadePlan(rows_values=rows_values, affected=affected)
+
+    def apply_cascade(
+        self,
+        user,
+        table: Table,
+        view,
+        start_date_field: Field,
+        end_date_field: Field,
+        predecessor_row_id: int,
+        new_start: Any,
+        new_end: Any,
+    ):
+        """
+        Commit the cascade as ONE undoable step (AC #2, AC #4).
+
+        Acquires the table-scoped lock FIRST and **recomputes** the cascade from
+        fresh row values under that lock — a concurrent edit may have moved a
+        successor since the preview, so the stored plan could be stale (AC #4
+        no-interleave, same TOCTOU discipline ``create_dependency`` uses). The
+        recomputed batch then commits through ``UpdateRowsActionType.do`` — one
+        call, one undoable action, atomic, broadcast as one batch (AC #2). Any
+        ``RowHandler`` rejection rolls the whole transaction back (AC #5).
+        """
+
+        # Imported lazily: ``rows.actions`` pulls in a large dependency graph that
+        # would create an import cycle at module load.
+        from baserow.contrib.database.rows.actions import UpdateRowsActionType
+
+        with transaction.atomic():
+            # Serialize overlapping cascades on the same table so they cannot
+            # interleave into an inconsistent schedule (NFR-3 / D8).
+            Table.objects.select_for_update().get(id=table.id)
+            model = table.get_model()
+            plan = self.compute_cascade(
+                table,
+                start_date_field,
+                end_date_field,
+                predecessor_row_id,
+                new_start,
+                new_end,
+                model=model,
+            )
+            UpdateRowsActionType.do(
+                user, table, plan.rows_values, model=model, view=view
+            )
+        return plan
+
+    def find_violations(
+        self,
+        table: Table,
+        start_date_field: Field,
+        end_date_field: Field,
+        model=None,
+    ) -> List[Edge]:
+        """
+        Return the FS edges that are currently violated — **derived state**, no
+        migration, no persisted flag (AC #3). An edge ``predecessor ->
+        successor`` is violated iff ``successor.start < predecessor.end`` (the
+        successor begins before its predecessor finishes). Dates are normalised
+        to aware UTC datetimes so a date-only / datetime field pair compares
+        consistently.
+        """
+
+        edges = self._load_fs_edges(table)
+        if not edges:
+            return []
+        if model is None:
+            model = table.get_model()
+        involved = {row_id for edge in edges for row_id in edge}
+        dates = self._load_row_dates(
+            table, involved, start_date_field, end_date_field, model=model
+        )
+        start_has_time = start_date_field.date_include_time
+        end_has_time = end_date_field.date_include_time
+
+        violated: List[Edge] = []
+        for predecessor_row_id, successor_row_id in edges:
+            predecessor = dates.get(predecessor_row_id)
+            successor = dates.get(successor_row_id)
+            if predecessor is None or successor is None:
+                continue
+            predecessor_end = date_utils.to_datetime(predecessor["end"], end_has_time)
+            successor_start = date_utils.to_datetime(
+                successor["start"], start_has_time
+            )
+            if predecessor_end is None or successor_start is None:
+                continue
+            if successor_start < predecessor_end:
+                violated.append((predecessor_row_id, successor_row_id))
+        return violated
 
     # -- create / delete / list -------------------------------------------
 

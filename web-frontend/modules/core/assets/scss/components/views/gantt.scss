@@ -65,6 +65,16 @@
   height: 100%;
 }
 
+// Story 3.10 / AC #3. The one place we override the library's SVG: a
+// dependency connector left in an invalid finish-to-start state (the author
+// declined to cascade, so a dependent now starts before its predecessor
+// finishes) is repainted in the warning colour so the broken edge is obvious.
+// Applied to the lib's `.arrow` path by `GanttView.markViolatedConnectors`.
+.gantt .arrow.gantt-view__arrow--violated {
+  stroke: $palette-red-500;
+  stroke-width: 2px;
+}
+
 .gantt-view__empty-text {
   color: $palette-neutral-700;
 }

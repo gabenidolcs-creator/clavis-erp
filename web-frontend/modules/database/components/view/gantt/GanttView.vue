@@ -120,29 +120,56 @@
       @refresh-row="refreshRow"
     >
     </RowEditModal>
+    <Modal ref="rescheduleModal" @hidden="onRescheduleModalHidden">
+      <h2 class="box__title">{{ $t('ganttView.rescheduleTitle') }}</h2>
+      <p>
+        {{
+          $t('ganttView.rescheduleMessage', {
+            count: pendingCascade ? pendingCascade.preview.cascade_count : 0,
+          })
+        }}
+      </p>
+      <div class="actions actions--right">
+        <button
+          class="button button--ghost"
+          type="button"
+          @click="declineCascade"
+        >
+          {{ $t('ganttView.rescheduleDecline') }}
+        </button>
+        <button class="button" type="button" @click="confirmCascade">
+          {{ $t('ganttView.rescheduleConfirm') }}
+        </button>
+      </div>
+    </Modal>
   </div>
 </template>
 
 <script>
 import { mapGetters } from 'vuex'
 
+import moment from '@baserow/modules/core/moment'
 import { notifyIf } from '@baserow/modules/core/utils/error'
 import {
   sortFieldsByOrderAndIdFunction,
   filterVisibleFieldsFunction,
   filterHiddenFieldsFunction,
 } from '@baserow/modules/database/utils/view'
+import Modal from '@baserow/modules/core/components/Modal'
 import RowCard from '@baserow/modules/database/components/card/RowCard'
 import RowEditModal from '@baserow/modules/database/components/row/RowEditModal'
 import viewHelpers from '@baserow/modules/database/mixins/viewHelpers'
 import { populateRow } from '@baserow/modules/database/store/view/grid'
 import { clone } from '@baserow/modules/core/utils/object'
-// Reuse the core MIT Timeline (Story 3.6) pure partition + date-parse helpers
-// instead of forking a second copy — the scheduled/tray split and the
-// user-timezone date parsing are identical, only the bar layer differs.
+// Reuse the core MIT Timeline (Story 3.6/3.7) pure partition + date-parse +
+// date-shift helpers instead of forking a second copy — the scheduled/tray
+// split, the user-timezone date parsing, and the whole-day shift discipline
+// (date-only → `YYYY-MM-DD`, datetime → preserve `HH:mm`) are identical, only
+// the bar layer differs. The cascade backend mirrors the same semantics.
 import {
   partitionTimelineRows,
   rowDateRange,
+  shiftDateValue,
 } from '@baserow/modules/database/components/view/timeline/TimelineView'
 
 // Lazy, cached-promise loaders mirroring `excel.js` so the heavy Frappe Gantt
@@ -177,7 +204,7 @@ export function ganttViewMode(timescale) {
 
 export default {
   name: 'GanttView',
-  components: { RowCard, RowEditModal },
+  components: { RowCard, RowEditModal, Modal },
   mixins: [viewHelpers],
   props: {
     fields: {
@@ -215,6 +242,17 @@ export default {
       // Set in `beforeUnmount` so the async lib loader bails instead of
       // rendering into a host that is about to be (or already is) detached.
       isUnmounting: false,
+      // Story 3.10 / AC #1: the in-flight cascade awaiting the author's
+      // confirm/decline. Holds the moved predecessor, its computed new
+      // start/end values + old values (for a predecessor-only write or a
+      // revert), and the read-only preview payload (affected successors +
+      // transitive count) used to populate the prompt. `null` when no prompt
+      // is open.
+      pendingCascade: null,
+      // Guards `onRescheduleModalHidden`: a confirm/decline sets this so a
+      // dismiss (escape/click-away) after a choice does not double-revert,
+      // while an undecided dismiss rolls the optimistic bar back. (AC #5)
+      cascadeResolved: true,
     }
   },
   computed: {
@@ -408,6 +446,23 @@ export default {
         (r) => r.id !== this.openRow.id && !existing.has(r.id)
       )
     },
+    /**
+     * Whether bars may be dragged/resized. Mirrors Timeline's `canDragBars`:
+     * not read-only, both date fields set, and the principal can write values
+     * to BOTH the start and end fields (a field-level permission, distinct from
+     * the row-level edge gate `canEditDependencies`). When false the lib is
+     * mounted `readonly` and no `on_date_change` fires. (AC #5)
+     */
+    canDragBars() {
+      return (
+        !this.readOnly &&
+        !!this.startDateField &&
+        !!this.endDateField &&
+        [this.startDateField, this.endDateField].every((field) =>
+          this.$registry.get('field', field.type).canWriteFieldValues(field)
+        )
+      )
+    },
   },
   watch: {
     row: {
@@ -567,10 +622,16 @@ export default {
       this.ganttInstance = new Gantt(this.$refs.ganttHost, this.ganttTasks, {
         view_mode: this.viewMode,
         date_format: 'YYYY-MM-DD',
-        // Render-only (AC #5): every editing affordance is disabled. The drag/
-        // resize write path is Story 3.10's scope, so `on_date_change`/
-        // `on_progress_change` stay unwired here.
-        readonly: true,
+        // Story 3.10: bars are draggable/resizable when the principal may write
+        // both date fields (`canDragBars`); otherwise the view stays render-only
+        // exactly as in 3.8. `readonly_progress` is always on — there is no
+        // progress field in v1, so the progress handle must never appear even
+        // when dates are editable. `on_date_change` fires once on pointer
+        // release with the moved bar's new start/end Date objects. (AC #5)
+        readonly: !this.canDragBars,
+        readonly_progress: true,
+        on_date_change: (task, start, end) =>
+          this.onBarDateChange(task, start, end),
         infinite_padding: false,
         popup_on: 'click',
         // Returning `false` suppresses the lib's own popup; the side effect
@@ -580,6 +641,7 @@ export default {
           return false
         },
       })
+      this.$nextTick(() => this.markViolatedConnectors())
     },
     /**
      * Re-renders the existing instance with the current task set, building it
@@ -591,6 +653,7 @@ export default {
         return
       }
       this.ganttInstance.refresh(this.ganttTasks)
+      this.$nextTick(() => this.markViolatedConnectors())
     },
     /**
      * Tears down the instance and empties the host node so the per-instance SVG
@@ -601,9 +664,12 @@ export default {
      * one anonymous `document` `mouseup` listener per instance in
      * `bind_bar_events` (not gated by the `readonly` option), which cannot be
      * removed without a lib reference. Re-opening a Gantt view therefore leaks a
-     * single dead document listener each time. It is render-only and harmless in
-     * 3.8; Story 3.10 (which wires the drag write path) should pin a lib version
-     * with a teardown hook or patch this out then.
+     * single dead document listener each time. Story 3.10 wires the drag write
+     * path on top of the same lib version, so the pre-existing leak is unchanged
+     * — not worsened: the write path adds no listeners of its own, it only reads
+     * the lib's `on_date_change` callback. A future lib bump with a teardown
+     * hook should remove the listener; until then this empties the host so the
+     * SVG and the bar-level (child) listeners are released on unmount.
      */
     destroyGantt() {
       this.ganttInstance = null
@@ -621,6 +687,232 @@ export default {
       if (row) {
         this.rowClick(row)
       }
+    },
+    /**
+     * Story 3.10 / AC #1, #2, #4, #5. Fires once on bar drag/resize release.
+     * Translates the lib's new start/end `Date`s into whole-day deltas, shifts
+     * the two date-field values through the shared Timeline `shiftDateValue`
+     * (date-only → `YYYY-MM-DD`, datetime → preserve `HH:mm`), then decides:
+     *
+     *   - no direct FS successor would be pushed → write the predecessor alone
+     *     immediately, no prompt (AC #4: a move that violates nothing is silent);
+     *   - at least one successor would start before the predecessor's new finish
+     *     → ask the backend for the read-only cascade preview and open the
+     *     confirm prompt. Nothing is written until the author confirms (AC #1).
+     */
+    async onBarDateChange(task, start, end) {
+      if (!this.canDragBars) {
+        return
+      }
+      const row = this.allRows.find((r) => String(r.id) === String(task.id))
+      if (!row) {
+        return
+      }
+      const { start: oldStart, end: oldEnd } = rowDateRange(
+        row,
+        this.startDateField,
+        this.endDateField
+      )
+      const startDelta = moment(start)
+        .startOf('day')
+        .diff(oldStart.clone().startOf('day'), 'days')
+      const endDelta = moment(end)
+        .startOf('day')
+        .diff(oldEnd.clone().startOf('day'), 'days')
+      // Day-granular no-op (a click, or a sub-day jiggle the bars can't show):
+      // snap back to the authoritative positions and do nothing.
+      if (startDelta === 0 && endDelta === 0) {
+        this.refreshGantt()
+        return
+      }
+      const oldStartValue = row[`field_${this.startDateField.id}`]
+      const oldEndValue = row[`field_${this.endDateField.id}`]
+      const newStartValue = shiftDateValue(
+        this.startDateField,
+        oldStartValue,
+        startDelta,
+        'days'
+      )
+      const newEndValue = shiftDateValue(
+        this.endDateField,
+        oldEndValue,
+        endDelta,
+        'days'
+      )
+      const oldValues = {
+        [`field_${this.startDateField.id}`]: oldStartValue,
+        [`field_${this.endDateField.id}`]: oldEndValue,
+      }
+      const values = {
+        [`field_${this.startDateField.id}`]: newStartValue,
+        [`field_${this.endDateField.id}`]: newEndValue,
+      }
+      // A direct FS successor is pushed when its start falls before the
+      // predecessor's NEW finish. Moving a predecessor earlier never violates,
+      // so this naturally prompts only on forward moves.
+      const newFinish = oldEnd.clone().add(endDelta, 'days')
+      const wouldViolate = this.dependencies
+        .filter((edge) => edge.predecessor_row_id === row.id)
+        .some((edge) => {
+          const successor = this.allRows.find(
+            (r) => r.id === edge.successor_row_id
+          )
+          if (!successor) {
+            return false
+          }
+          const { start: successorStart } = rowDateRange(
+            successor,
+            this.startDateField,
+            this.endDateField
+          )
+          return successorStart.isBefore(newFinish)
+        })
+      if (!wouldViolate) {
+        await this.commitPredecessorOnly(row, values, oldValues)
+        return
+      }
+      try {
+        const preview = await this.$store.dispatch(
+          this.storePrefix + 'view/gantt/previewCascade',
+          {
+            viewId: this.view.id,
+            predecessorRowId: row.id,
+            newStart: newStartValue,
+            newEnd: newEndValue,
+          }
+        )
+        this.cascadeResolved = false
+        this.pendingCascade = {
+          row,
+          values,
+          oldValues,
+          newStart: newStartValue,
+          newEnd: newEndValue,
+          preview,
+        }
+        this.$refs.rescheduleModal.show()
+      } catch (error) {
+        notifyIf(error, 'view')
+        this.refreshGantt()
+      }
+    },
+    /**
+     * Writes only the dragged predecessor's two date values, in a single
+     * undoable step, through the buffered-rows store. On failure the optimistic
+     * bar is rolled back to the store's authoritative position (AC #5).
+     */
+    async commitPredecessorOnly(row, values, oldValues) {
+      try {
+        await this.$store.dispatch(
+          this.storePrefix + 'view/gantt/updateRowValues',
+          {
+            table: this.table,
+            view: this.view,
+            fields: this.fields,
+            row,
+            values,
+            oldValues,
+          }
+        )
+      } catch (error) {
+        notifyIf(error, 'field')
+        this.refreshGantt()
+      }
+    },
+    /**
+     * AC #2: the author confirmed the cascade. Commit it — the backend shifts
+     * the predecessor + every transitive dependent atomically in one undoable
+     * step and broadcasts one batch update, so the buffered-rows handler
+     * repositions every bar. On error roll the optimistic bar back. (AC #5)
+     */
+    async confirmCascade() {
+      const pending = this.pendingCascade
+      if (!pending) {
+        return
+      }
+      this.cascadeResolved = true
+      this.$refs.rescheduleModal.hide()
+      try {
+        await this.$store.dispatch(
+          this.storePrefix + 'view/gantt/applyCascade',
+          {
+            viewId: this.view.id,
+            predecessorRowId: pending.row.id,
+            newStart: pending.newStart,
+            newEnd: pending.newEnd,
+          }
+        )
+      } catch (error) {
+        notifyIf(error, 'view')
+        this.refreshGantt()
+      } finally {
+        this.pendingCascade = null
+      }
+    },
+    /**
+     * AC #4: the author declined the cascade — move the predecessor alone and
+     * leave the dependents in place. The now-violated FS edges are re-derived on
+     * the next dependency fetch and styled by `markViolatedConnectors`.
+     */
+    async declineCascade() {
+      const pending = this.pendingCascade
+      if (!pending) {
+        return
+      }
+      this.cascadeResolved = true
+      this.$refs.rescheduleModal.hide()
+      await this.commitPredecessorOnly(
+        pending.row,
+        pending.values,
+        pending.oldValues
+      )
+      await this.$store.dispatch(
+        this.storePrefix + 'view/gantt/fetchDependencies',
+        {
+          viewId: this.view.id,
+        }
+      )
+      this.pendingCascade = null
+    },
+    /**
+     * The prompt was dismissed (escape / click-away) without a choice: treat it
+     * as a cancel and snap the optimistic bar back to its authoritative
+     * position, writing nothing. (AC #5)
+     */
+    onRescheduleModalHidden() {
+      if (!this.cascadeResolved) {
+        this.cascadeResolved = true
+        this.pendingCascade = null
+        this.refreshGantt()
+      }
+    },
+    /**
+     * AC #3: tag the SVG connectors of FS edges flagged `violated` (a dependent
+     * that starts before its predecessor finishes) so the stylesheet can render
+     * them in the warning treatment. Frappe Gantt keys each arrow with
+     * `data-from`/`data-to` = the predecessor/successor task ids, so each edge
+     * maps to exactly one connector. Re-applied after every (re)render.
+     */
+    markViolatedConnectors() {
+      const host = this.$refs.ganttHost
+      if (!host) {
+        return
+      }
+      host
+        .querySelectorAll('.arrow.gantt-view__arrow--violated')
+        .forEach((arrow) =>
+          arrow.classList.remove('gantt-view__arrow--violated')
+        )
+      this.dependencies
+        .filter((edge) => edge.violated)
+        .forEach((edge) => {
+          const arrow = host.querySelector(
+            `.arrow[data-from="${edge.predecessor_row_id}"][data-to="${edge.successor_row_id}"]`
+          )
+          if (arrow) {
+            arrow.classList.add('gantt-view__arrow--violated')
+          }
+        })
     },
     async updateValue({ field, row, value, oldValue }) {
       try {

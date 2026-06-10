@@ -485,4 +485,176 @@ test.describe("Gantt view", () => {
     ).toHaveCount(0);
     await expect(page.locator(".gantt-view__host .arrow path")).toHaveCount(1);
   });
+
+  // Story 3.10 — prompt-first reschedule on dependency. Dragging a predecessor
+  // bar forward so it would push a dependent fires the lib's `on_date_change`,
+  // which opens the confirm prompt (`ganttView.rescheduleTitle`). The author
+  // either cascades the whole chain or moves the predecessor alone, leaving the
+  // now-invalid FS connector styled `.gantt-view__arrow--violated`. Per story
+  // 3.10 Task 9 these are AUTHORED but NOT run locally (Docker e2e stack only).
+
+  /**
+   * Drags a Frappe Gantt bar group horizontally by `dxDays` whole columns. The
+   * lib snaps a drag to the column step, so moving by one `column_width` shifts
+   * the bar exactly one unit at the active zoom; the drag releases over the
+   * target so `on_date_change` fires once with the new dates.
+   */
+  async function dragBarByDays(page: any, rowId: number, dxDays: number) {
+    const bar = page.locator(
+      `.gantt-view__host .bar-wrapper[data-id="${rowId}"] .bar`,
+    );
+    const box = await bar.boundingBox();
+    if (box === null) {
+      throw new Error(`bar for row ${rowId} has no bounding box`);
+    }
+    // One Frappe Gantt column at the "day" zoom; the drag step is the column.
+    const columnWidth = await page.evaluate(() => {
+      const col = document.querySelector(".gantt-view__host .grid-row");
+      return col ? col.getBoundingClientRect().height : 38;
+    });
+    const startX = box.x + box.width / 2;
+    const startY = box.y + box.height / 2;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + columnWidth * dxDays, startY, { steps: 8 });
+    await page.mouse.up();
+  }
+
+  test("prompts before cascading and reschedules the whole chain on confirm (AC #1, #2)", async ({
+    page,
+    goto,
+    workspacePage,
+  }) => {
+    const { database, table, view } = await setupGantt(workspacePage, "day");
+
+    // A → B with B starting right after A. Pushing A forward over B's start
+    // makes B violate the FS constraint, so the prompt must appear.
+    const rowA = await createRow(workspacePage.user, table, {
+      Name: "Task A",
+      Start: dayKey(0),
+      End: dayKey(1),
+    });
+    const rowB = await createRow(workspacePage.user, table, {
+      Name: "Task B",
+      Start: dayKey(2),
+      End: dayKey(3),
+    });
+
+    const tablePage = new TablePage({ page, goto });
+    tablePage.pageUrl = `database/${database.id}/table/${table.id}/${view.id}`;
+    await tablePage.goto();
+
+    // Draw A → B through the picker (the 3.9 affordance).
+    await page
+      .locator(`.gantt-view__host .bar-wrapper[data-id="${rowB.id}"]`)
+      .click();
+    await page
+      .locator(".gantt-view__dependencies-add .dropdown__selected")
+      .click();
+    await page
+      .locator(
+        '.gantt-view__dependencies-add .select__item-name-text[title="Task A"]',
+      )
+      .click();
+    await expect(
+      page.locator(
+        `.gantt-view__host .arrow path[data-from="${rowA.id}"][data-to="${rowB.id}"]`,
+      ),
+    ).toHaveCount(1);
+    await page.keyboard.press("Escape");
+
+    // Drag A forward by 3 days so its new finish lands past B's start — the
+    // prompt opens and NOTHING is written yet (AC #1: preview only).
+    await dragBarByDays(page, rowA.id, 3);
+    await expect(
+      page.locator(".modal", { hasText: "Reschedule dependent tasks?" }),
+    ).toBeVisible();
+
+    // Confirm — the backend shifts A and the transitive dependent B atomically
+    // and the bars reposition. B's start is pushed to A's new finish (AC #2).
+    await page.locator(".button", { hasText: "Reschedule dependents" }).click();
+    await expect(
+      page.locator(".modal", { hasText: "Reschedule dependent tasks?" }),
+    ).toHaveCount(0);
+
+    // The connector survives and is NOT styled violated — the chain is valid.
+    await expect(
+      page.locator(
+        `.gantt-view__host .arrow.gantt-view__arrow--violated[data-from="${rowA.id}"][data-to="${rowB.id}"]`,
+      ),
+    ).toHaveCount(0);
+
+    // Reload — both shifts persisted server-side as one undoable batch (AC #2).
+    await tablePage.goto();
+    await expect(page.locator(".gantt-view__host .bar-wrapper")).toHaveCount(2);
+    await expect(
+      page.locator(
+        `.gantt-view__host .arrow path[data-from="${rowA.id}"][data-to="${rowB.id}"]`,
+      ),
+    ).toHaveCount(1);
+  });
+
+  test("moves only the predecessor on decline and flags the broken connector (AC #4)", async ({
+    page,
+    goto,
+    workspacePage,
+  }) => {
+    const { database, table, view } = await setupGantt(workspacePage, "day");
+
+    const rowA = await createRow(workspacePage.user, table, {
+      Name: "Task A",
+      Start: dayKey(0),
+      End: dayKey(1),
+    });
+    const rowB = await createRow(workspacePage.user, table, {
+      Name: "Task B",
+      Start: dayKey(2),
+      End: dayKey(3),
+    });
+
+    const tablePage = new TablePage({ page, goto });
+    tablePage.pageUrl = `database/${database.id}/table/${table.id}/${view.id}`;
+    await tablePage.goto();
+
+    await page
+      .locator(`.gantt-view__host .bar-wrapper[data-id="${rowB.id}"]`)
+      .click();
+    await page
+      .locator(".gantt-view__dependencies-add .dropdown__selected")
+      .click();
+    await page
+      .locator(
+        '.gantt-view__dependencies-add .select__item-name-text[title="Task A"]',
+      )
+      .click();
+    await expect(
+      page.locator(
+        `.gantt-view__host .arrow path[data-from="${rowA.id}"][data-to="${rowB.id}"]`,
+      ),
+    ).toHaveCount(1);
+    await page.keyboard.press("Escape");
+
+    // Drag A forward past B's start → prompt; decline keeps B in place, leaving
+    // the FS edge violated. The backend re-derives the `violated` flag on the
+    // dependency re-fetch and the connector is repainted as broken (AC #4).
+    await dragBarByDays(page, rowA.id, 3);
+    await expect(
+      page.locator(".modal", { hasText: "Reschedule dependent tasks?" }),
+    ).toBeVisible();
+    await page.locator(".button", { hasText: "Move this task only" }).click();
+
+    await expect(
+      page.locator(
+        `.gantt-view__host .arrow.gantt-view__arrow--violated[data-from="${rowA.id}"][data-to="${rowB.id}"]`,
+      ),
+    ).toHaveCount(1);
+
+    // Reload — the predecessor-only move and the derived violation persist.
+    await tablePage.goto();
+    await expect(
+      page.locator(
+        `.gantt-view__host .arrow.gantt-view__arrow--violated[data-from="${rowA.id}"][data-to="${rowB.id}"]`,
+      ),
+    ).toHaveCount(1);
+  });
 });

@@ -45,6 +45,8 @@ from baserow.contrib.database.api.views.errors import (
 from baserow.contrib.database.api.views.gantt.serializers import (
     CreateTaskDependencySerializer,
     GanttViewFieldOptionsSerializer,
+    RescheduleCascadePreviewRequestSerializer,
+    RescheduleCascadePreviewResponseSerializer,
     TaskDependencySerializer,
 )
 from baserow.contrib.database.api.views.serializers import FieldOptionsField
@@ -68,7 +70,10 @@ from baserow.contrib.database.views.exceptions import (
     ViewFilterTypeNotAllowedForField,
 )
 from baserow.contrib.database.views.filters import AdHocFilters
+from baserow.contrib.database.rows.exceptions import RowDoesNotExist
+from baserow.contrib.database.rows.operations import UpdateDatabaseRowOperationType
 from baserow.contrib.database.views.gantt.exceptions import (
+    GanttViewNotConfiguredForReschedule,
     InvalidTaskDependencyType,
     TaskDependencyAlreadyExists,
     TaskDependencyCycle,
@@ -84,8 +89,12 @@ from baserow.contrib.database.views.signals import view_loaded
 from baserow.contrib.database.views.utils import check_permissions_with_view_fallback
 from baserow.core.exceptions import UserNotInWorkspace
 
+from baserow.contrib.database.api.rows.errors import ERROR_ROW_DOES_NOT_EXIST
+from baserow.core.handler import CoreHandler
+
 from .errors import (
     ERROR_GANTT_DOES_NOT_EXIST,
+    ERROR_GANTT_NOT_CONFIGURED_FOR_RESCHEDULE,
     ERROR_INVALID_TASK_DEPENDENCY_TYPE,
     ERROR_TASK_DEPENDENCY_ALREADY_EXISTS,
     ERROR_TASK_DEPENDENCY_CYCLE,
@@ -93,6 +102,54 @@ from .errors import (
     ERROR_TASK_DEPENDENCY_ROW_DOES_NOT_EXIST,
 )
 from .pagination import GanttLimitOffsetPagination
+
+
+def _violated_edge_set(view, handler: TaskDependencyHandler) -> set:
+    """
+    Compute the set of currently-violated FS edges for ``view`` so the
+    dependency serializer can flag each one (Story 3.10 / AC #3). Returns an
+    empty set when the gantt view has not been configured with both date
+    fields (nothing to compare).
+    """
+
+    if view.start_date_field_id is None or view.end_date_field_id is None:
+        return set()
+    return set(
+        handler.find_violations(
+            view.table, view.start_date_field, view.end_date_field
+        )
+    )
+
+
+def _require_gantt_date_fields(view):
+    """
+    Return ``(start_date_field, end_date_field)`` for the gantt view, raising
+    ``GanttViewNotConfiguredForReschedule`` when either is unset — there is
+    nothing to cascade without both edges of a bar.
+    """
+
+    if view.start_date_field_id is None or view.end_date_field_id is None:
+        raise GanttViewNotConfiguredForReschedule(
+            "The gantt view has no start and/or end date field configured."
+        )
+    # ``view.start_date_field`` is the base ``Field``; the cascade reads
+    # ``date_include_time`` off the concrete ``DateField``, so resolve specifics.
+    return view.start_date_field.specific, view.end_date_field.specific
+
+
+def _check_reschedule_permission(user, table) -> None:
+    """
+    Enforce the same row-update permission the cascade write needs, so a preview
+    and an apply both require edit access (and a fixed-tier role prohibition or a
+    field edit restriction surfaces as 403 via the global registry).
+    """
+
+    CoreHandler().check_permissions(
+        user,
+        UpdateDatabaseRowOperationType.type,
+        workspace=table.database.workspace,
+        context=table,
+    )
 
 
 class GanttViewView(APIView):
@@ -586,10 +643,14 @@ class GanttViewDependenciesView(APIView):
         """Lists the dependency edges for the gantt view's table."""
 
         view = ViewHandler().get_view_as_user(request.user, view_id, GanttView)
-        dependencies = TaskDependencyHandler().list_dependencies(
-            request.user, view.table
+        handler = TaskDependencyHandler()
+        dependencies = handler.list_dependencies(request.user, view.table)
+        context = {"violated_edges": _violated_edge_set(view, handler)}
+        return Response(
+            TaskDependencySerializer(
+                dependencies, many=True, context=context
+            ).data
         )
-        return Response(TaskDependencySerializer(dependencies, many=True).data)
 
     @extend_schema(
         parameters=[
@@ -747,4 +808,159 @@ class PublicGanttViewDependenciesView(APIView):
         from baserow.contrib.database.views.gantt.models import TaskDependency
 
         dependencies = TaskDependency.objects.filter(table=view.table)
-        return Response(TaskDependencySerializer(dependencies, many=True).data)
+        context = {"violated_edges": _violated_edge_set(view, TaskDependencyHandler())}
+        return Response(
+            TaskDependencySerializer(
+                dependencies, many=True, context=context
+            ).data
+        )
+
+
+class GanttViewReschedulePreviewView(APIView):
+    permission_classes = (AllowAny,)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="view_id",
+                location=OpenApiParameter.PATH,
+                type=OpenApiTypes.INT,
+                description="Previews the FS cascade for this gantt view's table.",
+            ),
+        ],
+        tags=["Database table gantt view"],
+        operation_id="preview_database_table_gantt_view_reschedule",
+        description=(
+            "Computes — WITHOUT writing — the transitive set of dependent rows "
+            "that would shift if the predecessor row identified by "
+            "`predecessor_row_id` moved to `new_start`/`new_end`, following the "
+            "finish-to-start dependency edges of the gantt `view_id`'s table. "
+            "Returns the affected successors (with their current and proposed "
+            "dates) and the transitive cascade count so the client can prompt "
+            "the user before committing (Story 3.10 / FR-10)."
+        ),
+        request=RescheduleCascadePreviewRequestSerializer,
+        responses={
+            200: RescheduleCascadePreviewResponseSerializer,
+            400: get_error_schema(
+                [
+                    "ERROR_USER_NOT_IN_GROUP",
+                    "ERROR_GANTT_NOT_CONFIGURED_FOR_RESCHEDULE",
+                    "ERROR_ROW_DOES_NOT_EXIST",
+                ]
+            ),
+            401: get_error_schema(["PERMISSION_DENIED"]),
+            404: get_error_schema(["ERROR_GANTT_DOES_NOT_EXIST"]),
+        },
+    )
+    @map_exceptions(
+        {
+            UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
+            ViewDoesNotExist: ERROR_GANTT_DOES_NOT_EXIST,
+            GanttViewNotConfiguredForReschedule: (
+                ERROR_GANTT_NOT_CONFIGURED_FOR_RESCHEDULE
+            ),
+            RowDoesNotExist: ERROR_ROW_DOES_NOT_EXIST,
+        }
+    )
+    @validate_body(RescheduleCascadePreviewRequestSerializer, return_validated=True)
+    def post(self, request: Request, view_id: int, data) -> Response:
+        """Read-only cascade preview: returns the affected set + count, no write."""
+
+        view = ViewHandler().get_view_as_user(request.user, view_id, GanttView)
+        _check_reschedule_permission(request.user, view.table)
+        start_date_field, end_date_field = _require_gantt_date_fields(view)
+
+        plan = TaskDependencyHandler().compute_cascade(
+            view.table,
+            start_date_field,
+            end_date_field,
+            data["predecessor_row_id"],
+            data["new_start"],
+            data["new_end"],
+        )
+        return Response(
+            RescheduleCascadePreviewResponseSerializer(
+                {
+                    "affected_successors": plan.affected,
+                    "cascade_count": plan.cascade_count,
+                }
+            ).data
+        )
+
+
+class GanttViewRescheduleApplyView(APIView):
+    permission_classes = (AllowAny,)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="view_id",
+                location=OpenApiParameter.PATH,
+                type=OpenApiTypes.INT,
+                description="Applies the FS cascade for this gantt view's table.",
+            ),
+        ],
+        tags=["Database table gantt view"],
+        operation_id="apply_database_table_gantt_view_reschedule",
+        description=(
+            "Commits the FS cascade triggered by moving `predecessor_row_id` to "
+            "`new_start`/`new_end` as a SINGLE undoable step. Recomputes the "
+            "cascade under a table-scoped lock from fresh row values (so two "
+            "overlapping cascades cannot interleave), then shifts the "
+            "predecessor and every transitive dependent atomically in one batch "
+            "(Story 3.10 / FR-10). Returns the rows that were shifted."
+        ),
+        request=RescheduleCascadePreviewRequestSerializer,
+        responses={
+            200: RescheduleCascadePreviewResponseSerializer,
+            400: get_error_schema(
+                [
+                    "ERROR_USER_NOT_IN_GROUP",
+                    "ERROR_GANTT_NOT_CONFIGURED_FOR_RESCHEDULE",
+                    "ERROR_ROW_DOES_NOT_EXIST",
+                ]
+            ),
+            401: get_error_schema(["PERMISSION_DENIED"]),
+            403: get_error_schema(
+                ["ERROR_ROLE_PROHIBITED", "ERROR_FIELD_EDIT_PROHIBITED"]
+            ),
+            404: get_error_schema(["ERROR_GANTT_DOES_NOT_EXIST"]),
+        },
+    )
+    @map_exceptions(
+        {
+            UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
+            ViewDoesNotExist: ERROR_GANTT_DOES_NOT_EXIST,
+            GanttViewNotConfiguredForReschedule: (
+                ERROR_GANTT_NOT_CONFIGURED_FOR_RESCHEDULE
+            ),
+            RowDoesNotExist: ERROR_ROW_DOES_NOT_EXIST,
+        }
+    )
+    @validate_body(RescheduleCascadePreviewRequestSerializer, return_validated=True)
+    def post(self, request: Request, view_id: int, data) -> Response:
+        """Recompute-under-lock + commit the cascade as one undoable step."""
+
+        view = ViewHandler().get_view_as_user(request.user, view_id, GanttView)
+        _check_reschedule_permission(request.user, view.table)
+        start_date_field, end_date_field = _require_gantt_date_fields(view)
+
+        plan = TaskDependencyHandler().apply_cascade(
+            request.user,
+            view.table,
+            view,
+            start_date_field,
+            end_date_field,
+            data["predecessor_row_id"],
+            data["new_start"],
+            data["new_end"],
+        )
+        return Response(
+            RescheduleCascadePreviewResponseSerializer(
+                {
+                    "affected_successors": plan.affected,
+                    "cascade_count": plan.cascade_count,
+                }
+            ).data
+        )

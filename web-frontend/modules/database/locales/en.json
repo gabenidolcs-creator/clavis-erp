@@ -745,7 +745,11 @@
     "noPredecessors": "No predecessors yet.",
     "addPredecessor": "Add a predecessor",
     "cycleRejectedTitle": "Dependency would create a cycle",
-    "cycleRejectedMessage": "This link was rejected because it would create a circular dependency between the tasks."
+    "cycleRejectedMessage": "This link was rejected because it would create a circular dependency between the tasks.",
+    "rescheduleTitle": "Reschedule dependent tasks?",
+    "rescheduleMessage": "Moving this task affects no dependents. | Moving this task will reschedule 1 dependent task to keep the dependency. | Moving this task will reschedule {count} dependent tasks to keep the dependencies.",
+    "rescheduleConfirm": "Reschedule dependents",
+    "rescheduleDecline": "Move this task only"
   },
   "gridViewHide": {
     "hideField": "Hide Fields | 1 hidden field | {count} hidden fields"

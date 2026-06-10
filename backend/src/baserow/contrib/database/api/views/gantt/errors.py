@@ -35,3 +35,10 @@ ERROR_TASK_DEPENDENCY_DOES_NOT_EXIST = (
     HTTP_404_NOT_FOUND,
     "The requested dependency edge does not exist.",
 )
+
+ERROR_GANTT_NOT_CONFIGURED_FOR_RESCHEDULE = (
+    "ERROR_GANTT_NOT_CONFIGURED_FOR_RESCHEDULE",
+    HTTP_400_BAD_REQUEST,
+    "The gantt view has no start and/or end date field configured, so a "
+    "cascade reschedule cannot be computed.",
+)

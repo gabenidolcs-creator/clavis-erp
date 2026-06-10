@@ -3,11 +3,12 @@ import GanttService from '@baserow/modules/database/services/view/gantt'
 import { getRowMetadata } from '@baserow/modules/database/utils/row'
 
 export function populateRow(row, metadata = {}) {
-  // The gantt view is render-only (Story 3.8): unlike the timeline store there
-  // is no `dragging` pre-seed because no drag/resize write path exists here
-  // (that is Story 3.10's scope).
+  // Story 3.10 wired the bar drag/reschedule write path, so — like the timeline
+  // store — every row carries a `dragging` flag the bar layer can pre-seed
+  // while a drag is in flight (it has no persisted meaning).
   row._ = {
     metadata: getRowMetadata(row, metadata),
+    dragging: false,
   }
   return row
 }
@@ -126,6 +127,44 @@ export const actions = {
   },
   dependencyDeleted({ commit }, { dependencyId }) {
     commit('REMOVE_DEPENDENCY', dependencyId)
+  },
+  /**
+   * Story 3.10 / AC #1: read-only cascade preview. Returns the affected
+   * successors + the transitive count so the component can prompt the user;
+   * writes nothing.
+   */
+  async previewCascade(
+    { commit },
+    { viewId, predecessorRowId, newStart, newEnd }
+  ) {
+    const { data } = await GanttService(
+      this.$client
+    ).rescheduleCascadePreview(viewId, {
+      predecessorRowId,
+      newStart,
+      newEnd,
+    })
+    return data
+  },
+  /**
+   * Story 3.10 / AC #2: commit the cascade. The backend shifts the predecessor
+   * + every transitive dependent atomically in one undoable step and broadcasts
+   * one batch row update, so the existing buffered-rows WebSocket handler
+   * repositions every bar on this and peer clients. The dependency `violated`
+   * flags are re-derived on the next fetch, so refresh the edge set too. On
+   * error the action re-throws so the component can roll the optimistic bar back
+   * to its authoritative position (AC #5).
+   */
+  async applyCascade(
+    { dispatch },
+    { viewId, predecessorRowId, newStart, newEnd }
+  ) {
+    await GanttService(this.$client).rescheduleCascadeApply(viewId, {
+      predecessorRowId,
+      newStart,
+      newEnd,
+    })
+    await dispatch('fetchDependencies', { viewId })
   },
 }
 

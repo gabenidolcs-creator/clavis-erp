@@ -638,3 +638,260 @@ describe('GanttViewHeader dispatch', () => {
     expect(vm.dispatched[0].payload.readOnly).toBe(true)
   })
 })
+
+// Story 3.10: dragging a bar (the predecessor) computes whole-day deltas, and
+// branches on whether any direct FS successor would be pushed. No violation →
+// write the predecessor alone, silently. Violation → ask the backend for the
+// read-only preview and prompt; nothing is written until the author confirms.
+// (AC #1, #2, #4, #5)
+describe('GanttView cascade reschedule on drag (Story 3.10)', () => {
+  const startField = { id: 5, type: 'date', date_include_time: false }
+  const endField = { id: 6, type: 'date', date_include_time: false }
+
+  const makeVm = ({
+    allRows,
+    dependencies = [],
+    dispatch = null,
+    canDrag = true,
+  } = {}) => {
+    const dispatched = []
+    const recording = (action, payload) => {
+      dispatched.push({ action, payload })
+      if (action.endsWith('previewCascade')) {
+        return Promise.resolve({
+          cascade_count: 1,
+          affected_successors: [{ row_id: 2 }],
+        })
+      }
+      return Promise.resolve()
+    }
+    const modal = { show: vi.fn(), hide: vi.fn() }
+    const refreshGantt = vi.fn()
+    const vm = {
+      readOnly: false,
+      storePrefix: 'page/',
+      table: { id: 1 },
+      view: { id: 2 },
+      fields: [startField, endField],
+      allRows,
+      dependencies,
+      startDateField: startField,
+      endDateField: endField,
+      pendingCascade: null,
+      cascadeResolved: true,
+      dispatched,
+      $store: { dispatch: dispatch || recording },
+      $registry: {
+        get: () => ({ canWriteFieldValues: () => canDrag }),
+      },
+      $refs: { rescheduleModal: modal },
+      refreshGantt,
+    }
+    Object.defineProperty(vm, 'canDragBars', {
+      get: GanttView.computed.canDragBars,
+    })
+    for (const name of [
+      'onBarDateChange',
+      'commitPredecessorOnly',
+      'confirmCascade',
+      'declineCascade',
+      'onRescheduleModalHidden',
+    ]) {
+      vm[name] = GanttView.methods[name].bind(vm)
+    }
+    return vm
+  }
+
+  test('canDragBars is true only when not read-only and both fields are writable', () => {
+    expect(makeVm({ allRows: [] }).canDragBars).toBe(true)
+    expect(makeVm({ allRows: [], canDrag: false }).canDragBars).toBe(false)
+    const ro = makeVm({ allRows: [] })
+    ro.readOnly = true
+    expect(ro.canDragBars).toBe(false)
+  })
+
+  test('a move that violates no successor writes the predecessor alone, no prompt (AC #4)', async () => {
+    const vm = makeVm({
+      allRows: [
+        { id: 1, field_5: '2026-06-10', field_6: '2026-06-12' },
+        // Successor starts AFTER the predecessor's new finish → not pushed.
+        { id: 2, field_5: '2026-06-20', field_6: '2026-06-21' },
+      ],
+      dependencies: [{ predecessor_row_id: 1, successor_row_id: 2 }],
+    })
+    await vm.onBarDateChange(
+      { id: '1' },
+      new Date('2026-06-15'),
+      new Date('2026-06-17')
+    )
+    expect(vm.dispatched).toHaveLength(1)
+    expect(vm.dispatched[0].action).toBe('page/view/gantt/updateRowValues')
+    expect(vm.dispatched[0].payload.values).toEqual({
+      field_5: '2026-06-15',
+      field_6: '2026-06-17',
+    })
+    expect(vm.dispatched[0].payload.oldValues).toEqual({
+      field_5: '2026-06-10',
+      field_6: '2026-06-12',
+    })
+    expect(vm.$refs.rescheduleModal.show).not.toHaveBeenCalled()
+    expect(vm.pendingCascade).toBe(null)
+  })
+
+  test('a move that pushes a successor previews and prompts WITHOUT writing (AC #1)', async () => {
+    const vm = makeVm({
+      allRows: [
+        { id: 1, field_5: '2026-06-10', field_6: '2026-06-12' },
+        // Successor starts BEFORE the predecessor's new finish → pushed.
+        { id: 2, field_5: '2026-06-13', field_6: '2026-06-14' },
+      ],
+      dependencies: [{ predecessor_row_id: 1, successor_row_id: 2 }],
+    })
+    await vm.onBarDateChange(
+      { id: '1' },
+      new Date('2026-06-15'),
+      new Date('2026-06-17')
+    )
+    expect(vm.dispatched).toHaveLength(1)
+    expect(vm.dispatched[0].action).toBe('page/view/gantt/previewCascade')
+    expect(vm.dispatched[0].payload).toEqual({
+      viewId: 2,
+      predecessorRowId: 1,
+      newStart: '2026-06-15',
+      newEnd: '2026-06-17',
+    })
+    expect(vm.$refs.rescheduleModal.show).toHaveBeenCalled()
+    expect(vm.cascadeResolved).toBe(false)
+    expect(vm.pendingCascade.preview.cascade_count).toBe(1)
+    // Nothing committed yet.
+    expect(
+      vm.dispatched.some((d) => d.action.endsWith('updateRowValues'))
+    ).toBe(false)
+    expect(vm.dispatched.some((d) => d.action.endsWith('applyCascade'))).toBe(
+      false
+    )
+  })
+
+  test('a day-granular no-op snaps the bar back and writes nothing', async () => {
+    const vm = makeVm({
+      allRows: [{ id: 1, field_5: '2026-06-10', field_6: '2026-06-12' }],
+    })
+    await vm.onBarDateChange(
+      { id: '1' },
+      new Date('2026-06-10'),
+      new Date('2026-06-12')
+    )
+    expect(vm.dispatched).toHaveLength(0)
+    expect(vm.refreshGantt).toHaveBeenCalled()
+  })
+
+  test('onBarDateChange is a no-op when bars are not draggable (AC #5)', async () => {
+    const vm = makeVm({
+      allRows: [{ id: 1, field_5: '2026-06-10', field_6: '2026-06-12' }],
+      canDrag: false,
+    })
+    await vm.onBarDateChange(
+      { id: '1' },
+      new Date('2026-06-15'),
+      new Date('2026-06-17')
+    )
+    expect(vm.dispatched).toHaveLength(0)
+  })
+
+  test('confirmCascade commits the cascade and clears the prompt (AC #2)', async () => {
+    const vm = makeVm({ allRows: [] })
+    vm.pendingCascade = {
+      row: { id: 1 },
+      values: {},
+      oldValues: {},
+      newStart: '2026-06-15',
+      newEnd: '2026-06-17',
+      preview: { cascade_count: 1 },
+    }
+    vm.cascadeResolved = false
+    await vm.confirmCascade()
+    expect(vm.dispatched[0].action).toBe('page/view/gantt/applyCascade')
+    expect(vm.dispatched[0].payload).toEqual({
+      viewId: 2,
+      predecessorRowId: 1,
+      newStart: '2026-06-15',
+      newEnd: '2026-06-17',
+    })
+    expect(vm.$refs.rescheduleModal.hide).toHaveBeenCalled()
+    expect(vm.cascadeResolved).toBe(true)
+    expect(vm.pendingCascade).toBe(null)
+  })
+
+  test('declineCascade writes only the predecessor and refetches edges (AC #4)', async () => {
+    const vm = makeVm({ allRows: [] })
+    vm.pendingCascade = {
+      row: { id: 1 },
+      values: { field_5: '2026-06-15', field_6: '2026-06-17' },
+      oldValues: { field_5: '2026-06-10', field_6: '2026-06-12' },
+      newStart: '2026-06-15',
+      newEnd: '2026-06-17',
+      preview: { cascade_count: 1 },
+    }
+    vm.cascadeResolved = false
+    await vm.declineCascade()
+    expect(vm.dispatched[0].action).toBe('page/view/gantt/updateRowValues')
+    expect(vm.dispatched[0].payload.values).toEqual({
+      field_5: '2026-06-15',
+      field_6: '2026-06-17',
+    })
+    expect(vm.dispatched[1].action).toBe('page/view/gantt/fetchDependencies')
+    expect(vm.$refs.rescheduleModal.hide).toHaveBeenCalled()
+    expect(vm.pendingCascade).toBe(null)
+  })
+
+  test('dismissing the prompt without a choice reverts the optimistic bar (AC #5)', () => {
+    const vm = makeVm({ allRows: [] })
+    vm.pendingCascade = { row: { id: 1 } }
+    vm.cascadeResolved = false
+    vm.onRescheduleModalHidden()
+    expect(vm.refreshGantt).toHaveBeenCalled()
+    expect(vm.pendingCascade).toBe(null)
+    expect(vm.cascadeResolved).toBe(true)
+  })
+
+  test('a resolved hide (after confirm/decline) does not double-revert', () => {
+    const vm = makeVm({ allRows: [] })
+    vm.cascadeResolved = true
+    vm.onRescheduleModalHidden()
+    expect(vm.refreshGantt).not.toHaveBeenCalled()
+  })
+})
+
+// markViolatedConnectors (AC #3): for each edge flagged `violated`, find the lib
+// arrow keyed by data-from/data-to and tag it; clears stale tags first.
+describe('GanttView.markViolatedConnectors (AC #3)', () => {
+  test('tags the connector of a violated edge by its from/to row ids', () => {
+    const arrow = { classList: { add: vi.fn(), remove: vi.fn() } }
+    const host = {
+      querySelectorAll: vi.fn(() => []),
+      querySelector: vi.fn(() => arrow),
+    }
+    const vm = {
+      $refs: { ganttHost: host },
+      dependencies: [
+        { predecessor_row_id: 1, successor_row_id: 2, violated: true },
+        { predecessor_row_id: 3, successor_row_id: 4, violated: false },
+      ],
+    }
+    GanttView.methods.markViolatedConnectors.call(vm)
+    expect(host.querySelector).toHaveBeenCalledWith(
+      '.arrow[data-from="1"][data-to="2"]'
+    )
+    expect(host.querySelector).toHaveBeenCalledTimes(1)
+    expect(arrow.classList.add).toHaveBeenCalledWith(
+      'gantt-view__arrow--violated'
+    )
+  })
+
+  test('is a safe no-op when the host is not mounted', () => {
+    const vm = { $refs: {}, dependencies: [{ violated: true }] }
+    expect(() =>
+      GanttView.methods.markViolatedConnectors.call(vm)
+    ).not.toThrow()
+  })
+})

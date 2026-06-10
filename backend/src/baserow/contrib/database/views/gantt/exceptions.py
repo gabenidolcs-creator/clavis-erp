@@ -22,3 +22,10 @@ class TaskDependencyRowDoesNotExist(Exception):
 
 class InvalidTaskDependencyType(Exception):
     """Raised when a non-FS dependency type is provided (only FS is allowed v1)."""
+
+
+class GanttViewNotConfiguredForReschedule(Exception):
+    """
+    Raised when a cascade reschedule is requested on a gantt view that has no
+    start and/or end date field configured — there is nothing to shift.
+    """

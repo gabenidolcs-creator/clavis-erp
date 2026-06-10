@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-06
-last_updated: 2026-06-10T05:14:00Z
+last_updated: 2026-06-10T06:16:00Z
 project: clavis-erp
 project_key: NOKEY
 tracking_system: file-system
@@ -75,7 +75,7 @@ development_status:
   3-7-reschedule-and-resize-timeline-bars: done
   3-8-render-a-gantt-view: done
   3-9-define-task-dependencies-with-cycle-prevention: done
-  3-10-prompt-first-reschedule-on-dependency: backlog
+  3-10-prompt-first-reschedule-on-dependency: done
   3-11-milestones-and-critical-path-cpm: backlog
   3-12-geocoding-infrastructure-provider-abstraction-throttled-queue: backlog
   3-13-configure-a-map-view: backlog
