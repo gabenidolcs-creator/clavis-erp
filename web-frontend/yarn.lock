@@ -8773,6 +8773,7 @@ __metadata:
     eslint-plugin-vitest: "npm:^0.5.4"
     flush-promises: "npm:^1.0.2"
     form-data: "npm:4.0.5"
+    frappe-gantt: "npm:^1.2.2"
     globals: "npm:^17.0.0"
     happy-dom: "npm:^20.8.9"
     highlight.js: "npm:^11.11.1"
@@ -11847,6 +11848,13 @@ __metadata:
   version: 5.3.4
   resolution: "fraction.js@npm:5.3.4"
   checksum: 10c0/f90079fe9bfc665e0a07079938e8ff71115bce9462f17b32fc283f163b0540ec34dc33df8ed41bb56f028316b04361b9a9995b9ee9258617f8338e0b05c5f95a
+  languageName: node
+  linkType: hard
+
+"frappe-gantt@npm:^1.2.2":
+  version: 1.2.2
+  resolution: "frappe-gantt@npm:1.2.2"
+  checksum: 10c0/bfcab16b3070cfa6c5f2487f83a65735ab3f98e45e9cf8b504acd98f91ace2812eabcb1824c48e8bebe7d7f35cdaa66a868556363be12ba7376f1f5832780534
   languageName: node
   linkType: hard
 

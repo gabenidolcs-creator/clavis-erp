@@ -1,0 +1,70 @@
+// Container layout only. The bar/connector/axis styling is owned by the Frappe
+// Gantt library (its CSS is imported lazily by `GanttView.vue`); we deliberately
+// do not restyle its internal SVG beyond hosting it.
+.gantt-view {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: $white;
+
+  @include absolute(0);
+}
+
+.gantt-view__main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.gantt-view__host {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.gantt-view__card--tray {
+  width: auto;
+  cursor: pointer;
+}
+
+.gantt-view__unscheduled {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 0 0 auto;
+  max-height: 30%;
+  padding: 12px;
+  border-top: 1px solid $palette-neutral-200;
+  background-color: $palette-neutral-50;
+}
+
+.gantt-view__unscheduled-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: $palette-neutral-700;
+  font-weight: 600;
+}
+
+.gantt-view__unscheduled-count {
+  font-size: 12px;
+}
+
+.gantt-view__unscheduled-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.gantt-view__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.gantt-view__empty-text {
+  color: $palette-neutral-700;
+}

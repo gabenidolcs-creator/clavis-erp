@@ -349,6 +349,7 @@ class DatabaseConfig(AppConfig):
             CalendarViewType,
             FormViewType,
             GalleryViewType,
+            GanttViewType,
             GridViewType,
             KanbanViewType,
             TimelineViewType,
@@ -356,6 +357,9 @@ class DatabaseConfig(AppConfig):
 
         view_type_registry.register(GridViewType())
         view_type_registry.register(GalleryViewType())
+        # The Gantt view has no premium twin, so it registers unconditionally
+        # alongside Grid, Gallery, and Form.
+        view_type_registry.register(GanttViewType())
         # The free, clean-room Kanban and Calendar views live in core. In
         # open-core builds that still ship the premium plugin, the premium views
         # (types "kanban" and "calendar") register themselves and take

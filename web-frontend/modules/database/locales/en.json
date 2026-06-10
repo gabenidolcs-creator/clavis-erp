@@ -729,6 +729,19 @@
     "unscheduled": "Unscheduled",
     "noDateFields": "Pick a start and end date field to position the bars on the timeline."
   },
+  "ganttViewHeader": {
+    "positionBy": "Position by",
+    "startDateField": "Start date field",
+    "endDateField": "End date field",
+    "day": "Day",
+    "week": "Week",
+    "month": "Month",
+    "customizeCards": "Customize cards"
+  },
+  "ganttView": {
+    "unscheduled": "Unscheduled",
+    "noDateFields": "Pick a start and end date field to position the bars on the gantt."
+  },
   "gridViewHide": {
     "hideField": "Hide Fields | 1 hidden field | {count} hidden fields"
   },

@@ -353,6 +353,7 @@
     "kanban": "Kanban",
     "calendar": "Calendar",
     "timeline": "Timeline",
+    "gantt": "Gantt",
     "form": "Form",
     "sharing": {
       "linkName": "view",

@@ -10,6 +10,8 @@ import CalendarView from '@baserow/modules/database/components/view/calendar/Cal
 import CalendarViewHeader from '@baserow/modules/database/components/view/calendar/CalendarViewHeader'
 import TimelineView from '@baserow/modules/database/components/view/timeline/TimelineView'
 import TimelineViewHeader from '@baserow/modules/database/components/view/timeline/TimelineViewHeader'
+import GanttView from '@baserow/modules/database/components/view/gantt/GanttView'
+import GanttViewHeader from '@baserow/modules/database/components/view/gantt/GanttViewHeader'
 import FormView from '@baserow/modules/database/components/view/form/FormView'
 import FormViewHeader from '@baserow/modules/database/components/view/form/FormViewHeader'
 import {
@@ -1523,6 +1525,98 @@ export class TimelineViewType extends BaseBufferedRowViewTypeMixin(ViewType) {
   async afterFieldDeleted(context, field, fieldType, storePrefix = '') {
     // Clear the date references on any timeline view that depended on the
     // deleted field so the timeline does not point at a field that no longer
+    // exists.
+    this._setFieldToNull(context, field, 'start_date_field')
+    this._setFieldToNull(context, field, 'end_date_field')
+    await context.dispatch(
+      storePrefix + 'view/' + this.getType() + '/forceDeleteFieldOptions',
+      field.id,
+      {
+        root: true,
+      }
+    )
+  }
+}
+
+export class GanttViewType extends BaseBufferedRowViewTypeMixin(ViewType) {
+  static getType() {
+    return 'gantt'
+  }
+
+  getIconClass() {
+    return 'baserow-icon-gantt'
+  }
+
+  getColorClass() {
+    return 'color-success'
+  }
+
+  getName() {
+    const { $i18n: i18n } = this.app
+    return i18n.t('viewType.gantt')
+  }
+
+  getHeaderComponent() {
+    return GanttViewHeader
+  }
+
+  getComponent() {
+    return GanttView
+  }
+
+  canFilter() {
+    return true
+  }
+
+  canSort() {
+    return true
+  }
+
+  canShare() {
+    return true
+  }
+
+  canShowRowModal() {
+    return true
+  }
+
+  getDefaultFieldOptionValues() {
+    // The default values should be the same as in the `GanttViewFieldOptions`
+    // model in the backend to stay consistent.
+    return {
+      hidden: true,
+      order: maxPossibleOrderValue,
+    }
+  }
+
+  async afterFieldUpdated(
+    { dispatch, rootGetters },
+    field,
+    oldField,
+    fieldType,
+    storePrefix
+  ) {
+    // If a positioning field is changed to a type that can no longer represent
+    // a date, the gantt can no longer place bars by it, so the
+    // `start_date_field` and `end_date_field` references must be cleared.
+    if (!fieldType.canRepresentDate(field)) {
+      this._setFieldToNull({ dispatch, rootGetters }, field, 'start_date_field')
+      this._setFieldToNull({ dispatch, rootGetters }, field, 'end_date_field')
+    }
+    await dispatch(
+      storePrefix + 'view/gantt/updateSearch',
+      {
+        fields: rootGetters['field/getAll'],
+      },
+      {
+        root: true,
+      }
+    )
+  }
+
+  async afterFieldDeleted(context, field, fieldType, storePrefix = '') {
+    // Clear the date references on any gantt view that depended on the
+    // deleted field so the gantt does not point at a field that no longer
     // exists.
     this._setFieldToNull(context, field, 'start_date_field')
     this._setFieldToNull(context, field, 'end_date_field')

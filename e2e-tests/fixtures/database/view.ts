@@ -80,6 +80,32 @@ export async function createTimelineView(
   return createView(user, name, "timeline", settings, table);
 }
 
+/**
+ * Thin convenience wrapper that creates a core Gantt view already positioned by
+ * the given start and end date fields, plus an optional persisted zoom level
+ * (`timescale`). Mirrors the Timeline helper — the Gantt view shares the same
+ * start/end + timescale config contract; only the bar layer (Frappe Gantt SVG)
+ * differs. Gantt has no premium twin, so this is the registered "gantt" view
+ * type in any build.
+ */
+export async function createGanttView(
+  user: User,
+  name: string,
+  startDateFieldId: number | null,
+  endDateFieldId: number | null,
+  table: Table,
+  timescale: string | null = null,
+): Promise<View> {
+  const settings: any = {
+    start_date_field: startDateFieldId,
+    end_date_field: endDateFieldId,
+  };
+  if (timescale !== null) {
+    settings.timescale = timescale;
+  }
+  return createView(user, name, "gantt", settings, table);
+}
+
 export async function updateView(
   user: User,
   view: View,

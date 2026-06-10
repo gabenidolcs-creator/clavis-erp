@@ -1008,6 +1008,93 @@ class TimelineViewFieldOptions(HierarchicalModelMixin, models.Model):
         unique_together = ("timeline_view", "field")
 
 
+class GanttView(View):
+    # The Gantt view is a Bucket B core-only feature: Baserow ships no premium
+    # or enterprise Gantt twin, so — unlike TimelineView — there are no
+    # clean-room collision guards here. Standard table/reverse-accessor names
+    # are used because nothing else loads a `GanttView` model.
+    view_ptr = models.OneToOneField(
+        View,
+        on_delete=models.CASCADE,
+        parent_link=True,
+        primary_key=True,
+        serialize=False,
+        related_name="gantt_view",
+    )
+    field_options = models.ManyToManyField(
+        Field,
+        through="GanttViewFieldOptions",
+        related_name="gantt_view_field_options",
+    )
+    start_date_field = models.ForeignKey(
+        Field,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="gantt_view_start_date_field",
+        help_text="The date field positioning the left edge of each bar on the "
+        "gantt. A row is only rendered as a bar when both the start and end "
+        "date fields have a value; otherwise it is shown in the unscheduled tray.",
+    )
+    end_date_field = models.ForeignKey(
+        Field,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="gantt_view_end_date_field",
+        help_text="The date field positioning the right edge of each bar on the "
+        "gantt. A row is only rendered as a bar when both the start and end "
+        "date fields have a value; otherwise it is shown in the unscheduled tray.",
+    )
+    timescale = models.CharField(
+        max_length=8,
+        choices=[("day", "day"), ("week", "week"), ("month", "month")],
+        default="month",
+        help_text="The persisted zoom level of the time axis: day, week or month. "
+        "Mapped to the Frappe Gantt `view_mode` on the frontend.",
+    )
+
+    class Meta:
+        db_table = "database_ganttview"
+
+
+class GanttViewFieldOptionsManager(models.Manager):
+    """
+    The View can be trashed and the field options are not deleted, therefore
+    we need to filter out the trashed views.
+    """
+
+    def get_queryset(self):
+        trashed_Q = Q(gantt_view__trashed=True) | Q(field__trashed=True)
+        return super().get_queryset().filter(~trashed_Q)
+
+
+class GanttViewFieldOptions(HierarchicalModelMixin, models.Model):
+    objects = GanttViewFieldOptionsManager()
+    objects_and_trash = models.Manager()
+
+    gantt_view = models.ForeignKey(GanttView, on_delete=models.CASCADE)
+    field = models.ForeignKey(Field, on_delete=models.CASCADE)
+    hidden = models.BooleanField(
+        default=True,
+        help_text="Whether or not the field should be hidden in the card.",
+    )
+    # The default value is the maximum value of the small integer field because a newly
+    # created field must always be last.
+    order = models.SmallIntegerField(
+        default=32767,
+        help_text="The order that the field has in the form. Lower value is first.",
+    )
+
+    def get_parent(self):
+        return self.gantt_view
+
+    class Meta:
+        db_table = "database_ganttviewfieldoptions"
+        ordering = ("order", "field_id")
+        unique_together = ("gantt_view", "field")
+
+
 class FormView(View):
     field_options = models.ManyToManyField(Field, through="FormViewFieldOptions")
     title = models.TextField(

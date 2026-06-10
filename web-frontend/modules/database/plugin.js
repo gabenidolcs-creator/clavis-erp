@@ -14,6 +14,7 @@ import {
   KanbanViewType,
   CalendarViewType,
   TimelineViewType,
+  GanttViewType,
   FormViewType,
 } from '@baserow/modules/database/viewTypes'
 import {
@@ -436,6 +437,9 @@ export default defineNuxtPlugin({
     // this one (last registration wins). In OSS-only builds only this core
     // view is registered.
     $registry.register('view', new TimelineViewType(context))
+    // The Gantt view has no premium twin, so it registers plainly (no
+    // last-wins gating needed).
+    $registry.register('view', new GanttViewType(context))
     $registry.register('view', new FormViewType(context))
     $registry.register('viewFilter', new EqualViewFilterType(context))
     $registry.register('viewFilter', new NotEqualViewFilterType(context))

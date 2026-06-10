@@ -12,6 +12,8 @@ from baserow.contrib.database.views.models import (
     FormViewFieldOptionsConditionGroup,
     GalleryView,
     GalleryViewFieldOptions,
+    GanttView,
+    GanttViewFieldOptions,
     GridView,
     GridViewFieldOptions,
     KanbanView,
@@ -203,6 +205,33 @@ class ViewFixtures:
     def create_timeline_view_field_option(self, timeline_view, field, **kwargs):
         field_options, _ = TimelineViewFieldOptions.objects.update_or_create(
             timeline_view=timeline_view, field=field, defaults=kwargs
+        )
+        return field_options
+
+    def create_gantt_view(self, user=None, create_options=True, **kwargs):
+        if "table" not in kwargs:
+            kwargs["table"] = self.create_database_table(user=user)
+
+        if "name" not in kwargs:
+            kwargs["name"] = self.fake.name()
+
+        if "order" not in kwargs:
+            kwargs["order"] = 0
+
+        gantt_view = GanttView.objects.create(**kwargs)
+        if create_options:
+            self.create_gantt_view_field_options(gantt_view)
+        return gantt_view
+
+    def create_gantt_view_field_options(self, gantt_view, **kwargs):
+        return [
+            self.create_gantt_view_field_option(gantt_view, field, **kwargs)
+            for field in Field.objects.filter(table=gantt_view.table)
+        ]
+
+    def create_gantt_view_field_option(self, gantt_view, field, **kwargs):
+        field_options, _ = GanttViewFieldOptions.objects.update_or_create(
+            gantt_view=gantt_view, field=field, defaults=kwargs
         )
         return field_options
 
