@@ -1,5 +1,5 @@
 # generated: 2026-06-06
-# last_updated: 2026-06-06T00:00:00Z
+# last_updated: 2026-06-09T00:00:00Z
 # project: clavis-erp
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-06
-last_updated: 2026-06-09T21:35:00Z
+last_updated: 2026-06-09T23:09:00Z
 project: clavis-erp
 project_key: NOKEY
 tracking_system: file-system
@@ -67,7 +67,7 @@ development_status:
   # Epic 3: Visualize Data Multiple Ways
   epic-3: in-progress
   3-1-create-and-configure-a-kanban-view: done
-  3-2-drag-a-kanban-card-between-columns: backlog
+  3-2-drag-a-kanban-card-between-columns: done
   3-3-configure-kanban-card-appearance: backlog
   3-4-create-and-configure-a-calendar-view: backlog
   3-5-reschedule-a-calendar-entry-by-drag: backlog

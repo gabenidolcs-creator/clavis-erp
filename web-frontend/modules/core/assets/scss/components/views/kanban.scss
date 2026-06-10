@@ -55,6 +55,15 @@
   cursor: pointer;
 }
 
+.kanban-view__card--draggable {
+  cursor: grab;
+}
+
+.kanban-view__card--dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
 .kanban-view__empty {
   display: flex;
   align-items: center;

@@ -15,6 +15,10 @@ import {
   createGalleryView,
 } from '@baserow/test/fixtures/gallery'
 import {
+  createKanbanRows,
+  createKanbanView,
+} from '@baserow/test/fixtures/kanban'
+import {
   expectUserDeleted,
   expectUserUpdated,
   expectUserUpdatedRespondsWithError,
@@ -153,6 +157,22 @@ export class MockServer {
 
   createGalleryRows(gridView, fields, rows) {
     return createGalleryRows(this.mock, gridView, fields, rows)
+  }
+
+  createKanbanView(
+    application,
+    table,
+    { filters = [], sortings = [], ...rest }
+  ) {
+    return createKanbanView(this.mock, application, table, {
+      filters,
+      sortings,
+      ...rest,
+    })
+  }
+
+  createKanbanRows(kanbanView, fields, rows) {
+    return createKanbanRows(this.mock, kanbanView, fields, rows)
   }
 
   nextSearchForTermWillReturn(searchTerm, gridView, results) {

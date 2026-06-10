@@ -6,6 +6,8 @@
           v-for="column in columns"
           :key="column.id === null ? 'uncategorized' : column.id"
           class="kanban-view__column"
+          @dragover="onDragOver($event)"
+          @drop="onDrop(column, $event)"
         >
           <div class="kanban-view__column-header">
             <span
@@ -30,8 +32,15 @@
               :row="row"
               :workspace-id="database.workspace.id"
               :cover-image-field="coverImageField"
+              :draggable="canDrag"
               class="kanban-view__card"
+              :class="{
+                'kanban-view__card--draggable': canDrag,
+                'kanban-view__card--dragging': row._ && row._.dragging,
+              }"
               @click="rowClick(row)"
+              @dragstart="onDragStart(row, $event)"
+              @dragend="onDragEnd(row)"
             ></RowCard>
           </div>
         </div>
@@ -175,6 +184,8 @@ export default {
   data() {
     return {
       showHiddenFieldsInRowModal: false,
+      // The card currently being dragged, or null when no drag is in progress.
+      draggingRow: null,
     }
   },
   computed: {
@@ -205,6 +216,24 @@ export default {
         return []
       }
       return groupRowsBySingleSelect(this.allRows, this.singleSelectField)
+    },
+    /**
+     * Whether cards may be dragged between columns. Dragging mutates the
+     * grouping single-select cell, so it is only offered when the view is not
+     * read-only, a grouping field is configured, and that field is writable by
+     * the current user. Field editability routes through the same
+     * `canWriteFieldValues` predicate the grid/row editing path uses, so it
+     * honours the Epic 1 field-permission layer. The server enforces the same
+     * boundary regardless; disabling the UI just avoids an obvious no-op + the
+     * rollback round-trip. (AC #4)
+     */
+    canDrag() {
+      if (this.readOnly || !this.singleSelectField) {
+        return false
+      }
+      return this.$registry
+        .get('field', this.singleSelectField.type)
+        .canWriteFieldValues(this.singleSelectField)
     },
     /**
      * Returns the visible field objects in the right order.
@@ -271,6 +300,109 @@ export default {
       } catch (error) {
         notifyIf(error, 'field')
       }
+    },
+    /**
+     * Begins dragging a card. Tracks the dragged row and flips its pre-seeded
+     * `row._.dragging` flag (set in store/view/kanban.js `populateRow`) for the
+     * drag visual state. When dragging is not permitted the drag is cancelled
+     * so the card stays put. (AC #4)
+     */
+    onDragStart(row, event) {
+      if (!this.canDrag) {
+        if (event) {
+          event.preventDefault()
+        }
+        return
+      }
+      this.draggingRow = row
+      if (row._) {
+        row._.dragging = true
+      }
+      if (event && event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move'
+        // Some browsers require a payload for the drag to initiate.
+        try {
+          event.dataTransfer.setData('text/plain', String(row.id))
+        } catch (e) {}
+      }
+    },
+    onDragEnd(row) {
+      if (row && row._) {
+        row._.dragging = false
+      }
+      this.draggingRow = null
+    },
+    /**
+     * `dragover` must call `preventDefault` for the element to be a valid drop
+     * target. Only do so while a permitted drag is in progress — so a read-only
+     * board (or any non-drag dragover) never claims the drop target. The
+     * template intentionally binds `@dragover` WITHOUT the `.prevent` modifier;
+     * an unconditional modifier would make every column a drop target and defeat
+     * this guard.
+     */
+    onDragOver(event) {
+      if (this.canDrag && this.draggingRow !== null && event) {
+        event.preventDefault()
+        if (event.dataTransfer) {
+          event.dataTransfer.dropEffect = 'move'
+        }
+      }
+    },
+    /**
+     * Drops the dragged card onto a column. Resolves the target option object
+     * from the column (`null` for Uncategorized) and dispatches the existing
+     * optimistic row-update path via `updateValue`. The card re-buckets
+     * reactively because `columns` is derived from the store; rollback (on
+     * failure) returns it. Dropping onto the card's own column is a no-op.
+     * (AC #1, #3, #5)
+     */
+    onDrop(column, event) {
+      if (event) {
+        event.preventDefault()
+      }
+      const row = this.draggingRow
+      this.draggingRow = null
+      if (row && row._) {
+        row._.dragging = false
+      }
+      if (!this.canDrag || row === null || row === undefined) {
+        return
+      }
+
+      const field = this.singleSelectField
+      const fieldKey = `field_${field.id}`
+      const currentValue = row[fieldKey] === undefined ? null : row[fieldKey]
+      const currentOptionId =
+        currentValue === null || currentValue === undefined
+          ? null
+          : currentValue.id
+      const targetOptionId = column.id
+
+      // No-op guard (AC #5): dropping on the row's own column (both null counts
+      // as equal) does not dispatch and does not flicker.
+      if (currentOptionId === targetOptionId) {
+        return
+      }
+
+      // Build the target value as the full option object (or null for
+      // Uncategorized). SingleSelectFieldType.prepareValueForUpdate converts it
+      // to the option id for the request, so we must NOT pre-convert it.
+      let targetOption = null
+      if (targetOptionId !== null) {
+        const option = (field.select_options || []).find(
+          (o) => o.id === targetOptionId
+        )
+        targetOption = option
+          ? { id: option.id, value: option.value, color: option.color }
+          : { id: column.id, value: column.label, color: column.color }
+      }
+
+      return this.updateValue({
+        field,
+        row,
+        value: targetOption,
+        oldValue: currentValue,
+      })
     },
     rowClick(row) {
       this.$refs.rowEditModal.show(row.id)
