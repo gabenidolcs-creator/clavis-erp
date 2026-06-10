@@ -7,7 +7,7 @@ import {
   deleteAllNonPrimaryFieldsFromTable,
   getFieldsForTable,
 } from "../../fixtures/database/field";
-import { createRow } from "../../fixtures/database/rows";
+import { createRow, listRows } from "../../fixtures/database/rows";
 import {
   createCalendarView,
   createViewFilter,
@@ -247,5 +247,279 @@ test.describe("Calendar view", () => {
 
     // dateField is referenced to keep its id in scope for clarity.
     expect(dateField.id).toBeTruthy();
+  });
+
+  test("dragging a calendar card to another day reschedules its date field and persists (Story 3.5 AC #1, AC #2 via reload)", async ({
+    page,
+    goto,
+    workspacePage,
+  }) => {
+    const { database, table, dateField, view } =
+      await setupCalendar(workspacePage);
+
+    // A single row dated today — it renders as one card on today's day cell.
+    await createRow(workspacePage.user, table, { Date: dayKey(0) });
+
+    const tablePage = new TablePage({ page, goto });
+    tablePage.pageUrl = `database/${database.id}/table/${table.id}/${view.id}`;
+    await tablePage.goto();
+
+    // The card is on today's cell; the grid holds exactly one card.
+    await expect(
+      page.locator(".calendar-view__day-cards .calendar-view__card"),
+    ).toHaveCount(1);
+
+    const card = page
+      .locator(".calendar-view__day-cards .calendar-view__card")
+      .first();
+    await expect(card).toBeVisible();
+
+    // Pick a deterministic drop target: an in-period day cell that is NOT today
+    // (so the drop is a real move, never the no-op self-drop). Because the cell
+    // is in the current period it shares today's month/year, so its day-number
+    // label fully determines the expected `YYYY-MM-DD` value.
+    const target = page
+      .locator(
+        ".calendar-view__day:not(.calendar-view__day--today):not(.calendar-view__day--outside)",
+      )
+      .first();
+    const targetDayNumber = (
+      await target.locator(".calendar-view__day-number").innerText()
+    ).trim();
+    const now = new Date();
+    const expectedDate = `${now.getFullYear()}-${String(
+      now.getMonth() + 1,
+    ).padStart(2, "0")}-${targetDayNumber.padStart(2, "0")}`;
+
+    // Native HTML5 DnD needs a manual mouse sequence (down → stepped move → up)
+    // so the dragover/drop handlers fire on the way over the target cell.
+    const cardBox = await card.boundingBox();
+    const targetBox = await target.boundingBox();
+    if (cardBox === null || targetBox === null) {
+      throw new Error("Could not resolve drag source/target bounding boxes");
+    }
+    await page.mouse.move(
+      cardBox.x + cardBox.width / 2,
+      cardBox.y + cardBox.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      targetBox.x + targetBox.width / 2,
+      targetBox.y + targetBox.height / 2,
+      { steps: 12 },
+    );
+    await page.mouse.up();
+
+    // The card re-buckets from the store: still exactly one card on the grid,
+    // now under the target day (AC #1).
+    await expect(
+      page.locator(".calendar-view__day-cards .calendar-view__card"),
+    ).toHaveCount(1);
+    await expect(target.locator(".calendar-view__card")).toHaveCount(1);
+
+    // The underlying date cell actually changed server-side: a fresh row read
+    // returns the target day, not today (AC #1 value set; AC #2 persisted via
+    // the reused row-update/broadcast path).
+    const rows = await listRows(workspacePage.user, table);
+    expect(rows).toHaveLength(1);
+    expect(rows[0][`field_${dateField.id}`]).toBe(expectedDate);
+
+    // Reloading the calendar (a fresh server fetch) still shows the single card
+    // under the target day, confirming persistence/broadcast (AC #2).
+    await tablePage.goto();
+    await expect(
+      page.locator(".calendar-view__day-cards .calendar-view__card"),
+    ).toHaveCount(1);
+  });
+
+  test("dragging a scheduled card to the unscheduled tray clears its date field (Story 3.5 AC #5)", async ({
+    page,
+    goto,
+    workspacePage,
+  }) => {
+    const { database, table, dateField, view } =
+      await setupCalendar(workspacePage);
+
+    // Two rows: one dated today (renders on the grid, the drag source) and one
+    // already unscheduled (so the unscheduled tray is present as a drop target).
+    await createRow(workspacePage.user, table, { Date: dayKey(0) });
+    await createRow(workspacePage.user, table, { Date: null });
+
+    const tablePage = new TablePage({ page, goto });
+    tablePage.pageUrl = `database/${database.id}/table/${table.id}/${view.id}`;
+    await tablePage.goto();
+
+    await expect(
+      page.locator(".calendar-view__day-cards .calendar-view__card"),
+    ).toHaveCount(1);
+    await expect(page.locator(".calendar-view__unscheduled-count")).toHaveText(
+      "1",
+    );
+
+    const card = page
+      .locator(".calendar-view__day-cards .calendar-view__card")
+      .first();
+    const tray = page.locator(".calendar-view__unscheduled");
+
+    const cardBox = await card.boundingBox();
+    const trayBox = await tray.boundingBox();
+    if (cardBox === null || trayBox === null) {
+      throw new Error("Could not resolve drag source/target bounding boxes");
+    }
+    await page.mouse.move(
+      cardBox.x + cardBox.width / 2,
+      cardBox.y + cardBox.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      trayBox.x + trayBox.width / 2,
+      trayBox.y + trayBox.height / 2,
+      { steps: 12 },
+    );
+    await page.mouse.up();
+
+    // The dragged card leaves the grid and joins the tray — now two unscheduled
+    // rows, none on the grid (AC #5 clear → tray, reactive re-bucket).
+    await expect(
+      page.locator(".calendar-view__day-cards .calendar-view__card"),
+    ).toHaveCount(0);
+    await expect(page.locator(".calendar-view__unscheduled-count")).toHaveText(
+      "2",
+    );
+
+    // The date cell was cleared to null server-side.
+    const rows = await listRows(workspacePage.user, table);
+    const cleared = rows.filter((r) => r[`field_${dateField.id}`] === null);
+    expect(cleared).toHaveLength(2);
+
+    // view is referenced to keep its id in scope for clarity.
+    expect(view.id).toBeTruthy();
+  });
+
+  test("dragging an unscheduled card onto a day cell sets its date field (Story 3.5 AC #5 schedule direction)", async ({
+    page,
+    goto,
+    workspacePage,
+  }) => {
+    const { database, table, dateField, view } =
+      await setupCalendar(workspacePage);
+
+    // A single undated row — it starts life in the unscheduled tray, NOT on the
+    // grid. Dragging it onto a day cell must schedule it (the mirror of the
+    // clear-to-tray case above).
+    await createRow(workspacePage.user, table, { Date: null });
+
+    const tablePage = new TablePage({ page, goto });
+    tablePage.pageUrl = `database/${database.id}/table/${table.id}/${view.id}`;
+    await tablePage.goto();
+
+    // Precondition: the card sits in the tray, the grid is empty.
+    await expect(page.locator(".calendar-view__unscheduled-count")).toHaveText(
+      "1",
+    );
+    await expect(
+      page.locator(".calendar-view__day-cards .calendar-view__card"),
+    ).toHaveCount(0);
+
+    const card = page
+      .locator(".calendar-view__unscheduled-cards .calendar-view__card")
+      .first();
+    await expect(card).toBeVisible();
+
+    // Same deterministic in-period, non-today target as the day→day scenario:
+    // its day-number label fully determines the expected `YYYY-MM-DD`.
+    const target = page
+      .locator(
+        ".calendar-view__day:not(.calendar-view__day--today):not(.calendar-view__day--outside)",
+      )
+      .first();
+    const targetDayNumber = (
+      await target.locator(".calendar-view__day-number").innerText()
+    ).trim();
+    const now = new Date();
+    const expectedDate = `${now.getFullYear()}-${String(
+      now.getMonth() + 1,
+    ).padStart(2, "0")}-${targetDayNumber.padStart(2, "0")}`;
+
+    const cardBox = await card.boundingBox();
+    const targetBox = await target.boundingBox();
+    if (cardBox === null || targetBox === null) {
+      throw new Error("Could not resolve drag source/target bounding boxes");
+    }
+    await page.mouse.move(
+      cardBox.x + cardBox.width / 2,
+      cardBox.y + cardBox.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      targetBox.x + targetBox.width / 2,
+      targetBox.y + targetBox.height / 2,
+      { steps: 12 },
+    );
+    await page.mouse.up();
+
+    // The card leaves the tray and lands under the target day (AC #5 schedule,
+    // reactive re-bucket: tray empties, one card on the grid).
+    await expect(page.locator(".calendar-view__unscheduled-count")).toHaveText(
+      "0",
+    );
+    await expect(
+      page.locator(".calendar-view__day-cards .calendar-view__card"),
+    ).toHaveCount(1);
+    await expect(target.locator(".calendar-view__card")).toHaveCount(1);
+
+    // The date cell was set to the target day server-side.
+    const rows = await listRows(workspacePage.user, table);
+    expect(rows).toHaveLength(1);
+    expect(rows[0][`field_${dateField.id}`]).toBe(expectedDate);
+  });
+
+  test("dropping a card on its own current day is a no-op (Story 3.5 AC #1)", async ({
+    page,
+    goto,
+    workspacePage,
+  }) => {
+    const { database, table, dateField, view } =
+      await setupCalendar(workspacePage);
+
+    // One row dated today — the drag source and the drop target are the same
+    // cell, so the move must not fire a request and the value must not change.
+    await createRow(workspacePage.user, table, { Date: dayKey(0) });
+
+    const tablePage = new TablePage({ page, goto });
+    tablePage.pageUrl = `database/${database.id}/table/${table.id}/${view.id}`;
+    await tablePage.goto();
+
+    const today = page.locator(".calendar-view__day--today").first();
+    const card = today.locator(".calendar-view__card").first();
+    await expect(card).toBeVisible();
+
+    const cardBox = await card.boundingBox();
+    const todayBox = await today.boundingBox();
+    if (cardBox === null || todayBox === null) {
+      throw new Error("Could not resolve drag source/target bounding boxes");
+    }
+    // Drag the card and drop it back on its own day cell.
+    await page.mouse.move(
+      cardBox.x + cardBox.width / 2,
+      cardBox.y + cardBox.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      todayBox.x + todayBox.width / 2,
+      todayBox.y + todayBox.height / 2,
+      { steps: 8 },
+    );
+    await page.mouse.up();
+
+    // The card stays put and the value is unchanged (no-op guard: no request,
+    // no flicker).
+    await expect(today.locator(".calendar-view__card")).toHaveCount(1);
+    const rows = await listRows(workspacePage.user, table);
+    expect(rows).toHaveLength(1);
+    expect(rows[0][`field_${dateField.id}`]).toBe(dayKey(0));
+
+    // view referenced to keep its id in scope for clarity.
+    expect(view.id).toBeTruthy();
   });
 });

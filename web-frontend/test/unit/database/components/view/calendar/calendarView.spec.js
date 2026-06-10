@@ -1,10 +1,12 @@
 import { vi } from 'vitest'
+import moment from '@baserow/modules/core/moment'
 import { TestApp } from '@baserow/test/helpers/testApp'
 import { CalendarViewType } from '@baserow/modules/database/viewTypes'
 import CalendarView, {
   rowDateKey,
   buildCalendarDays,
   groupRowsByDate,
+  dateValueForDay,
 } from '@baserow/modules/database/components/view/calendar/CalendarView'
 import CalendarViewHeader from '@baserow/modules/database/components/view/calendar/CalendarViewHeader'
 
@@ -150,12 +152,7 @@ describe('groupRowsByDate', () => {
 
   test('an end-date field spans the row across every visible day in range', () => {
     const row = { id: 4, field_5: '2026-06-10', field_6: '2026-06-12' }
-    const { rowsByDay } = groupRowsByDate(
-      [row],
-      dateField,
-      endDateField,
-      days
-    )
+    const { rowsByDay } = groupRowsByDate([row], dateField, endDateField, days)
     expect(rowsByDay['2026-06-10'].map((r) => r.id)).toEqual([4])
     expect(rowsByDay['2026-06-11'].map((r) => r.id)).toEqual([4])
     expect(rowsByDay['2026-06-12'].map((r) => r.id)).toEqual([4])
@@ -163,12 +160,7 @@ describe('groupRowsByDate', () => {
 
   test('an end date earlier than the start is ignored (single-day placement)', () => {
     const row = { id: 5, field_5: '2026-06-11', field_6: '2026-06-10' }
-    const { rowsByDay } = groupRowsByDate(
-      [row],
-      dateField,
-      endDateField,
-      days
-    )
+    const { rowsByDay } = groupRowsByDate([row], dateField, endDateField, days)
     expect(rowsByDay['2026-06-11'].map((r) => r.id)).toEqual([5])
     expect(rowsByDay['2026-06-10']).toBeUndefined()
   })
@@ -438,5 +430,341 @@ describe('CalendarViewHeader dispatch', () => {
     const vm = makeVm({ hasPermission: false })
     await vm.orderFieldOptions({ order: [5, 6] })
     expect(vm.dispatched[0].payload.readOnly).toBe(true)
+  })
+})
+
+// dateValueForDay is the one net-new bit of value logic for Story 3.5: it
+// builds the Date Field value so a dragged card lands exactly on the dropped
+// day. The keystone invariant is the round-trip
+// `rowDateKey(dateValueForDay(...)) === dayKey`.
+describe('dateValueForDay', () => {
+  const dateOnlyField = { id: 5, type: 'date', date_include_time: false }
+  const dateTimeField = { id: 5, type: 'date', date_include_time: true }
+
+  test('a date-only field returns the day key verbatim', () => {
+    expect(dateValueForDay(dateOnlyField, '2026-06-10', '2026-06-12')).toBe(
+      '2026-06-12'
+    )
+  })
+
+  test('a date-only field returns the day key even with no prior value', () => {
+    expect(dateValueForDay(dateOnlyField, null, '2026-06-12')).toBe(
+      '2026-06-12'
+    )
+  })
+
+  test('a datetime field preserves the time-of-day and only swaps the date', () => {
+    const oldValue = '2026-06-10T14:30:45Z'
+    const result = dateValueForDay(dateTimeField, oldValue, '2026-06-12')
+    // The wall-clock time-of-day (in the local frame rowDateKey parses with) is
+    // preserved; only the calendar date changes.
+    expect(moment(result).format('HH:mm:ss')).toBe(
+      moment(oldValue).format('HH:mm:ss')
+    )
+  })
+
+  test.each([
+    ['2026-06-10T14:30:00Z', '2026-06-12'],
+    ['2026-06-10T23:59:00Z', '2026-06-12'],
+    ['2026-06-10T00:01:00Z', '2026-06-12'],
+    [null, '2026-06-12'],
+  ])(
+    'datetime round-trips: rowDateKey(dateValueForDay(%s, %s)) === dayKey',
+    (oldValue, dayKey) => {
+      const result = dateValueForDay(dateTimeField, oldValue, dayKey)
+      expect(rowDateKey(result)).toBe(dayKey)
+    }
+  )
+})
+
+// CalendarView.onDropDay / onDropUnscheduled reschedule a row by reusing the
+// existing optimistic updateValue path. Driven at the method level (no mount).
+describe('CalendarView.onDropDay', () => {
+  const dateField = { id: 5, type: 'date', date_include_time: false }
+
+  const makeVm = ({ canDragDate = true, draggingRow = null } = {}) => {
+    const updates = []
+    const vm = {
+      dateField,
+      canDragDate,
+      draggingRow,
+      updates,
+      updateValue(payload) {
+        updates.push(payload)
+        return Promise.resolve()
+      },
+    }
+    vm.onDropDay = CalendarView.methods.onDropDay.bind(vm)
+    return vm
+  }
+
+  const fakeEvent = () => ({ preventDefault: vi.fn() })
+
+  test('reschedules a row from its day to the dropped day', () => {
+    const row = { id: 10, field_5: '2026-06-10', _: { dragging: true } }
+    const vm = makeVm({ draggingRow: row })
+    const event = fakeEvent()
+
+    vm.onDropDay({ key: '2026-06-12' }, event)
+
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(vm.updates).toHaveLength(1)
+    expect(vm.updates[0]).toMatchObject({
+      field: dateField,
+      row,
+      value: '2026-06-12',
+      oldValue: '2026-06-10',
+    })
+    // Drag teardown.
+    expect(vm.draggingRow).toBe(null)
+    expect(row._.dragging).toBe(false)
+  })
+
+  test('schedules an unscheduled row dropped on a day cell', () => {
+    const row = { id: 10, field_5: null, _: { dragging: true } }
+    const vm = makeVm({ draggingRow: row })
+
+    vm.onDropDay({ key: '2026-06-12' }, fakeEvent())
+
+    expect(vm.updates).toHaveLength(1)
+    expect(vm.updates[0]).toMatchObject({
+      value: '2026-06-12',
+      oldValue: null,
+    })
+  })
+
+  test('is a no-op when dropped on the row’s own current day', () => {
+    const row = { id: 10, field_5: '2026-06-12', _: { dragging: true } }
+    const vm = makeVm({ draggingRow: row })
+
+    vm.onDropDay({ key: '2026-06-12' }, fakeEvent())
+
+    expect(vm.updates).toHaveLength(0)
+  })
+
+  test('bails without dispatching when canDragDate is false', () => {
+    const row = { id: 10, field_5: '2026-06-10', _: { dragging: true } }
+    const vm = makeVm({ canDragDate: false, draggingRow: row })
+
+    vm.onDropDay({ key: '2026-06-12' }, fakeEvent())
+
+    expect(vm.updates).toHaveLength(0)
+  })
+})
+
+describe('CalendarView.onDropUnscheduled', () => {
+  const dateField = { id: 5, type: 'date', date_include_time: false }
+
+  const makeVm = ({ canDragDate = true, draggingRow = null } = {}) => {
+    const updates = []
+    const vm = {
+      dateField,
+      canDragDate,
+      draggingRow,
+      updates,
+      updateValue(payload) {
+        updates.push(payload)
+        return Promise.resolve()
+      },
+    }
+    vm.onDropUnscheduled = CalendarView.methods.onDropUnscheduled.bind(vm)
+    return vm
+  }
+
+  const fakeEvent = () => ({ preventDefault: vi.fn() })
+
+  test('clears the date field to null when a scheduled card is dropped on the tray', () => {
+    const row = { id: 10, field_5: '2026-06-10', _: { dragging: true } }
+    const vm = makeVm({ draggingRow: row })
+
+    vm.onDropUnscheduled(fakeEvent())
+
+    expect(vm.updates).toHaveLength(1)
+    expect(vm.updates[0]).toMatchObject({
+      field: dateField,
+      row,
+      value: null,
+      oldValue: '2026-06-10',
+    })
+  })
+
+  test('is a no-op when the card is already unscheduled', () => {
+    const row = { id: 10, field_5: null, _: { dragging: true } }
+    const vm = makeVm({ draggingRow: row })
+
+    vm.onDropUnscheduled(fakeEvent())
+
+    expect(vm.updates).toHaveLength(0)
+  })
+
+  test('bails without dispatching when canDragDate is false', () => {
+    const row = { id: 10, field_5: '2026-06-10', _: { dragging: true } }
+    const vm = makeVm({ canDragDate: false, draggingRow: row })
+
+    vm.onDropUnscheduled(fakeEvent())
+
+    expect(vm.updates).toHaveLength(0)
+  })
+})
+
+// canDragDate gates whether cards are draggable: read-only views and a missing
+// or non-writable date field disable drag; the server stays the backstop.
+describe('CalendarView.canDragDate', () => {
+  const dateField = { id: 5, type: 'date' }
+
+  const makeVm = ({ readOnly = false, field = dateField, writable = true }) => {
+    const vm = {
+      readOnly,
+      dateField: field,
+      $registry: {
+        get: () => ({ canWriteFieldValues: () => writable }),
+      },
+    }
+    Object.defineProperty(vm, 'canDragDate', {
+      get: CalendarView.computed.canDragDate,
+    })
+    return vm
+  }
+
+  test('is false when the view is read-only', () => {
+    expect(makeVm({ readOnly: true }).canDragDate).toBe(false)
+  })
+
+  test('is false when no date field is configured', () => {
+    expect(makeVm({ field: null }).canDragDate).toBe(false)
+  })
+
+  test('is false when the date field is not writable for the user', () => {
+    expect(makeVm({ writable: false }).canDragDate).toBe(false)
+  })
+
+  test('is true for a writable date field on an editable view', () => {
+    expect(makeVm({ writable: true }).canDragDate).toBe(true)
+  })
+})
+
+// onDragStart / onDragEnd / onDragOver are the drag-lifecycle handlers that sit
+// in front of the drop handlers. They track `draggingRow`, flip the pre-seeded
+// `row._.dragging` visual flag, and — critically for AC #4 — gate the native
+// HTML5 drop target on `canDragDate` so a read-only / non-writable calendar
+// never accepts a drop. Driven at the method level (no mount).
+describe('CalendarView.onDragStart', () => {
+  const makeVm = ({ canDragDate = true } = {}) => {
+    const vm = { canDragDate, draggingRow: null }
+    vm.onDragStart = CalendarView.methods.onDragStart.bind(vm)
+    return vm
+  }
+
+  const fakeEvent = () => {
+    const store = {}
+    return {
+      preventDefault: vi.fn(),
+      dataTransfer: {
+        effectAllowed: null,
+        setData: vi.fn((type, value) => {
+          store[type] = value
+        }),
+        _store: store,
+      },
+    }
+  }
+
+  test('tracks the dragged row, flips the dragging flag, and sets the payload', () => {
+    const row = { id: 10, _: { dragging: false } }
+    const vm = makeVm()
+    const event = fakeEvent()
+
+    vm.onDragStart(row, event)
+
+    expect(vm.draggingRow).toBe(row)
+    expect(row._.dragging).toBe(true)
+    expect(event.dataTransfer.effectAllowed).toBe('move')
+    expect(event.dataTransfer.setData).toHaveBeenCalledWith('text/plain', '10')
+    expect(event.preventDefault).not.toHaveBeenCalled()
+  })
+
+  test('cancels the drag and tracks nothing when canDragDate is false (AC #4)', () => {
+    const row = { id: 10, _: { dragging: false } }
+    const vm = makeVm({ canDragDate: false })
+    const event = fakeEvent()
+
+    vm.onDragStart(row, event)
+
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(vm.draggingRow).toBe(null)
+    expect(row._.dragging).toBe(false)
+    expect(event.dataTransfer.setData).not.toHaveBeenCalled()
+  })
+
+  test('does not throw when the row has no `_` metadata bag', () => {
+    const row = { id: 10 }
+    const vm = makeVm()
+    expect(() => vm.onDragStart(row, fakeEvent())).not.toThrow()
+    expect(vm.draggingRow).toBe(row)
+  })
+})
+
+describe('CalendarView.onDragEnd', () => {
+  const makeVm = () => {
+    const vm = { draggingRow: { id: 10 } }
+    vm.onDragEnd = CalendarView.methods.onDragEnd.bind(vm)
+    return vm
+  }
+
+  test('clears the dragging flag and the tracked row', () => {
+    const row = { id: 10, _: { dragging: true } }
+    const vm = makeVm()
+
+    vm.onDragEnd(row)
+
+    expect(row._.dragging).toBe(false)
+    expect(vm.draggingRow).toBe(null)
+  })
+
+  test('does not throw when the row is null', () => {
+    const vm = makeVm()
+    expect(() => vm.onDragEnd(null)).not.toThrow()
+    expect(vm.draggingRow).toBe(null)
+  })
+})
+
+describe('CalendarView.onDragOver', () => {
+  const makeVm = ({ canDragDate = true, draggingRow = { id: 10 } } = {}) => {
+    const vm = { canDragDate, draggingRow }
+    vm.onDragOver = CalendarView.methods.onDragOver.bind(vm)
+    return vm
+  }
+
+  const fakeEvent = () => ({
+    preventDefault: vi.fn(),
+    dataTransfer: { dropEffect: null },
+  })
+
+  test('marks the cell a valid drop target during a permitted drag', () => {
+    const vm = makeVm()
+    const event = fakeEvent()
+
+    vm.onDragOver(event)
+
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(event.dataTransfer.dropEffect).toBe('move')
+  })
+
+  test('does not claim the drop target when canDragDate is false (AC #4)', () => {
+    const vm = makeVm({ canDragDate: false })
+    const event = fakeEvent()
+
+    vm.onDragOver(event)
+
+    expect(event.preventDefault).not.toHaveBeenCalled()
+  })
+
+  test('does not claim the drop target when no drag is in progress', () => {
+    const vm = makeVm({ draggingRow: null })
+    const event = fakeEvent()
+
+    vm.onDragOver(event)
+
+    expect(event.preventDefault).not.toHaveBeenCalled()
   })
 })

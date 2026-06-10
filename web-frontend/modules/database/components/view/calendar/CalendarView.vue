@@ -23,6 +23,8 @@
               'calendar-view__day--outside': !day.inCurrentPeriod,
               'calendar-view__day--today': day.isToday,
             }"
+            @dragover="onDragOver($event)"
+            @drop="onDropDay(day, $event)"
           >
             <div class="calendar-view__day-header">
               <span class="calendar-view__day-number">{{ day.label }}</span>
@@ -36,13 +38,25 @@
                 :workspace-id="database.workspace.id"
                 :cover-image-field="coverImageField"
                 class="calendar-view__card"
+                :draggable="canDragDate"
+                :class="{
+                  'calendar-view__card--draggable': canDragDate,
+                  'calendar-view__card--dragging': row._ && row._.dragging,
+                }"
                 @click="rowClick(row)"
+                @dragstart="onDragStart(row, $event)"
+                @dragend="onDragEnd(row)"
               ></RowCard>
             </div>
           </div>
         </div>
       </div>
-      <div v-if="unscheduledRows.length > 0" class="calendar-view__unscheduled">
+      <div
+        v-if="unscheduledRows.length > 0"
+        class="calendar-view__unscheduled"
+        @dragover="onDragOver($event)"
+        @drop="onDropUnscheduled($event)"
+      >
         <div class="calendar-view__unscheduled-header">
           {{ $t('calendarView.unscheduled') }}
           <span class="calendar-view__unscheduled-count">{{
@@ -58,7 +72,14 @@
             :workspace-id="database.workspace.id"
             :cover-image-field="coverImageField"
             class="calendar-view__card"
+            :draggable="canDragDate"
+            :class="{
+              'calendar-view__card--draggable': canDragDate,
+              'calendar-view__card--dragging': row._ && row._.dragging,
+            }"
             @click="rowClick(row)"
+            @dragstart="onDragStart(row, $event)"
+            @dragend="onDragEnd(row)"
           ></RowCard>
         </div>
       </div>
@@ -147,6 +168,32 @@ export function rowDateKey(value) {
     return null
   }
   return parsed.format('YYYY-MM-DD')
+}
+
+/**
+ * Builds the new value for a Date Field so that the rescheduled card lands
+ * exactly on the dropped day cell (`dayKey`, `YYYY-MM-DD`).
+ *
+ * - Date-only fields return the day key verbatim, matching
+ *   `BaseDateFieldType.formatValue`'s store shape for a date cell.
+ * - Datetime fields preserve the existing time-of-day and only swap the date.
+ *   The swap is done in the SAME local frame `rowDateKey` parses with (plain
+ *   `moment`, never `moment.utc`), so the round-trip invariant
+ *   `rowDateKey(dateValueForDay(...)) === dayKey` holds even near midnight; an
+ *   empty origin value (scheduling from the unscheduled tray) defaults the time
+ *   to start-of-day. The result is serialized as a UTC ISO string, the shape
+ *   `formatValue` and the backend expect.
+ */
+export function dateValueForDay(dateField, oldValue, dayKey) {
+  if (!dateField.date_include_time) {
+    return dayKey
+  }
+  const m = oldValue ? moment(oldValue) : moment(dayKey + ' 00:00')
+  const [year, month, date] = dayKey.split('-')
+  m.year(+year)
+    .month(+month - 1)
+    .date(+date)
+  return m.utc().format()
 }
 
 /**
@@ -286,6 +333,8 @@ export default {
       // The date the grid is centred on. Defaults to today in the user's
       // timezone.
       referenceDate: moment.tz(getUserTimeZone()).format('YYYY-MM-DD'),
+      // The card currently being dragged, or null when no drag is in progress.
+      draggingRow: null,
     }
   },
   computed: {
@@ -317,6 +366,24 @@ export default {
         return null
       }
       return this.fields.find((field) => field.id === fieldId) || null
+    },
+    /**
+     * Whether calendar cards may be dragged to reschedule. Dragging mutates the
+     * configured date cell, so it is only offered when the view is not
+     * read-only, a date field is configured, and that field is writable by the
+     * current user. Editability routes through the same `canWriteFieldValues`
+     * predicate the grid/row editing path uses, so it honours the Epic 1
+     * field-permission layer. The server enforces the same boundary regardless;
+     * disabling the UI just avoids an obvious no-op + the rollback round-trip.
+     * (AC #4)
+     */
+    canDragDate() {
+      if (this.readOnly || !this.dateField) {
+        return false
+      }
+      return this.$registry
+        .get('field', this.dateField.type)
+        .canWriteFieldValues(this.dateField)
     },
     todayKey() {
       return moment.tz(getUserTimeZone()).format('YYYY-MM-DD')
@@ -419,6 +486,119 @@ export default {
       } catch (error) {
         notifyIf(error, 'field')
       }
+    },
+    /**
+     * Begins dragging a card. Tracks the dragged row and flips its pre-seeded
+     * `row._.dragging` flag (set in store/view/calendar.js `populateRow`) for
+     * the drag visual state. When dragging is not permitted the drag is
+     * cancelled so the card stays put. (AC #4)
+     */
+    onDragStart(row, event) {
+      if (!this.canDragDate) {
+        if (event) {
+          event.preventDefault()
+        }
+        return
+      }
+      this.draggingRow = row
+      if (row._) {
+        row._.dragging = true
+      }
+      if (event && event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move'
+        // Some browsers require a payload for the drag to initiate.
+        try {
+          event.dataTransfer.setData('text/plain', String(row.id))
+        } catch (e) {}
+      }
+    },
+    onDragEnd(row) {
+      if (row && row._) {
+        row._.dragging = false
+      }
+      this.draggingRow = null
+    },
+    /**
+     * `dragover` must call `preventDefault` for the element to be a valid drop
+     * target. Only do so while a permitted drag is in progress — so a read-only
+     * calendar (or any non-drag dragover) never claims the drop target. The
+     * template intentionally binds `@dragover` WITHOUT the `.prevent` modifier;
+     * an unconditional modifier would make every cell a drop target and defeat
+     * this guard.
+     */
+    onDragOver(event) {
+      if (this.canDragDate && this.draggingRow !== null && event) {
+        event.preventDefault()
+        if (event.dataTransfer) {
+          event.dataTransfer.dropEffect = 'move'
+        }
+      }
+    },
+    /**
+     * Drops the dragged card onto a day cell and reschedules the row to that
+     * day via the existing optimistic row-update path (`updateValue`). The card
+     * re-buckets reactively because `rowsByDay` is derived from the store;
+     * rollback (on failure) returns it. Dropping onto the card's own current
+     * day is a no-op. (AC #1, #3, #5)
+     */
+    onDropDay(day, event) {
+      if (event) {
+        event.preventDefault()
+      }
+      const row = this.draggingRow
+      this.draggingRow = null
+      if (row && row._) {
+        row._.dragging = false
+      }
+      if (!this.canDragDate || row === null || row === undefined) {
+        return
+      }
+
+      const fieldKey = `field_${this.dateField.id}`
+      const oldValue = row[fieldKey] === undefined ? null : row[fieldKey]
+
+      // No-op guard (AC #1): dropping on the row's own day does not dispatch and
+      // does not flicker.
+      if (rowDateKey(oldValue) === day.key) {
+        return
+      }
+
+      const value = dateValueForDay(this.dateField, oldValue, day.key)
+      return this.updateValue({ field: this.dateField, row, value, oldValue })
+    },
+    /**
+     * Drops the dragged card onto the unscheduled tray, clearing the date cell
+     * to `null` (unscheduling the row). Rides the same optimistic
+     * `updateValue` path; the cleared row moves to the tray reactively. Already
+     * unscheduled rows are a no-op. (AC #5)
+     */
+    onDropUnscheduled(event) {
+      if (event) {
+        event.preventDefault()
+      }
+      const row = this.draggingRow
+      this.draggingRow = null
+      if (row && row._) {
+        row._.dragging = false
+      }
+      if (!this.canDragDate || row === null || row === undefined) {
+        return
+      }
+
+      const fieldKey = `field_${this.dateField.id}`
+      const oldValue = row[fieldKey] === undefined ? null : row[fieldKey]
+
+      // No-op guard: an already-unscheduled card dropped on the tray.
+      if (rowDateKey(oldValue) === null) {
+        return
+      }
+
+      return this.updateValue({
+        field: this.dateField,
+        row,
+        value: null,
+        oldValue,
+      })
     },
     rowClick(row) {
       this.$refs.rowEditModal.show(row.id)

@@ -1,76 +1,61 @@
-# Test Automation Summary — Story 2.5: Running Count Field
+# Test Automation Summary — Story 3.5: Reschedule a Calendar Entry by Drag
 
-**Date:** 2026-06-09
-**QA workflow:** bmad-qa-generate-e2e-tests
-**Story:** `_bmad-output/implementation-artifacts/2-5-running-count-field.md` (Status: review)
-
-## Scope
-
-Story 2.5 was already fully implemented (dev-story complete) with backend (6), frontend
-unit (6), and E2E (3) tests. This QA pass performed gap analysis of the E2E suite against
-the four acceptance criteria and auto-applied the discovered gaps.
+**Workflow:** `bmad-qa-generate-e2e-tests`
+**Date:** 2026-06-10
+**Engineer role:** QA automation (test generation only — no code review / story validation)
+**Story status at run:** `review` (implementation pre-applied; this run audits coverage and auto-applies gaps)
+**Profile:** OSS-only (clean-room Bucket A — core `.calendar-view__*` DOM; never `premium/`/`enterprise/`)
 
 ## Gap Analysis
 
-| AC | Behavior | Pre-existing E2E coverage | Gap found |
-|----|----------|---------------------------|-----------|
-| #1 | Whole-table count displayed, read-only | 3 tests (column visible, cell read-only, value=2) | none |
-| #2 | Count updates on row **create** | none | **GAP — added** |
-| #3 | Count updates on row **delete** | none | **GAP — added** |
-| #4 | Relational `count` type unaffected | n/a — backend registry concern | covered by `test_running_count_field_registered` (backend) |
+Coverage audited against the 5 acceptance criteria and the implemented handlers in
+`CalendarView.vue` (`onDragStart`/`onDragEnd`/`onDragOver`/`onDropDay`/`onDropUnscheduled`,
+`dateValueForDay`, `canDragDate`).
 
-AC #2 and AC #3 are user-facing behaviors (counts recompute across all rows on mutation)
-that had backend unit coverage but **no E2E coverage**. These are exactly the
-end-to-end workflows the QA E2E workflow targets.
+| Surface | Already covered (pre-run) | Gap found | Action |
+|---|---|---|---|
+| Unit — `dateValueForDay`, `onDropDay`, `onDropUnscheduled`, `canDragDate`, `updateValue`, computeds | ✅ | — | kept |
+| Unit — `onDragStart` | ❌ | drag lifecycle / AC #4 cancel-when-not-permitted / payload | **added** |
+| Unit — `onDragEnd` | ❌ | flag teardown + null-row safety | **added** |
+| Unit — `onDragOver` | ❌ | AC #4 drop-target gate (`canDragDate && draggingRow`) | **added** |
+| E2E — day→day reschedule, scheduled→tray clear | ✅ | — | kept |
+| E2E — unscheduled-tray→day (AC #5 *schedule* direction) | ❌ | only the clear direction was tested | **added** |
+| E2E — no-op self-day drop (AC #1) | ❌ | guard untested end-to-end | **added** |
 
-## Generated Tests
+## Generated / Extended Tests
 
-### E2E Tests — `e2e-tests/tests/database/running_count_field.spec.ts`
+### Unit — `web-frontend/test/unit/database/components/view/calendar/calendarView.spec.js`
+- [x] `CalendarView.onDragStart` — tracks `draggingRow`, flips `row._.dragging`, sets `effectAllowed`/payload; **cancels + tracks nothing when `canDragDate` false (AC #4)**; survives a row with no `_` bag.
+- [x] `CalendarView.onDragEnd` — clears the dragging flag + tracked row; null-row safe.
+- [x] `CalendarView.onDragOver` — `preventDefault` only during a permitted drag; **does not claim the drop target when `canDragDate` false or no drag in progress (AC #4)**.
 
-Pre-existing (kept):
-- [x] Running Count field column appears in table after creation (AC #1)
-- [x] Running Count cell is read-only — no input appears on click (AC #1)
-- [x] Running Count cell displays the whole-table row count (AC #1)
+### E2E — `e2e-tests/tests/database/calendar_view.spec.ts`
+- [x] Drag an **unscheduled** tray card onto a day cell → date field set, card leaves tray, lands under target day, DB read confirms value (AC #5 schedule direction).
+- [x] Drop a card on its **own current day** → no request, value unchanged, card stays put (AC #1 no-op guard).
 
-Added this pass:
-- [x] **Running Count increments for all rows when a row is created** (AC #2) — seeds
-  2 rows (count=2), creates a 3rd row via API (`after_rows_created` hook recomputes),
-  reloads the grid, asserts the cell reads `3` and 3 rows are present.
-- [x] **Running Count decrements for all rows when a row is deleted** (AC #3) — seeds
-  2 rows (count=2), deletes one via API (`rows_deleted` signal recomputes), reloads
-  the grid, asserts the cell reads `1` and 1 row remains.
+## Coverage vs Acceptance Criteria
 
-### Fixture additions — `e2e-tests/fixtures/database/rows.ts`
+| AC | Description | Unit | E2E |
+|---|---|---|---|
+| #1 | Drag→reschedule + reactive re-bucket + no-op self-drop | ✅ | ✅ |
+| #2 | Real-time broadcast via reused row-update path (persisted on reload) | ✅ (`updateValue` dispatch) | ✅ (reload assert) |
+| #3 | Optimistic + rollback via `notifyIf` | ✅ (`updateValue` reject) | n/a (server fault injection out of e2e scope) |
+| #4 | Permission / read-only drag gate | ✅ (`canDragDate`, `onDragStart`, `onDragOver`) | n/a (UI gate; server is backstop) |
+| #5 | Unscheduled tray, both directions | ✅ | ✅ (both directions) |
 
-`createRows` did not exist (story Task 9 confirmed). Added three minimal API helpers,
-mirroring the existing `updateRows`:
-- `createRow(user, table, rowValues = {})` — POST a row, returns the created row.
-- `listRows(user, table)` — GET rows, returns the `results` array (used to resolve a
-  seeded row id for deletion).
-- `deleteRow(user, table, rowId)` — DELETE a row.
+## Verification
 
-## Coverage
+- **Unit:** `yarn vitest run web-frontend/test/unit/database/components/view/calendar/calendarView.spec.js`
+  → **60 passed** (52 pre-run + 8 new). No mount (premium store override → OOM); method/computed-level only.
+- **ESLint** (repo root, `web-frontend/node_modules/.bin/eslint`): clean on the unit spec.
+- **Prettier** `--check`: clean on `calendar_view.spec.ts`.
+- **E2E:** authored only — NOT run locally (requires the OSS-only Docker stack); wired to the dedicated OSS-only CI lane (same lane as the Kanban spec). [Source: story Task 6 / 3-2 test-run note]
 
-- Acceptance criteria with E2E coverage: **3/4** (AC #1, #2, #3). AC #4 is a backend
-  registry invariant, not an E2E-suitable flow — covered by backend unit test.
-- E2E tests: 3 -> **5**.
-
-## Validation
-
-- E2E tests **not run locally**: `e2e-tests/` has no installed `node_modules`
-  (`Cannot find module '@playwright/test'`) and the suite requires the full Docker stack,
-  per the story's explicit instruction ("Do NOT run E2E tests locally"). Same documented
-  constraint as `autonumber_field.spec.ts` / `currency_field.spec.ts`.
-- New tests are structural mirrors of the existing passing AC #1 specs; added fixture
-  helpers mirror the existing `updateRows` pattern and use Baserow's standard row REST
-  endpoints (`database/rows/table/{id}/`).
-- Locators are the established semantic/class locators already used by the autonumber
-  suite (`.grid-field-number`, `firstNonPrimaryCellWrappingColumnDiv`, `rows()`).
-- No hardcoded sleeps; assertions use Playwright auto-waiting `expect`.
-- Tests are independent — each provisions its own database/table.
+## Coverage Metrics
+- Drag-lifecycle handlers: 5/5 covered at the unit level (was 2/5).
+- AC coverage: 5/5 with at least one automated assertion.
+- E2E reschedule scenarios: 4 (day→day, scheduled→tray, tray→day, self-day no-op).
 
 ## Next Steps
-
-- Run the full E2E suite in CI / Docker stack to confirm green.
-- Story remains in `review`; advance via `bmad-code-review` (adversarial review),
-  consistent with stories 2.1-2.4.
+- Run the E2E suite in the OSS-only CI lane (Docker required).
+- AC #3 server-side rollback remains a unit-level assertion; a fault-injection e2e (e.g. revoke field write mid-session) is a possible future enhancement.

@@ -81,6 +81,15 @@
   cursor: pointer;
 }
 
+.calendar-view__card--draggable {
+  cursor: grab;
+}
+
+.calendar-view__card--dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
 .calendar-view__unscheduled {
   display: flex;
   flex-direction: column;
