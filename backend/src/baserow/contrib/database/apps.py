@@ -195,6 +195,7 @@ class DatabaseConfig(AppConfig):
 
         from .fields.field_types import (
             AutonumberFieldType,
+            BarcodeFieldType,
             BooleanFieldType,
             CountFieldType,
             CreatedByFieldType,
@@ -230,6 +231,7 @@ class DatabaseConfig(AppConfig):
         field_type_registry.register(URLFieldType())
         field_type_registry.register(EmailFieldType())
         field_type_registry.register(NumberFieldType())
+        field_type_registry.register(BarcodeFieldType())
         field_type_registry.register(CurrencyFieldType())
         field_type_registry.register(PercentFieldType())
         field_type_registry.register(RatingFieldType())

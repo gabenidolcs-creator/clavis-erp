@@ -219,6 +219,7 @@ from .handler import FieldHandler
 from .models import (
     AbstractSelectOption,
     AutonumberField,
+    BarcodeField,
     BooleanField,
     CountField,
     CreatedByField,
@@ -909,6 +910,15 @@ class PercentFieldType(NumberFieldType):
         values["number_suffix"] = "%"
         values["number_prefix"] = ""
         return values
+
+
+class BarcodeFieldType(TextFieldType):
+    type = "barcode"
+    model_class = BarcodeField
+    allowed_fields = TextFieldType.allowed_fields + ["barcode_type"]
+    serializer_field_names = TextFieldType.serializer_field_names + ["barcode_type"]
+    _can_group_by = True
+    _can_have_db_index = True
 
 
 class RatingFieldType(FieldType):

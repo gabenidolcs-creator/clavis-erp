@@ -59,7 +59,7 @@ development_status:
   epic-2: backlog
   2-1-currency-field: done
   2-2-percent-field: done
-  2-3-barcode-field: backlog
+  2-3-barcode-field: review
   2-4-autonumber-field: backlog
   2-5-running-count-field: backlog
   epic-2-retrospective: optional

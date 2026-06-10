@@ -27,6 +27,7 @@ import guessFormat from 'moment-guess'
 import { Registerable } from '@baserow/modules/core/registry'
 import { mix } from '@baserow/modules/core/mixins'
 import FieldNumberSubForm from '@baserow/modules/database/components/field/FieldNumberSubForm'
+import FieldBarcodeSubForm from '@baserow/modules/database/components/field/FieldBarcodeSubForm'
 import FieldCurrencySubForm from '@baserow/modules/database/components/field/FieldCurrencySubForm'
 import FieldPercentSubForm from '@baserow/modules/database/components/field/FieldPercentSubForm'
 import FieldAutonumberSubForm from '@baserow/modules/database/components/field/FieldAutonumberSubForm'
@@ -61,6 +62,7 @@ import GridViewFieldDuration from '@baserow/modules/database/components/view/gri
 import GridViewFieldMultipleCollaborators from '@baserow/modules/database/components/view/grid/fields/GridViewFieldMultipleCollaborators'
 import GridViewFieldUUID from '@baserow/modules/database/components/view/grid/fields/GridViewFieldUUID'
 import GridViewFieldAutonumber from '@baserow/modules/database/components/view/grid/fields/GridViewFieldAutonumber'
+import GridViewFieldBarcode from '@baserow/modules/database/components/view/grid/fields/GridViewFieldBarcode'
 import GridViewFieldLastModifiedBy from '@baserow/modules/database/components/view/grid/fields/GridViewFieldLastModifiedBy'
 import GridViewFieldPassword from '@baserow/modules/database/components/view/grid/fields/GridViewFieldPassword'
 import GridViewFieldFormViewEditRow from '@baserow/modules/database/components/view/grid/fields/GridViewFieldFormViewEditRow'
@@ -2028,6 +2030,38 @@ export class PercentFieldType extends NumberFieldType {
     if (value === null || value === undefined || value === '') return ''
     const displayField = { ...field, number_suffix: '%', number_prefix: '' }
     return formatDecimalNumber(displayField, value)
+  }
+}
+
+export class BarcodeFieldType extends TextFieldType {
+  static getType() {
+    return 'barcode'
+  }
+
+  static getIconClass() {
+    return 'iconoir-barcode'
+  }
+
+  getName() {
+    const { $i18n: i18n } = this.app
+    return i18n.t('fieldType.barcode')
+  }
+
+  getFormComponent() {
+    return FieldBarcodeSubForm
+  }
+
+  getGridViewFieldComponent() {
+    return GridViewFieldBarcode
+  }
+
+  getDefaultValueFieldName() {
+    return 'text_default'
+  }
+
+  toHumanReadableString(field, value) {
+    if (value === null || value === undefined) return ''
+    return String(value)
   }
 }
 

@@ -180,6 +180,7 @@
     "multipleCollaboratorsDropdown": "Dropdown",
     "multipleCollaboratorsCheckboxes": "Checkboxes",
     "defaultValueFunctionNow": "Current date",
+    "barcode": "Barcode",
     "currency": "Currency",
     "percent": "Percent"
   },

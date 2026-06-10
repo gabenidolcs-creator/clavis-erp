@@ -307,6 +307,9 @@
     "defaultValueLabel": "Default value",
     "defaultValuePlaceholder": "Enter a default value"
   },
+  "fieldBarcodeSubForm": {
+    "typeLabel": "Barcode type"
+  },
   "fieldCurrencySubForm": {
     "symbolLabel": "Currency symbol",
     "symbolPlaceholder": "$"

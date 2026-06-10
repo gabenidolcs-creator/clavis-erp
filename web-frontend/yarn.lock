@@ -8778,6 +8778,7 @@ __metadata:
     highlight.js: "npm:^11.11.1"
     iconoir: "npm:^6.11.0"
     js-sha256: "npm:^0.11.1"
+    jsbarcode: "npm:^3.12.3"
     jwt-decode: "npm:^3.1.2"
     lodash.debounce: "npm:^4.0.8"
     lowlight: "npm:^3.3.0"
@@ -8796,6 +8797,7 @@ __metadata:
     postcss-scss: "npm:^4.0.9"
     posthog-js: "npm:^1.232.4"
     prettier: "npm:^3.7.4"
+    qrcode.vue: "npm:^3.9.1"
     sass: "npm:1.98.0"
     storybook: "npm:^9.1.19"
     stylelint: "npm:^16.26.1"
@@ -13073,6 +13075,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"jsbarcode@npm:^3.12.3":
+  version: 3.12.3
+  resolution: "jsbarcode@npm:3.12.3"
+  checksum: 10c0/da6683fe036eb288b92159d4f46b96cc376bcd0b7048715aaa7dc47f20e3d6d505b59e645818ed9685c399ed79c513197e30cf0540c94627d9dee19d0a67ddaa
+  languageName: node
+  linkType: hard
+
 "jsdoc-type-pratt-parser@npm:^4.0.0":
   version: 4.8.0
   resolution: "jsdoc-type-pratt-parser@npm:4.8.0"
@@ -16488,6 +16497,15 @@ __metadata:
   dependencies:
     hookified: "npm:^1.13.0"
   checksum: 10c0/bffeb42ff3908d9df97872b5bb3f6b4a862c99bc210e1dea404c92519c8e9e885ab77bf49f68e0ba28c38aae2fa719ba7200037e96a6a6d089d8349c2bebf0db
+  languageName: node
+  linkType: hard
+
+"qrcode.vue@npm:^3.9.1":
+  version: 3.9.1
+  resolution: "qrcode.vue@npm:3.9.1"
+  peerDependencies:
+    vue: ^3.0.0
+  checksum: 10c0/8cfc964100e793f9319f2ba7e233b9c9f88c65495af66d0b577928f1edd0df7fac4fa7b652de8edd6d24cf00f6ba044b973af4f2d91d0c911f4cd297f0e7653f
   languageName: node
   linkType: hard
 

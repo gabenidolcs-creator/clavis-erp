@@ -426,6 +426,24 @@ class PercentField(NumberField):
         app_label = "database"
 
 
+BARCODE_TYPE_CHOICES = [
+    ("qr", "QR Code"),
+    ("code128", "Code 128"),
+]
+
+
+class BarcodeField(TextField):
+    barcode_type = models.CharField(
+        max_length=20,
+        choices=BARCODE_TYPE_CHOICES,
+        default="qr",
+        help_text="The barcode symbology to render (qr or code128).",
+    )
+
+    class Meta:
+        app_label = "database"
+
+
 class RatingField(Field):
     max_value = models.PositiveSmallIntegerField(
         default=5,
