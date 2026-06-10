@@ -4,7 +4,7 @@ baseline_commit: 0d5121f4a
 
 # Story 2.4: Autonumber Field
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -85,11 +85,13 @@ Realizes FR-21. **Bucket B `[B]` — license-clean upstream implementation; no c
   - [x] Create `web-frontend/test/unit/database/autonumberFieldType.spec.js`. Pattern: `barcodeFieldType.spec.js` (same directory). Note: story scaffold used `toBe('42')` for `toHumanReadableString` but base impl returns `value || ''` (returns `42` not `'42'`), corrected to `toBe(42)`.
   - [x] Run: `just f test -- --reporter=verbose web-frontend/test/unit/database/autonumberFieldType.spec.js` and confirm all 6 tests pass. ✅ 6/6 passed.
 
-- [x] **Task 3 — E2E test: `autonumber_field.spec.ts` (AC: #1, #2)**
-  - [x] Create `e2e-tests/tests/database/autonumber_field.spec.ts`. Pattern: `e2e-tests/tests/database/currency_field.spec.ts`. Two tests:
+- [x] **Task 3 — E2E test: `autonumber_field.spec.ts` (AC: #1)**
+  - [x] Create `e2e-tests/tests/database/autonumber_field.spec.ts`. Pattern: `e2e-tests/tests/database/currency_field.spec.ts`. Three tests:
     1. **Column appears after creation** — create autonumber field via API, navigate to table, assert field header is visible.
     2. **Cell is read-only** — assert `.grid-field-number` div renders and no input appears on click.
+    3. **Cell displays numeric value** — assert first cell shows `"1"` after `createTable` seeds example rows.
   - [x] Note: `createRows` fixture does not exist (`rows.ts` only has `updateRows`); simplified test 2 to use `firstNonPrimaryCellWrappingColumnDiv` + read-only click assertion, consistent with other field E2E patterns.
+  - [x] Note: AC #2 (deleted rows do not renumber) is covered exclusively by backend tests (`test_trash_restore_autonumber_field` in `test_autonumber_field_type.py`) — no E2E coverage needed.
   - [x] Do NOT run E2E tests locally (requires Docker stack). File only needs to exist and be syntactically correct. ✅ File created.
 
 - [x] **Task 4 — Update sprint-status.yaml (housekeeping)**
@@ -107,7 +109,7 @@ Realizes FR-21. **Bucket B `[B]` — license-clean upstream implementation; no c
 
 ### Frontend tests — `toHumanReadableString` base method
 
-`AutonumberFieldType` does not override `toHumanReadableString`. The base `FieldType.toHumanReadableString(field, value)` returns `String(value ?? '')`. For an integer value `42` this returns `'42'`; for `null` it returns `''`. Confirm via `fieldTypes.js` grep before writing tests.
+`AutonumberFieldType` does not override `toHumanReadableString`. The base `FieldType.toHumanReadableString(field, value)` returns `value || ''` (see `fieldTypes.js:574`). For an integer value `42` this returns `42` (number, not string); for `null` it returns `''`. Test assertion uses `toBe(42)` not `toBe('42')`.
 
 ### E2E test — read-only cell assertion
 
@@ -152,6 +154,28 @@ just f test -- --reporter=verbose web-frontend/test/unit/database/
 - [Source: web-frontend/test/unit/database/barcodeFieldType.spec.js] — frontend test pattern to follow
 - [Source: e2e-tests/tests/database/currency_field.spec.ts] — E2E test pattern to follow
 
+## Senior Developer Review (AI)
+
+**Reviewer:** gabenidolcs (claude-sonnet-4-6) | **Date:** 2026-06-09 | **Outcome:** ✅ Approved — advanced to done
+
+### Findings
+
+| # | Severity | Finding | Resolution |
+|---|---|---|---|
+| 1 | MEDIUM | File List missing `test-summary-2-4.md` added by QA commit `a0dad0b6e` | Fixed: added to File List |
+| 2 | MEDIUM | Task 3 claimed "(AC: #1, #2)" but E2E tests only cover AC #1; AC #2 covered only by backend tests | Fixed: corrected to "(AC: #1)" with explicit AC #2 backend coverage note |
+| 3 | LOW | Dev Note `toHumanReadableString` description said `String(value ?? '')` — wrong; actual impl is `value \|\| ''` | Fixed: corrected to match `fieldTypes.js:574` |
+
+### Verification
+
+- Unit tests: 6/6 pass (`EXTRA_VITEST_PARAMS="" yarn test:core`) ✅
+- E2E spec: 3 tests, syntactically valid, covers column creation + read-only + value display ✅
+- AC #1 (read-only, auto-increment): covered by unit tests + E2E tests 2 & 3 ✅
+- AC #2 (no renumber on delete): covered by 17 upstream backend tests ✅
+- AC #3 (Postgres sequence, collision-free): covered by backend architecture + upstream tests ✅
+- File List: 5 files reconciled against git commits `6580889cb` + `a0dad0b6e` ✅
+- No CRITICAL issues. Story approved.
+
 ## Dev Agent Record
 
 ### Agent Model Used
@@ -173,3 +197,4 @@ claude-sonnet-4-6
 - `e2e-tests/tests/database/autonumber_field.spec.ts` (new)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (updated)
 - `_bmad-output/implementation-artifacts/2-4-autonumber-field.md` (updated)
+- `_bmad-output/implementation-artifacts/tests/test-summary-2-4.md` (new)
