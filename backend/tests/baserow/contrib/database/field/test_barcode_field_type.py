@@ -100,15 +100,17 @@ def test_barcode_field_stores_text_value(data_fixture):
 
 
 def test_barcode_field_migration_reversible():
-    """Migration 0218 must have no irreversible operations."""
+    """Migration 0218 contains no irreversible RunSQL operations."""
     from importlib import import_module
+
+    from django.db.migrations.operations.special import RunSQL
 
     migration_module = import_module(
         "baserow.contrib.database.migrations"
         ".0218_barcodefield_alter_formview_mode"
     )
     for op in migration_module.Migration.operations:
-        if hasattr(op, "reverse_sql"):
-            assert op.reverse_sql is not None, f"Operation {op!r} has no reverse_sql"
-        if hasattr(op, "reverse"):
-            assert op.reverse is not None, f"Operation {op!r} has no reverse function"
+        if isinstance(op, RunSQL):
+            assert op.reverse_sql is not None, (
+                f"Irreversible RunSQL found in migration: {op!r}"
+            )

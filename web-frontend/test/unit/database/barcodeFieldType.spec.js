@@ -37,4 +37,10 @@ describe('BarcodeFieldType', () => {
     const field = { barcode_type: 'qr' }
     expect(fieldType.toHumanReadableString(field, undefined)).toBe('')
   })
+
+  test('toHumanReadableString returns empty string for empty string (AC #4)', () => {
+    const fieldType = testApp.getApp().$registry.get('field', 'barcode')
+    const field = { barcode_type: 'qr' }
+    expect(fieldType.toHumanReadableString(field, '')).toBe('')
+  })
 })
