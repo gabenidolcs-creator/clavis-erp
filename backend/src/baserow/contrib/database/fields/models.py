@@ -1004,6 +1004,21 @@ class AutonumberField(Field):
     pass
 
 
+class RunningCountField(Field):
+    filter_conditions = models.JSONField(
+        default=None,
+        null=True,
+        blank=True,
+        help_text=(
+            "Optional filter conditions in Baserow ViewFilter format. "
+            "Null means count all non-trashed rows in the table (whole-table scope)."
+        ),
+    )
+
+    class Meta:
+        app_label = "database"
+
+
 class PasswordField(Field):
     allow_endpoint_authentication = models.BooleanField(
         db_default=False,

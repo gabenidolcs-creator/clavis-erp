@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-06
-last_updated: 2026-06-09T20:10:00Z
+last_updated: 2026-06-09T20:23:00Z
 project: clavis-erp
 project_key: NOKEY
 tracking_system: file-system
@@ -61,7 +61,7 @@ development_status:
   2-2-percent-field: done
   2-3-barcode-field: done
   2-4-autonumber-field: done
-  2-5-running-count-field: backlog
+  2-5-running-count-field: done
   epic-2-retrospective: optional
 
   # Epic 3: Visualize Data Multiple Ways

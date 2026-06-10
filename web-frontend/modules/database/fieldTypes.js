@@ -130,6 +130,11 @@ import RowCardFieldURL from '@baserow/modules/database/components/card/RowCardFi
 import RowCardFieldMultipleCollaborators from '@baserow/modules/database/components/card/RowCardFieldMultipleCollaborators'
 import RowCardFieldUUID from '@baserow/modules/database/components/card/RowCardFieldUUID'
 import RowCardFieldAutonumber from '@baserow/modules/database/components/card/RowCardFieldAutonumber'
+import GridViewFieldRunningCount from '@baserow/modules/database/components/view/grid/fields/GridViewFieldRunningCount'
+import FunctionalGridViewFieldRunningCount from '@baserow/modules/database/components/view/grid/fields/FunctionalGridViewFieldRunningCount'
+import RowEditFieldRunningCount from '@baserow/modules/database/components/row/RowEditFieldRunningCount'
+import RowCardFieldRunningCount from '@baserow/modules/database/components/card/RowCardFieldRunningCount'
+import FieldRunningCountSubForm from '@baserow/modules/database/components/field/FieldRunningCountSubForm'
 import RowCardFieldLastModifiedBy from '@baserow/modules/database/components/card/RowCardFieldLastModifiedBy'
 import RowCardFieldPassword from '@baserow/modules/database/components/card/RowCardFieldPassword'
 import RowCardFieldFormViewEditRow from '@baserow/modules/database/components/card/RowCardFieldFormViewEditRow'
@@ -5145,6 +5150,107 @@ export class AutonumberFieldType extends FieldType {
 
   canHaveDbIndex(fieldValues) {
     return true
+  }
+}
+
+export class RunningCountFieldType extends FieldType {
+  static getType() {
+    return 'running_count'
+  }
+
+  static getIconClass() {
+    return 'iconoir-stats-up-square'
+  }
+
+  getName() {
+    const { $i18n: i18n } = this.app
+    return i18n.t('fieldType.runningCount')
+  }
+
+  getFormViewFieldComponents(field) {
+    return {}
+  }
+
+  isReadOnlyField() {
+    return true
+  }
+
+  shouldFetchDataWhenAdded() {
+    return true
+  }
+
+  getGridViewFieldComponent() {
+    return GridViewFieldRunningCount
+  }
+
+  getFormComponent() {
+    return FieldRunningCountSubForm
+  }
+
+  getFunctionalGridViewFieldComponent() {
+    return FunctionalGridViewFieldRunningCount
+  }
+
+  getRowEditFieldComponent(field) {
+    return RowEditFieldRunningCount
+  }
+
+  getCardComponent() {
+    return RowCardFieldRunningCount
+  }
+
+  canUpsert() {
+    return false
+  }
+
+  getSort(name, order) {
+    return (a, b) => {
+      if (a[name] === b[name]) {
+        return 0
+      }
+
+      if (
+        (a[name] === null && order === 'ASC') ||
+        (b[name] === null && order === 'DESC')
+      ) {
+        return -1
+      }
+
+      if (
+        (b[name] === null && order === 'ASC') ||
+        (a[name] === null && order === 'DESC')
+      ) {
+        return 1
+      }
+
+      const numberA = new BigNumber(a[name])
+      const numberB = new BigNumber(b[name])
+
+      if (order === 'ASC') {
+        return numberA.isLessThan(numberB) ? -1 : 1
+      }
+      return numberB.isLessThan(numberA) ? -1 : 1
+    }
+  }
+
+  toHumanReadableString(field, value) {
+    return value || ''
+  }
+
+  getDocsDataType(field) {
+    return 'running_count'
+  }
+
+  getDocsDescription(field) {
+    return this.app.$i18n.t('fieldDocs.runningCount')
+  }
+
+  getDocsRequestExample(field) {
+    return null
+  }
+
+  getDocsResponseExample(field) {
+    return 42
   }
 }
 

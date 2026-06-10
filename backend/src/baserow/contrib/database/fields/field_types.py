@@ -245,6 +245,7 @@ from .models import (
     PhoneNumberField,
     RatingField,
     RollupField,
+    RunningCountField,
     SelectOption,
     SingleSelectField,
     TextField,
@@ -889,7 +890,9 @@ class CurrencyFieldType(NumberFieldType):
     type = "currency"
     model_class = CurrencyField
     allowed_fields = NumberFieldType.allowed_fields + ["currency_symbol"]
-    serializer_field_names = NumberFieldType.serializer_field_names + ["currency_symbol"]
+    serializer_field_names = NumberFieldType.serializer_field_names + [
+        "currency_symbol"
+    ]
     _can_group_by = True
     _can_have_db_index = True
 
@@ -7580,6 +7583,78 @@ class AutonumberFieldType(ReadOnlyFieldType):
         self, formula_type: BaserowFormulaNumberType
     ) -> NumberField:
         return NumberField(number_decimal_places=0, number_negative=False)
+
+
+class RunningCountFieldType(ReadOnlyFieldType):
+    """
+    Running Count fields count the number of rows in the same table matching an
+    optional filter condition. For V1 the scope is the whole table (no filter), so
+    every row shows the same total non-trashed row count. Unlike the relational
+    ``CountFieldType`` (which counts linked rows via a ``through_field`` using the
+    formula engine), this field stores a plain integer in the dynamic user-table
+    column and recomputes it on row create/delete.
+    """
+
+    type = "running_count"
+    model_class = RunningCountField
+    can_be_in_form_view = False
+    keep_data_on_duplication = True
+    _can_have_db_index = False
+    allowed_fields = ["filter_conditions"]
+    serializer_field_names = ["filter_conditions"]
+    serializer_field_overrides = {
+        "filter_conditions": serializers.JSONField(
+            required=False,
+            allow_null=True,
+            help_text=(
+                "Filter conditions for rows to count. Null = count all rows "
+                "(whole-table scope)."
+            ),
+        ),
+    }
+
+    def get_serializer_field(self, instance, **kwargs):
+        return serializers.IntegerField(required=False, allow_null=True, **kwargs)
+
+    def get_serializer_help_text(self, instance):
+        return (
+            "Count of rows in this table matching the configured condition. "
+            "Defaults to total non-trashed row count (whole-table scope)."
+        )
+
+    def get_model_field(self, instance, **kwargs):
+        return models.IntegerField(null=True, **kwargs)
+
+    def _get_count(self, field):
+        """Compute current row count for the table (V1: whole-table, no filter)."""
+
+        model = field.table.get_model(fields=[field])
+        return model.objects.filter(trashed=False).count()
+
+    def _update_all_rows(self, field):
+        """Set all rows' running_count column to the current count."""
+
+        count = self._get_count(field)
+        model = field.table.get_model(fields=[field])
+        model.objects.filter(trashed=False).update(**{f"field_{field.id}": count})
+
+    def after_create(self, field, model, user, connection, before, field_kwargs):
+        self._update_all_rows(field)
+
+    # NOTE: row-create recomputation is handled by the rows_created signal in
+    # apps.py (DatabaseConfig.ready), not by an after_rows_created FieldType hook.
+    # That hook is only invoked on the batch RowHandler.force_create_rows path, so it
+    # would miss single-row creates (force_create_row / the create_row API). The
+    # rows_created signal fires on both the single-row and batch paths.
+
+    def after_rows_imported(
+        self,
+        field,
+        update_collector=None,
+        field_cache=None,
+        via_path_to_starting_table=None,
+    ):
+        self._update_all_rows(field)
 
 
 class PasswordFieldType(FieldType):

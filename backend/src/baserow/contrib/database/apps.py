@@ -220,6 +220,7 @@ class DatabaseConfig(AppConfig):
             PhoneNumberFieldType,
             RatingFieldType,
             RollupFieldType,
+            RunningCountFieldType,
             SingleSelectFieldType,
             TextFieldType,
             URLFieldType,
@@ -254,6 +255,7 @@ class DatabaseConfig(AppConfig):
         field_type_registry.register(MultipleCollaboratorsFieldType())
         field_type_registry.register(UUIDFieldType())
         field_type_registry.register(AutonumberFieldType())
+        field_type_registry.register(RunningCountFieldType())
         field_type_registry.register(PasswordFieldType())
         field_type_registry.register(FormViewEditRowFieldType())
 
@@ -763,6 +765,41 @@ class DatabaseConfig(AppConfig):
 
         post_migrate.connect(safely_update_formula_versions, sender=self)
         pre_migrate.connect(clear_generated_model_cache_receiver, sender=self)
+
+        # Recompute Running Count fields when rows are created in or deleted from a
+        # table. Both signals fire on the single-row (force_create_row /
+        # delete_row) AND batch (force_create_rows / delete_rows) paths, so the
+        # signal-based approach covers every mutation route — unlike the
+        # FieldType.after_rows_created hook, which is only invoked by the batch path.
+        # Lazy imports inside the handler avoid circular imports during Django startup.
+        from baserow.contrib.database.rows.signals import (
+            rows_created as _rows_created,
+        )
+        from baserow.contrib.database.rows.signals import (
+            rows_deleted as _rows_deleted,
+        )
+
+        def _recompute_running_counts(table):
+            from baserow.contrib.database.fields.models import RunningCountField
+            from baserow.contrib.database.fields.registries import (
+                field_type_registry as _field_type_registry,
+            )
+
+            for field in RunningCountField.objects.filter(table=table):
+                field_type = _field_type_registry.get_by_model(field)
+                field_type._update_all_rows(field)
+
+        def _on_rows_created(sender, rows, table, model, **kwargs):
+            _recompute_running_counts(table)
+
+        def _on_rows_deleted(sender, rows, table, model, **kwargs):
+            _recompute_running_counts(table)
+
+        # weak=False keeps the local handlers alive; otherwise Django's default weak
+        # reference is garbage-collected once ready() returns and the signal never
+        # fires.
+        _rows_created.connect(_on_rows_created, weak=False)
+        _rows_deleted.connect(_on_rows_deleted, weak=False)
 
         from .fields.object_scopes import FieldObjectScopeType
         from .object_scopes import DatabaseObjectScopeType

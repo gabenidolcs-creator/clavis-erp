@@ -42,6 +42,7 @@ import {
   MultipleCollaboratorsFieldType,
   UUIDFieldType,
   AutonumberFieldType,
+  RunningCountFieldType,
   PasswordFieldType,
   FormViewEditRowFieldType,
 } from '@baserow/modules/database/fieldTypes'
@@ -717,6 +718,7 @@ export default defineNuxtPlugin({
     $registry.register('field', new MultipleCollaboratorsFieldType(context))
     $registry.register('field', new UUIDFieldType(context))
     $registry.register('field', new AutonumberFieldType(context))
+    $registry.register('field', new RunningCountFieldType(context))
     $registry.register('field', new PasswordFieldType(context))
     $registry.register('field', new FormViewEditRowFieldType(context))
 

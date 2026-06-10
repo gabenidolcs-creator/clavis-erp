@@ -1,63 +1,76 @@
-# Test Automation Summary — Story 1.1: Establish the clean-room process gate
+# Test Automation Summary — Story 2.5: Running Count Field
 
-**Generated:** 2026-06-06
-**Framework:** Python stdlib runner (pytest-compatible, pytest not required) — matches the project's existing gate test pattern.
-**Feature under test:** Clean-room provenance merge gate (`docs/clean-room/scripts/check_provenance.py`) + its CI entrypoint (`.github/workflows/clean-room-provenance-gate.yml`).
+**Date:** 2026-06-09
+**QA workflow:** bmad-qa-generate-e2e-tests
+**Story:** `_bmad-output/implementation-artifacts/2-5-running-count-field.md` (Status: review)
 
-> Story 1.1 is a process/governance story with **no UI and no HTTP API**. The only
-> executable, testable surface is the provenance gate. "E2E" here = invoking the gate
-> CLI exactly as CI does (env vars → exit code), which branch protection keys off of.
+## Scope
+
+Story 2.5 was already fully implemented (dev-story complete) with backend (6), frontend
+unit (6), and E2E (3) tests. This QA pass performed gap analysis of the E2E suite against
+the four acceptance criteria and auto-applied the discovered gaps.
+
+## Gap Analysis
+
+| AC | Behavior | Pre-existing E2E coverage | Gap found |
+|----|----------|---------------------------|-----------|
+| #1 | Whole-table count displayed, read-only | 3 tests (column visible, cell read-only, value=2) | none |
+| #2 | Count updates on row **create** | none | **GAP — added** |
+| #3 | Count updates on row **delete** | none | **GAP — added** |
+| #4 | Relational `count` type unaffected | n/a — backend registry concern | covered by `test_running_count_field_registered` (backend) |
+
+AC #2 and AC #3 are user-facing behaviors (counts recompute across all rows on mutation)
+that had backend unit coverage but **no E2E coverage**. These are exactly the
+end-to-end workflows the QA E2E workflow targets.
 
 ## Generated Tests
 
-### Unit / decision-logic tests — `docs/clean-room/scripts/test_check_provenance.py`
-Extended the existing suite (11 → 23 tests). Added gap coverage:
+### E2E Tests — `e2e-tests/tests/database/running_count_field.spec.ts`
 
-- [x] `detect_bucket_a`: empty/`None` inputs → not Bucket A; label case + whitespace tolerance.
-- [x] `find_provenance_files`: ignores non-`.md` files in the dir; multiple files + whitespace stripping.
-- [x] `validate_provenance`: `enterprise/` path excluded (was only `premium/`); excluded path **outside** the Sources block passes (boundary regression guard); missing "Sources Consulted" heading; placeholder-only template row rejected; empty text rejected.
-- [x] Real shipped `provenance-record-template.md` read from disk is **rejected** (template-vs-real guard).
-- [x] `evaluate`: first-invalid-then-valid → passes; all-invalid → joins each reason.
+Pre-existing (kept):
+- [x] Running Count field column appears in table after creation (AC #1)
+- [x] Running Count cell is read-only — no input appears on click (AC #1)
+- [x] Running Count cell displays the whole-table row count (AC #1)
 
-### E2E tests — `docs/clean-room/scripts/test_gate_e2e.py` (new)
-True end-to-end: spawns `check_provenance.py` as a subprocess with CI's env vars
-(`PR_LABELS`, `PR_BODY`, `CHANGED_FILES`), asserts process exit code + stdout. Real
-on-disk provenance fixtures created/removed under `docs/clean-room/provenance/`.
+Added this pass:
+- [x] **Running Count increments for all rows when a row is created** (AC #2) — seeds
+  2 rows (count=2), creates a 3rd row via API (`after_rows_created` hook recomputes),
+  reloads the grid, asserts the cell reads `3` and 3 rows are present.
+- [x] **Running Count decrements for all rows when a row is deleted** (AC #3) — seeds
+  2 rows (count=2), deletes one via API (`rows_deleted` signal recomputes), reloads
+  the grid, asserts the cell reads `1` and 1 row remains.
 
-- [x] Non-Bucket-A PR → exit 0, "PASS", "not Bucket A".
-- [x] Bucket-A by label, no provenance → exit 1, "no provenance record".
-- [x] Bucket-A by PR-template checkbox, no provenance → exit 1.
-- [x] Bucket-A + valid on-disk provenance file → exit 0, names the file.
-- [x] Bucket-A + invalid provenance (unchecked attestation) → exit 1, "attestation".
-- [x] Labels parsed from mixed comma + newline separation.
-- [x] Empty environment → exit 0 (gate not applicable).
+### Fixture additions — `e2e-tests/fixtures/database/rows.ts`
 
-## Results
-
-| Suite | File | Tests | Result |
-|-------|------|-------|--------|
-| Unit  | `test_check_provenance.py` | 23 | ✅ 23/23 |
-| E2E   | `test_gate_e2e.py`         | 7  | ✅ 7/7 |
-| **Total** | | **30** | ✅ all pass |
-
-Run commands (pytest-free):
-```
-python3 docs/clean-room/scripts/test_check_provenance.py
-python3 docs/clean-room/scripts/test_gate_e2e.py
-```
+`createRows` did not exist (story Task 9 confirmed). Added three minimal API helpers,
+mirroring the existing `updateRows`:
+- `createRow(user, table, rowValues = {})` — POST a row, returns the created row.
+- `listRows(user, table)` — GET rows, returns the `results` array (used to resolve a
+  seeded row id for deletion).
+- `deleteRow(user, table, rowId)` — DELETE a row.
 
 ## Coverage
 
-- Gate decision functions (`detect_bucket_a`, `find_provenance_files`, `validate_provenance`, `evaluate`): fully covered including branch/boundary edges.
-- CLI entrypoint `main()` (env parsing, disk read, exit codes, stdout): covered end-to-end via subprocess (was 0% before this run).
-- Maps to Story 1.1 AC #3 (provenance is a hard merge gate) and Task 6 (validate gate end-to-end).
+- Acceptance criteria with E2E coverage: **3/4** (AC #1, #2, #3). AC #4 is a backend
+  registry invariant, not an E2E-suitable flow — covered by backend unit test.
+- E2E tests: 3 -> **5**.
 
-## Not Covered (out of scope / by design)
+## Validation
 
-- The GitHub Actions YAML runtime itself (requires GitHub runner) — the gate's `Self-test` step in the workflow already runs `test_check_provenance.py`; consider adding `test_gate_e2e.py` to that step.
-- Branch-protection "required status check" enforcement — a repo-admin setting outside repo files (documented in `docs/clean-room/merge-gate.md`).
+- E2E tests **not run locally**: `e2e-tests/` has no installed `node_modules`
+  (`Cannot find module '@playwright/test'`) and the suite requires the full Docker stack,
+  per the story's explicit instruction ("Do NOT run E2E tests locally"). Same documented
+  constraint as `autonumber_field.spec.ts` / `currency_field.spec.ts`.
+- New tests are structural mirrors of the existing passing AC #1 specs; added fixture
+  helpers mirror the existing `updateRows` pattern and use Baserow's standard row REST
+  endpoints (`database/rows/table/{id}/`).
+- Locators are the established semantic/class locators already used by the autonumber
+  suite (`.grid-field-number`, `firstNonPrimaryCellWrappingColumnDiv`, `rows()`).
+- No hardcoded sleeps; assertions use Playwright auto-waiting `expect`.
+- Tests are independent — each provisions its own database/table.
 
 ## Next Steps
 
-- Add `python3 docs/clean-room/scripts/test_gate_e2e.py` to the workflow's "Self-test the gate logic" step so the E2E suite also runs in CI.
-- Add a provenance fixture per real Bucket A story (1.2–1.7, 1.9) as they land.
+- Run the full E2E suite in CI / Docker stack to confirm green.
+- Story remains in `review`; advance via `bmad-code-review` (adversarial review),
+  consistent with stories 2.1-2.4.
