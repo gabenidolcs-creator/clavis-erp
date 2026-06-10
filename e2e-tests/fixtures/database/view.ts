@@ -34,6 +34,28 @@ export async function createView(
   );
 }
 
+/**
+ * Thin convenience wrapper that creates a core Calendar view already positioned
+ * by the given date field (and, optionally, an end date field for multi-day
+ * events). Mirrors the generic `createView` call the Kanban e2e helper makes,
+ * keeping the calendar spec readable.
+ */
+export async function createCalendarView(
+  user: User,
+  name: string,
+  dateFieldId: number | null,
+  table: Table,
+  endDateFieldId: number | null = null,
+): Promise<View> {
+  return createView(
+    user,
+    name,
+    "calendar",
+    { date_field: dateFieldId, end_date_field: endDateFieldId },
+    table,
+  );
+}
+
 export async function updateView(
   user: User,
   view: View,

@@ -16,6 +16,9 @@ from baserow.contrib.database.api.fields.errors import (
     ERROR_INCOMPATIBLE_FIELD,
     ERROR_SELECT_OPTION_DOES_NOT_BELONG_TO_FIELD,
 )
+from baserow.contrib.database.api.views.calendar.serializers import (
+    CalendarViewFieldOptionsSerializer,
+)
 from baserow.contrib.database.api.views.form.errors import (
     ERROR_FORM_VIEW_FIELD_OPTIONS_CONDITION_GROUP_DOES_NOT_EXIST,
     ERROR_FORM_VIEW_FIELD_TYPE_IS_NOT_SUPPORTED,
@@ -63,6 +66,8 @@ from .exceptions import (
 )
 from .handler import ViewHandler
 from .models import (
+    CalendarView,
+    CalendarViewFieldOptions,
     FormView,
     FormViewFieldOptions,
     FormViewFieldOptionsAllowedSelectOptions,
@@ -902,6 +907,270 @@ class KanbanViewType(ViewType):
             KanbanView.objects.filter(card_cover_image_field_id=field.id).update(
                 card_cover_image_field_id=None
             )
+
+
+class CalendarViewType(ViewType):
+    type = "calendar"
+    model_class = CalendarView
+    field_options_model_class = CalendarViewFieldOptions
+    field_options_serializer_class = CalendarViewFieldOptionsSerializer
+    allowed_fields = ["date_field", "end_date_field"]
+    field_options_allowed_fields = ["hidden", "order"]
+    serializer_field_names = ["date_field", "end_date_field"]
+    serializer_field_overrides = {
+        "date_field": serializers.PrimaryKeyRelatedField(
+            queryset=Field.objects.all(),
+            required=False,
+            default=None,
+            allow_null=True,
+            help_text="The date field by which the rows are positioned on the "
+            "calendar. Rows without a value are shown in the unscheduled tray.",
+        ),
+        "end_date_field": serializers.PrimaryKeyRelatedField(
+            queryset=Field.objects.all(),
+            required=False,
+            default=None,
+            allow_null=True,
+            help_text="An optional date field marking the end of a multi-day event. "
+            "When set, rows span from `date_field` to `end_date_field`.",
+        ),
+    }
+    api_exceptions_map = {
+        FieldNotInTable: ERROR_FIELD_NOT_IN_TABLE,
+        IncompatibleField: ERROR_INCOMPATIBLE_FIELD,
+    }
+    can_decorate = True
+    can_share = True
+    has_public_info = True
+
+    def get_api_urls(self):
+        from baserow.contrib.database.api.views.calendar import urls as api_urls
+
+        return [
+            path("calendar/", include(api_urls, namespace=self.type)),
+        ]
+
+    def prepare_values(self, values, table, user):
+        """
+        Check that the provided date field and the optional end date field are
+        date-representable fields that belong to the same table.
+        """
+
+        for name in ("date_field", "end_date_field"):
+            if values.get(name, None) is not None:
+                if isinstance(values[name], int):
+                    values[name] = Field.objects.get(pk=values[name])
+
+                field_type = field_type_registry.get_by_model(values[name].specific)
+                if not field_type.can_represent_date(values[name]):
+                    raise IncompatibleField(
+                        "The provided field cannot be used to position rows on the "
+                        "calendar, because it cannot represent a date."
+                    )
+                elif values[name].table_id != table.id:
+                    raise FieldNotInTable(
+                        "The provided date field id does not belong to the calendar "
+                        "view's table."
+                    )
+
+        return super().prepare_values(values, table, user)
+
+    def after_fields_type_change(self, fields):
+        # If a positioning field is changed to a type that can no longer
+        # represent a date, the reference must be nulled out so the calendar does
+        # not point at a field that has no meaningful date value.
+        fields_cannot_represent_date = [
+            field
+            for field in fields
+            if not field_type_registry.get_by_model(
+                field.specific_class
+            ).can_represent_date(field)
+        ]
+        if len(fields_cannot_represent_date) > 0:
+            ids = [f.id for f in fields_cannot_represent_date]
+            CalendarView.objects.filter(date_field_id__in=ids).update(
+                date_field_id=None
+            )
+            CalendarView.objects.filter(end_date_field_id__in=ids).update(
+                end_date_field_id=None
+            )
+
+    def export_serialized(
+        self,
+        calendar: View,
+        import_export_config: ImportExportConfig,
+        cache: Dict,
+        files_zip: Optional[ExportZipFile] = None,
+        storage: Optional[Storage] = None,
+    ):
+        """
+        Adds the serialized calendar view options to the exported dict.
+        """
+
+        serialized = super().export_serialized(
+            calendar, import_export_config, cache, files_zip, storage
+        )
+
+        if calendar.date_field_id:
+            serialized["date_field_id"] = calendar.date_field_id
+        if calendar.end_date_field_id:
+            serialized["end_date_field_id"] = calendar.end_date_field_id
+
+        serialized_field_options = []
+        for field_option in calendar.get_field_options():
+            serialized_field_options.append(
+                {
+                    "id": field_option.id,
+                    "field_id": field_option.field_id,
+                    "hidden": field_option.hidden,
+                    "order": field_option.order,
+                }
+            )
+
+        serialized["field_options"] = serialized_field_options
+        return serialized
+
+    def import_serialized(
+        self,
+        table: Table,
+        serialized_values: Dict[str, Any],
+        import_export_config: ImportExportConfig,
+        id_mapping: Dict[str, Any],
+        cache: Dict,
+        files_zip: Optional[ZipFile] = None,
+        storage: Optional[Storage] = None,
+    ) -> Optional[View]:
+        """
+        Imports the serialized calendar view field options.
+        """
+
+        serialized_copy = serialized_values.copy()
+
+        if serialized_copy.get("date_field_id", None):
+            serialized_copy["date_field_id"] = id_mapping["database_fields"][
+                serialized_copy["date_field_id"]
+            ]
+        if serialized_copy.get("end_date_field_id", None):
+            serialized_copy["end_date_field_id"] = id_mapping["database_fields"][
+                serialized_copy["end_date_field_id"]
+            ]
+
+        field_options = serialized_copy.pop("field_options")
+
+        calendar_view = super().import_serialized(
+            table,
+            serialized_copy,
+            import_export_config,
+            id_mapping,
+            cache,
+            files_zip,
+            storage,
+        )
+
+        if calendar_view is not None:
+            if "database_calendar_view_field_options" not in id_mapping:
+                id_mapping["database_calendar_view_field_options"] = {}
+
+            for field_option in field_options:
+                field_option_copy = field_option.copy()
+                field_option_id = field_option_copy.pop("id")
+                field_option_copy["field_id"] = id_mapping["database_fields"][
+                    field_option["field_id"]
+                ]
+                field_option_object = CalendarViewFieldOptions.objects.create(
+                    calendar_view=calendar_view, **field_option_copy
+                )
+                id_mapping["database_calendar_view_field_options"][field_option_id] = (
+                    field_option_object.id
+                )
+
+        return calendar_view
+
+    def view_created(self, view):
+        """
+        When a calendar view is created, we want to set the first three fields as
+        visible.
+        """
+
+        field_options = view.get_field_options(create_if_missing=True).order_by(
+            "-field__primary", "field__id"
+        )
+        ids_to_update = [f.id for f in field_options[0:3]]
+
+        if ids_to_update:
+            CalendarViewFieldOptions.objects.filter(id__in=ids_to_update).update(
+                hidden=False
+            )
+
+    def export_prepared_values(self, view: CalendarView) -> Dict[str, Any]:
+        """
+        Add `date_field` and `end_date_field` to the exportable fields.
+
+        :param view: The calendar view to export.
+        :return: The prepared values.
+        """
+
+        values = super().export_prepared_values(view)
+        values["date_field"] = view.date_field_id
+        values["end_date_field"] = view.end_date_field_id
+
+        return values
+
+    def get_visible_field_options_in_order(self, calendar_view: CalendarView):
+        return (
+            calendar_view.get_field_options(create_if_missing=True)
+            .filter(
+                Q(hidden=False)
+                | Q(field__id=calendar_view.date_field_id)
+                | Q(field__id=calendar_view.end_date_field_id)
+            )
+            .order_by("order", "field__id")
+        )
+
+    def get_hidden_fields(
+        self,
+        view: CalendarView,
+        field_ids_to_check: Optional[List[int]] = None,
+    ) -> Set[int]:
+        hidden_field_ids = set()
+        fields = view.table.field_set.all()
+        field_options = view.calendarviewfieldoptions_set.all()
+
+        if field_ids_to_check is not None:
+            fields = [f for f in fields if f.id in field_ids_to_check]
+
+        for field in fields:
+            # The date field and the end date field are always visible because the
+            # calendar depends on their values to position the rows.
+            if field.id == view.date_field_id:
+                continue
+            if field.id == view.end_date_field_id:
+                continue
+
+            # Find corresponding field option
+            field_option_matching = None
+            for field_option in field_options:
+                if field_option.field_id == field.id:
+                    field_option_matching = field_option
+
+            # A field is considered hidden, if it is explicitly hidden
+            # or if the field options don't exist
+            if field_option_matching is None or field_option_matching.hidden:
+                hidden_field_ids.add(field.id)
+
+        return hidden_field_ids
+
+    def enhance_queryset(self, queryset):
+        return queryset.prefetch_related("calendarviewfieldoptions_set")
+
+    def after_field_delete(self, field: Field) -> None:
+        # Null the date field references so the calendar does not point at a
+        # trashed field. SET_NULL on the FK only fires on a hard delete, but
+        # Baserow trashes (soft-deletes) fields, so this must be done explicitly.
+        CalendarView.objects.filter(date_field_id=field.id).update(date_field_id=None)
+        CalendarView.objects.filter(end_date_field_id=field.id).update(
+            end_date_field_id=None
+        )
 
 
 class FormViewType(ViewType):

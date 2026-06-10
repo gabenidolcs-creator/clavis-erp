@@ -6,6 +6,8 @@ import GalleryView from '@baserow/modules/database/components/view/gallery/Galle
 import GalleryViewHeader from '@baserow/modules/database/components/view/gallery/GalleryViewHeader'
 import KanbanView from '@baserow/modules/database/components/view/kanban/KanbanView'
 import KanbanViewHeader from '@baserow/modules/database/components/view/kanban/KanbanViewHeader'
+import CalendarView from '@baserow/modules/database/components/view/calendar/CalendarView'
+import CalendarViewHeader from '@baserow/modules/database/components/view/calendar/CalendarViewHeader'
 import FormView from '@baserow/modules/database/components/view/form/FormView'
 import FormViewHeader from '@baserow/modules/database/components/view/form/FormViewHeader'
 import {
@@ -1338,6 +1340,98 @@ export class KanbanViewType extends BaseBufferedRowViewTypeMixin(ViewType) {
     // exists.
     this._setFieldToNull(context, field, 'single_select_field')
     this._setFieldToNull(context, field, 'card_cover_image_field')
+    await context.dispatch(
+      storePrefix + 'view/' + this.getType() + '/forceDeleteFieldOptions',
+      field.id,
+      {
+        root: true,
+      }
+    )
+  }
+}
+
+export class CalendarViewType extends BaseBufferedRowViewTypeMixin(ViewType) {
+  static getType() {
+    return 'calendar'
+  }
+
+  getIconClass() {
+    return 'baserow-icon-calendar'
+  }
+
+  getColorClass() {
+    return 'color-success'
+  }
+
+  getName() {
+    const { $i18n: i18n } = this.app
+    return i18n.t('viewType.calendar')
+  }
+
+  getHeaderComponent() {
+    return CalendarViewHeader
+  }
+
+  getComponent() {
+    return CalendarView
+  }
+
+  canFilter() {
+    return true
+  }
+
+  canSort() {
+    return true
+  }
+
+  canShare() {
+    return true
+  }
+
+  canShowRowModal() {
+    return true
+  }
+
+  getDefaultFieldOptionValues() {
+    // The default values should be the same as in the `CalendarViewFieldOptions`
+    // model in the backend to stay consistent.
+    return {
+      hidden: true,
+      order: maxPossibleOrderValue,
+    }
+  }
+
+  async afterFieldUpdated(
+    { dispatch, rootGetters },
+    field,
+    oldField,
+    fieldType,
+    storePrefix
+  ) {
+    // If a positioning field is changed to a type that can no longer represent
+    // a date, the calendar can no longer place rows by it, so the `date_field`
+    // and `end_date_field` references must be cleared.
+    if (!fieldType.canRepresentDate(field)) {
+      this._setFieldToNull({ dispatch, rootGetters }, field, 'date_field')
+      this._setFieldToNull({ dispatch, rootGetters }, field, 'end_date_field')
+    }
+    await dispatch(
+      storePrefix + 'view/calendar/updateSearch',
+      {
+        fields: rootGetters['field/getAll'],
+      },
+      {
+        root: true,
+      }
+    )
+  }
+
+  async afterFieldDeleted(context, field, fieldType, storePrefix = '') {
+    // Clear the date references on any calendar view that depended on the
+    // deleted field so the calendar does not point at a field that no longer
+    // exists.
+    this._setFieldToNull(context, field, 'date_field')
+    this._setFieldToNull(context, field, 'end_date_field')
     await context.dispatch(
       storePrefix + 'view/' + this.getType() + '/forceDeleteFieldOptions',
       field.id,

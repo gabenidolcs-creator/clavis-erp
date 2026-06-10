@@ -351,6 +351,7 @@
     "grid": "Grid",
     "gallery": "Gallery",
     "kanban": "Kanban",
+    "calendar": "Calendar",
     "form": "Form",
     "sharing": {
       "linkName": "view",

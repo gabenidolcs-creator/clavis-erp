@@ -12,6 +12,7 @@ import {
   GridViewType,
   GalleryViewType,
   KanbanViewType,
+  CalendarViewType,
   FormViewType,
 } from '@baserow/modules/database/viewTypes'
 import {
@@ -429,6 +430,7 @@ export default defineNuxtPlugin({
     // premium board takes precedence. In OSS-only builds only this core view is
     // registered.
     $registry.register('view', new KanbanViewType(context))
+    $registry.register('view', new CalendarViewType(context))
     $registry.register('view', new FormViewType(context))
     $registry.register('viewFilter', new EqualViewFilterType(context))
     $registry.register('viewFilter', new NotEqualViewFilterType(context))

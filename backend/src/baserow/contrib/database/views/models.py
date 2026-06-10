@@ -826,6 +826,93 @@ class KanbanViewFieldOptions(HierarchicalModelMixin, models.Model):
         unique_together = ("kanban_view", "field")
 
 
+class CalendarView(View):
+    # The free, clean-room Calendar view lives in the always-loaded core
+    # `database` app. In open-core builds the premium plugin also defines a
+    # `CalendarView` model (table `database_calendarview`). Both model classes
+    # are loaded by Django regardless of which view type wins the registry, so
+    # the core model is given a distinct table name and non-clashing reverse
+    # accessors to avoid `fields.E304/E305` reverse-accessor clashes and
+    # migration table collisions.
+    view_ptr = models.OneToOneField(
+        View,
+        on_delete=models.CASCADE,
+        parent_link=True,
+        primary_key=True,
+        serialize=False,
+        related_name="core_calendar_view",
+    )
+    field_options = models.ManyToManyField(
+        Field,
+        through="CalendarViewFieldOptions",
+        # Disable the `Field` -> calendar reverse accessor; the premium Calendar
+        # view defines its own and the default name would clash.
+        related_name="+",
+    )
+    date_field = models.ForeignKey(
+        Field,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="core_calendar_view_date_field",
+        help_text="The date field by which the rows are positioned on the "
+        "calendar. Rows without a value are shown in the unscheduled tray.",
+    )
+    end_date_field = models.ForeignKey(
+        Field,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="core_calendar_view_end_date_field",
+        help_text="An optional date field marking the end of a multi-day event. "
+        "When set, rows span from `date_field` to `end_date_field`.",
+    )
+
+    class Meta:
+        # Distinct table so the core (free) Calendar does not collide with the
+        # premium Calendar (`database_calendarview`) in open-core builds.
+        db_table = "database_corecalendarview"
+
+
+class CalendarViewFieldOptionsManager(models.Manager):
+    """
+    The View can be trashed and the field options are not deleted, therefore
+    we need to filter out the trashed views.
+    """
+
+    def get_queryset(self):
+        trashed_Q = Q(calendar_view__trashed=True) | Q(field__trashed=True)
+        return super().get_queryset().filter(~trashed_Q)
+
+
+class CalendarViewFieldOptions(HierarchicalModelMixin, models.Model):
+    objects = CalendarViewFieldOptionsManager()
+    objects_and_trash = models.Manager()
+
+    calendar_view = models.ForeignKey(CalendarView, on_delete=models.CASCADE)
+    # Disable the `Field` -> options reverse accessor; the premium Calendar
+    # field options model defines its own and the default name would clash.
+    field = models.ForeignKey(Field, on_delete=models.CASCADE, related_name="+")
+    hidden = models.BooleanField(
+        default=True,
+        help_text="Whether or not the field should be hidden in the card.",
+    )
+    # The default value is the maximum value of the small integer field because a newly
+    # created field must always be last.
+    order = models.SmallIntegerField(
+        default=32767,
+        help_text="The order that the field has in the form. Lower value is first.",
+    )
+
+    def get_parent(self):
+        return self.calendar_view
+
+    class Meta:
+        db_table = "database_corecalendarviewfieldoptions"
+        ordering = ("order", "field_id")
+        unique_together = ("calendar_view", "field")
+
+
 class FormView(View):
     field_options = models.ManyToManyField(Field, through="FormViewFieldOptions")
     title = models.TextField(

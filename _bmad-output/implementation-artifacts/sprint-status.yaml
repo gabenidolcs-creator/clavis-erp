@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-06
-last_updated: 2026-06-09T23:30:00Z
+last_updated: 2026-06-10T00:00:00Z
 project: clavis-erp
 project_key: NOKEY
 tracking_system: file-system
@@ -69,7 +69,7 @@ development_status:
   3-1-create-and-configure-a-kanban-view: done
   3-2-drag-a-kanban-card-between-columns: done
   3-3-configure-kanban-card-appearance: done
-  3-4-create-and-configure-a-calendar-view: backlog
+  3-4-create-and-configure-a-calendar-view: done
   3-5-reschedule-a-calendar-entry-by-drag: backlog
   3-6-create-and-configure-a-timeline-view: backlog
   3-7-reschedule-and-resize-timeline-bars: backlog

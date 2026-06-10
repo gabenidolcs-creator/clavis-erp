@@ -4,6 +4,8 @@ from baserow.contrib.database.fields.models import Field
 from baserow.contrib.database.views.exceptions import DecoratorTypeAlreadyRegistered
 from baserow.contrib.database.views.handler import ViewHandler
 from baserow.contrib.database.views.models import (
+    CalendarView,
+    CalendarViewFieldOptions,
     FormView,
     FormViewFieldOptions,
     FormViewFieldOptionsCondition,
@@ -145,6 +147,33 @@ class ViewFixtures:
     def create_kanban_view_field_option(self, kanban_view, field, **kwargs):
         field_options, _ = KanbanViewFieldOptions.objects.update_or_create(
             kanban_view=kanban_view, field=field, defaults=kwargs
+        )
+        return field_options
+
+    def create_calendar_view(self, user=None, create_options=True, **kwargs):
+        if "table" not in kwargs:
+            kwargs["table"] = self.create_database_table(user=user)
+
+        if "name" not in kwargs:
+            kwargs["name"] = self.fake.name()
+
+        if "order" not in kwargs:
+            kwargs["order"] = 0
+
+        calendar_view = CalendarView.objects.create(**kwargs)
+        if create_options:
+            self.create_calendar_view_field_options(calendar_view)
+        return calendar_view
+
+    def create_calendar_view_field_options(self, calendar_view, **kwargs):
+        return [
+            self.create_calendar_view_field_option(calendar_view, field, **kwargs)
+            for field in Field.objects.filter(table=calendar_view.table)
+        ]
+
+    def create_calendar_view_field_option(self, calendar_view, field, **kwargs):
+        field_options, _ = CalendarViewFieldOptions.objects.update_or_create(
+            calendar_view=calendar_view, field=field, defaults=kwargs
         )
         return field_options
 

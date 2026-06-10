@@ -704,6 +704,18 @@
     "uncategorized": "Uncategorized",
     "noSingleSelectField": "Pick a single select field to group the cards into columns."
   },
+  "calendarViewHeader": {
+    "positionBy": "Position by",
+    "dateField": "Date field",
+    "endDateField": "End date field (optional)",
+    "month": "Month",
+    "week": "Week",
+    "customizeCards": "Customize cards"
+  },
+  "calendarView": {
+    "unscheduled": "Unscheduled",
+    "noDateField": "Pick a date field to position the cards on the calendar."
+  },
   "gridViewHide": {
     "hideField": "Hide Fields | 1 hidden field | {count} hidden fields"
   },
@@ -877,6 +889,11 @@
   "chooseSingleSelectField": {
     "addSelectField": "Add single select field",
     "warningWhenNothingToChooseOrCreate": "There are no single select fields to choose from and you do not have permissions to make one."
+  },
+  "chooseDateField": {
+    "addDateField": "Add date field",
+    "none": "None",
+    "warningWhenNothingToChooseOrCreate": "There are no date fields to choose from and you do not have permissions to make one."
   },
   "viewDecoratorContext": {
     "addDecorator": "Add decorator"
