@@ -4,6 +4,7 @@ import { KanbanViewType } from '@baserow/modules/database/viewTypes'
 import KanbanView, {
   groupRowsBySingleSelect,
 } from '@baserow/modules/database/components/view/kanban/KanbanView'
+import KanbanViewHeader from '@baserow/modules/database/components/view/kanban/KanbanViewHeader'
 
 describe('KanbanViewType', () => {
   let testApp
@@ -369,5 +370,204 @@ describe('KanbanView card drag-and-drop', () => {
 
     // The component left the cell to the store; it is still the origin option.
     expect(row.field_2).toEqual(origin)
+  })
+})
+
+// Story 3.3 — card appearance. The card-face field selection (`hidden`/`order`
+// field options) and the cover image were inherited from the Gallery-derived
+// core Kanban view in Story 3.1. These tests pin the EXISTING behavior:
+// `cardFields`/`hiddenFields`/`coverImageField` computeds drive what `RowCard`
+// renders. Driven against a minimal instance for the same reason as the drag
+// tests above — a full mount pulls in the premium kanban store (registers last,
+// overrides core) and would leave the free-core surface / clean room.
+describe('KanbanView card appearance computeds', () => {
+  const textField = { id: 11, name: 'Name', type: 'text', primary: true }
+  const statusField = { id: 12, name: 'Status', type: 'single_select' }
+  const notesField = { id: 13, name: 'Notes', type: 'long_text' }
+  const coverField = { id: 14, name: 'Cover', type: 'file' }
+
+  // Binds the real `cardFields`/`hiddenFields`/`coverImageField` computeds to a
+  // minimal instance. `fieldOptions` is supplied directly (it is itself a
+  // store-backed computed in the component; the appearance computeds only read
+  // `this.fieldOptions`).
+  const makeVm = ({ fields, fieldOptions, view = {} } = {}) => {
+    const vm = { fields, fieldOptions, view }
+    for (const name of ['cardFields', 'hiddenFields', 'coverImageField']) {
+      Object.defineProperty(vm, name, { get: KanbanView.computed[name] })
+    }
+    return vm
+  }
+
+  test('cardFields excludes hidden fields and orders by option order then id (AC #1)', () => {
+    const vm = makeVm({
+      fields: [textField, statusField, notesField],
+      fieldOptions: {
+        11: { hidden: false, order: 2 },
+        12: { hidden: false, order: 1 },
+        13: { hidden: true, order: 3 },
+      },
+    })
+
+    // notesField (13) is hidden → excluded. status (order 1) before name (order 2).
+    expect(vm.cardFields.map((f) => f.id)).toEqual([12, 11])
+  })
+
+  test('a field without a field option is treated as hidden (AC #1)', () => {
+    const vm = makeVm({
+      fields: [textField, statusField],
+      fieldOptions: { 11: { hidden: false, order: 0 } },
+    })
+
+    expect(vm.cardFields.map((f) => f.id)).toEqual([11])
+    expect(vm.hiddenFields.map((f) => f.id)).toEqual([12])
+  })
+
+  test('hiddenFields is the complement of cardFields (AC #1)', () => {
+    const vm = makeVm({
+      fields: [textField, statusField, notesField],
+      fieldOptions: {
+        11: { hidden: false, order: 0 },
+        12: { hidden: true, order: 1 },
+        13: { hidden: true, order: 2 },
+      },
+    })
+
+    expect(vm.cardFields.map((f) => f.id)).toEqual([11])
+    expect(vm.hiddenFields.map((f) => f.id)).toEqual([12, 13])
+  })
+
+  test('coverImageField resolves view.card_cover_image_field to the field object (AC #1)', () => {
+    const vm = makeVm({
+      fields: [textField, coverField],
+      fieldOptions: {},
+      view: { card_cover_image_field: 14 },
+    })
+
+    expect(vm.coverImageField).toBe(coverField)
+  })
+
+  test('coverImageField is null when unset or pointing at a missing field (AC #1)', () => {
+    expect(
+      makeVm({
+        fields: [textField, coverField],
+        fieldOptions: {},
+        view: { card_cover_image_field: null },
+      }).coverImageField
+    ).toBe(null)
+
+    expect(
+      makeVm({
+        fields: [textField],
+        fieldOptions: {},
+        view: { card_cover_image_field: 999 },
+      }).coverImageField
+    ).toBe(null)
+  })
+})
+
+// Story 3.3 — the "Customize cards" header (already wired in 3.1) dispatches the
+// two distinct persistence paths: the cover image via the GENERIC `view/update`
+// and the field options (hidden/order) via the kanban store actions. Each is
+// guarded by readOnly OR a missing update_field_options permission. Driven at
+// the method level (no mount) to stay on the free-core surface.
+describe('KanbanViewHeader card-appearance dispatch', () => {
+  const makeVm = ({ readOnly = false, hasPermission = true } = {}) => {
+    const dispatched = []
+    const vm = {
+      readOnly,
+      storePrefix: 'page/',
+      view: { id: 5 },
+      database: { workspace: { id: 9 } },
+      dispatched,
+      $store: {
+        dispatch: (action, payload) => {
+          dispatched.push({ action, payload })
+          return Promise.resolve()
+        },
+      },
+      $hasPermission: () => hasPermission,
+    }
+    for (const name of [
+      'updateCoverImageField',
+      'updateFieldOptionsOfField',
+      'orderFieldOptions',
+      'updateAllFieldOptions',
+    ]) {
+      vm[name] = KanbanViewHeader.methods[name].bind(vm)
+    }
+    return vm
+  }
+
+  test('updateCoverImageField dispatches the generic view/update with card_cover_image_field (AC #2)', async () => {
+    const vm = makeVm()
+    await vm.updateCoverImageField(14)
+
+    expect(vm.dispatched).toHaveLength(1)
+    expect(vm.dispatched[0].action).toBe('view/update')
+    expect(vm.dispatched[0].payload).toMatchObject({
+      view: vm.view,
+      values: { card_cover_image_field: 14 },
+      readOnly: false,
+    })
+  })
+
+  test('updateCoverImageField passes null to clear the cover (AC #2)', async () => {
+    const vm = makeVm()
+    await vm.updateCoverImageField(null)
+
+    expect(vm.dispatched[0].payload.values).toEqual({
+      card_cover_image_field: null,
+    })
+  })
+
+  test('updateFieldOptionsOfField dispatches the kanban store action with the readOnly/permission guard (AC #2)', async () => {
+    const vm = makeVm()
+    const field = { id: 12 }
+    await vm.updateFieldOptionsOfField({
+      field,
+      values: { hidden: true },
+      oldValues: { hidden: false },
+    })
+
+    expect(vm.dispatched).toHaveLength(1)
+    expect(vm.dispatched[0].action).toBe(
+      'page/view/kanban/updateFieldOptionsOfField'
+    )
+    expect(vm.dispatched[0].payload).toMatchObject({
+      field,
+      values: { hidden: true },
+      readOnly: false,
+    })
+  })
+
+  test('orderFieldOptions dispatches the kanban store reorder action (AC #2)', async () => {
+    const vm = makeVm()
+    await vm.orderFieldOptions({ order: [12, 11, 13] })
+
+    expect(vm.dispatched[0].action).toBe(
+      'page/view/kanban/updateFieldOptionsOrder'
+    )
+    expect(vm.dispatched[0].payload).toMatchObject({
+      order: [12, 11, 13],
+      readOnly: false,
+    })
+  })
+
+  test('field-option dispatches carry readOnly=true when the view is read-only (AC #2)', async () => {
+    const vm = makeVm({ readOnly: true })
+    await vm.updateFieldOptionsOfField({
+      field: { id: 12 },
+      values: { hidden: true },
+      oldValues: { hidden: false },
+    })
+
+    expect(vm.dispatched[0].payload.readOnly).toBe(true)
+  })
+
+  test('field-option dispatches carry readOnly=true when the update permission is missing (AC #2)', async () => {
+    const vm = makeVm({ hasPermission: false })
+    await vm.orderFieldOptions({ order: [11, 12] })
+
+    expect(vm.dispatched[0].payload.readOnly).toBe(true)
   })
 })

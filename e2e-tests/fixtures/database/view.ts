@@ -46,6 +46,20 @@ export async function updateView(
   return response.data;
 }
 
+export async function updateFieldOptions(
+  user: User,
+  view: View,
+  fieldOptions: any,
+): Promise<any> {
+  const response: any = await getClient(user).patch(
+    `database/views/${view.id}/field_options/`,
+    {
+      field_options: fieldOptions,
+    },
+  );
+  return response.data;
+}
+
 export async function createViewFilter(
   user: User,
   view: View,

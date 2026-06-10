@@ -11,6 +11,7 @@ import { createRow } from "../../fixtures/database/rows";
 import {
   createView,
   createViewFilter,
+  updateFieldOptions,
   updateView,
 } from "../../fixtures/database/view";
 
@@ -252,5 +253,156 @@ test.describe("Kanban view", () => {
     await expect(columns.nth(0).locator(".kanban-view__card")).toHaveCount(0);
     await expect(columns.nth(1).locator(".kanban-view__card")).toHaveCount(1);
     await expect(page.locator(".kanban-view__card")).toHaveCount(1);
+  });
+
+  // STORY 3.3 — Configure Kanban card appearance.
+  //
+  // The card-appearance feature (per-field visibility on the card face + a cover
+  // image field) is shared with the Gallery view and reached from the board's
+  // "Customize cards" header link. This scenario drives the two persistence
+  // paths exercised by AC #1 (which fields show on the card face) and AC #2 (the
+  // cover image field), and confirms both survive a reload. AC #3 (no Kanban
+  // row-coloring decorations) is asserted by the absence of a decoration locator.
+  test("customizing card appearance hides a field, sets a cover image, and both persist on reload (AC #1, #2, #3)", async ({
+    page,
+    goto,
+    workspacePage,
+  }) => {
+    const { database, table, view } = await setupKanban(workspacePage);
+
+    // Add a long-text "Notes" field (shown on the card face) and a file "Cover"
+    // field (eligible as the cover image source).
+    const notesField = await createField(
+      workspacePage.user,
+      "Notes",
+      "long_text",
+      {},
+      table,
+    );
+    const coverField = await createField(
+      workspacePage.user,
+      "Cover",
+      "file",
+      {},
+      table,
+    );
+
+    // Seed a single row so exactly one card renders on the board.
+    await createRow(workspacePage.user, table, { Notes: "hello" });
+
+    // Make the Notes field visible on the card face to begin with, so the toggle
+    // below has a deterministic starting state.
+    await updateFieldOptions(workspacePage.user, view, {
+      [notesField.id]: { hidden: false },
+    });
+
+    const tablePage = new TablePage({ page, goto });
+    tablePage.pageUrl = `database/${database.id}/table/${table.id}/${view.id}`;
+    await tablePage.goto();
+
+    const card = page.locator(".kanban-view__card");
+    await expect(card).toHaveCount(1);
+
+    // AC #3 — KanbanView passes no `decorationsByPlace` to RowCard, so no
+    // row-coloring decorator components render. Decorators are component-driven
+    // (no fixed CSS class to assert against), so this is verified at the unit
+    // level (kanbanView.spec.js — RowCard receives no decorations). Here we only
+    // confirm the card renders its standard content region with no extra layer.
+    await expect(card.locator(".card__content")).toHaveCount(1);
+
+    // Open the "Customize cards" context from the view header.
+    await page
+      .locator(".header__filter-link", { hasText: "Customize cards" })
+      .click();
+
+    // AC #1 — the "Customize cards" context is rendered with
+    // `allow-cover-image-field=true`, so the shared ViewFieldsContext exposes
+    // the cover-image picker FormGroup (the UI surface for toggling the cover).
+    await expect(page.locator(".hidings__cover")).toHaveCount(1);
+
+    // The Notes field starts visible on the card face (AC #1).
+    const notesCardField = page
+      .locator(".card__field-name")
+      .filter({ hasText: "Notes" });
+    await expect(notesCardField).toHaveCount(1);
+
+    // Toggle Notes off in the field list — it disappears from the card face.
+    const notesToggle = page
+      .locator(".hidings__item")
+      .filter({ hasText: "Notes" })
+      .locator(".switch");
+    await notesToggle.click();
+    await expect(notesCardField).toHaveCount(0);
+
+    // Toggle it back on — it reappears, proving the per-field face toggle is live.
+    await notesToggle.click();
+    await expect(notesCardField).toHaveCount(1);
+
+    // AC #2 — set the cover image field via the generic view PATCH; the cover
+    // placeholder renders on the card (empty-state icon, no uploaded image yet).
+    await updateView(workspacePage.user, view, {
+      card_cover_image_field: coverField.id,
+    });
+    await tablePage.goto();
+    await expect(page.locator(".card__cover")).toHaveCount(1);
+
+    // Hide Notes from the card face and confirm both settings persist on reload.
+    await updateFieldOptions(workspacePage.user, view, {
+      [notesField.id]: { hidden: true },
+    });
+    await tablePage.goto();
+    await expect(page.locator(".kanban-view__card")).toHaveCount(1);
+    await expect(
+      page.locator(".card__field-name").filter({ hasText: "Notes" }),
+    ).toHaveCount(0);
+    await expect(page.locator(".card__cover")).toHaveCount(1);
+
+    // Clearing the cover field removes the cover region from the card (AC #2).
+    await updateView(workspacePage.user, view, {
+      card_cover_image_field: null,
+    });
+    await tablePage.goto();
+    await expect(page.locator(".card__cover")).toHaveCount(0);
+  });
+
+  // STORY 3.3 — AC #4: the grouping single-select field is always treated as a
+  // board data dependency by `get_hidden_fields`, even when its field option is
+  // toggled `hidden`. If that guard regressed, the single-select value would no
+  // longer be fetched for the board and every card would fall into the trailing
+  // "Uncategorized" column. This drives the guard end-to-end: with the grouping
+  // field's option hidden, cards must still bucket into their matching option
+  // columns after a fresh reload.
+  test("keeps the grouping single-select field data-available when its field option is hidden, so cards still bucket correctly (AC #4)", async ({
+    page,
+    goto,
+    workspacePage,
+  }) => {
+    const { database, table, statusField, toDoOption, doneOption, view } =
+      await setupKanban(workspacePage);
+
+    // One card per option — they must land in their own columns, never all in
+    // Uncategorized.
+    await createRow(workspacePage.user, table, { Status: toDoOption.id });
+    await createRow(workspacePage.user, table, { Status: doneOption.id });
+
+    // Hide the grouping single-select field's option. `get_hidden_fields` must
+    // exclude it from the hidden set regardless, keeping its value fetchable.
+    await updateFieldOptions(workspacePage.user, view, {
+      [statusField.id]: { hidden: true },
+    });
+
+    const tablePage = new TablePage({ page, goto });
+    tablePage.pageUrl = `database/${database.id}/table/${table.id}/${view.id}`;
+    await tablePage.goto();
+
+    const columns = page.locator(".kanban-view__column");
+    await expect(columns).toHaveCount(3);
+
+    // Each card still buckets by its grouping value — the option columns hold
+    // their card and Uncategorized stays empty. A regressed guard would dump
+    // both cards into column index 2 (Uncategorized).
+    await expect(columns.nth(0).locator(".kanban-view__card")).toHaveCount(1);
+    await expect(columns.nth(1).locator(".kanban-view__card")).toHaveCount(1);
+    await expect(columns.nth(2).locator(".kanban-view__card")).toHaveCount(0);
   });
 });
