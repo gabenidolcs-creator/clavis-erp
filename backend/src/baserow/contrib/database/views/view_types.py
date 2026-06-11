@@ -46,6 +46,9 @@ from baserow.contrib.database.api.views.grid.serializers import (
 from baserow.contrib.database.api.views.kanban.serializers import (
     KanbanViewFieldOptionsSerializer,
 )
+from baserow.contrib.database.api.views.map.serializers import (
+    MapViewFieldOptionsSerializer,
+)
 from baserow.contrib.database.api.views.timeline.serializers import (
     TimelineViewFieldOptionsSerializer,
 )
@@ -87,6 +90,8 @@ from .models import (
     GridViewFieldOptions,
     KanbanView,
     KanbanViewFieldOptions,
+    MapView,
+    MapViewFieldOptions,
     TimelineView,
     TimelineViewFieldOptions,
     View,
@@ -1735,6 +1740,204 @@ class GanttViewType(ViewType):
         GanttView.objects.filter(end_date_field_id=field.id).update(
             end_date_field_id=None
         )
+
+
+class MapViewType(ViewType):
+    type = "map"
+    model_class = MapView
+    field_options_model_class = MapViewFieldOptions
+    field_options_serializer_class = MapViewFieldOptionsSerializer
+    allowed_fields = ["address_field", "lat_field", "lng_field"]
+    field_options_allowed_fields = ["hidden", "order"]
+    serializer_field_names = ["address_field", "lat_field", "lng_field"]
+    serializer_field_overrides = {
+        "address_field": serializers.PrimaryKeyRelatedField(
+            queryset=Field.objects.all(),
+            required=False,
+            default=None,
+            allow_null=True,
+            help_text="Text field geocoded to produce pin coordinates. Mutually "
+            "exclusive with lat_field/lng_field.",
+        ),
+        "lat_field": serializers.PrimaryKeyRelatedField(
+            queryset=Field.objects.all(),
+            required=False,
+            default=None,
+            allow_null=True,
+            help_text="Numeric field holding latitude. Used with lng_field.",
+        ),
+        "lng_field": serializers.PrimaryKeyRelatedField(
+            queryset=Field.objects.all(),
+            required=False,
+            default=None,
+            allow_null=True,
+            help_text="Numeric field holding longitude. Used with lat_field.",
+        ),
+    }
+    api_exceptions_map = {
+        FieldNotInTable: ERROR_FIELD_NOT_IN_TABLE,
+        IncompatibleField: ERROR_INCOMPATIBLE_FIELD,
+    }
+    can_filter = True
+    can_sort = True
+    can_share = True
+    has_public_info = True
+
+    def get_api_urls(self):
+        from baserow.contrib.database.api.views.map import urls as api_urls
+
+        return [
+            path("map/", include(api_urls, namespace=self.type)),
+        ]
+
+    def prepare_values(self, values, table, user):
+        address_field = values.get("address_field", None)
+        lat_field = values.get("lat_field", None)
+        lng_field = values.get("lng_field", None)
+
+        # Mutually exclusive modes
+        if address_field is not None and (lat_field is not None or lng_field is not None):
+            raise IncompatibleField(
+                "address_field and lat_field/lng_field are mutually exclusive. "
+                "Set one mode or the other."
+            )
+
+        for name, field_obj in [
+            ("address_field", address_field),
+            ("lat_field", lat_field),
+            ("lng_field", lng_field),
+        ]:
+            if field_obj is None:
+                continue
+            if isinstance(field_obj, int):
+                field_obj = Field.objects.get(pk=field_obj)
+                values[name] = field_obj
+            if field_obj.table_id != table.id:
+                raise FieldNotInTable(
+                    f"The provided field for {name} does not belong to the "
+                    "map view's table."
+                )
+
+        return super().prepare_values(values, table, user)
+
+    def after_fields_type_change(self, fields):
+        # Null address_field if its type no longer holds text; null lat/lng
+        # fields if they are no longer numeric.
+        from baserow.contrib.database.fields.field_types import (
+            LongTextFieldType,
+            NumberFieldType,
+            TextFieldType,
+        )
+
+        text_types = (TextFieldType.type, LongTextFieldType.type)
+        number_type = NumberFieldType.type
+
+        non_text = [
+            f
+            for f in fields
+            if field_type_registry.get_by_model(f.specific_class).type
+            not in text_types
+        ]
+        non_numeric = [
+            f
+            for f in fields
+            if field_type_registry.get_by_model(f.specific_class).type != number_type
+        ]
+
+        if non_text:
+            ids = [f.id for f in non_text]
+            MapView.objects.filter(address_field_id__in=ids).update(
+                address_field_id=None
+            )
+        if non_numeric:
+            ids = [f.id for f in non_numeric]
+            MapView.objects.filter(lat_field_id__in=ids).update(lat_field_id=None)
+            MapView.objects.filter(lng_field_id__in=ids).update(lng_field_id=None)
+
+    def after_field_delete(self, field: Field) -> None:
+        MapView.objects.filter(address_field_id=field.id).update(address_field_id=None)
+        MapView.objects.filter(lat_field_id=field.id).update(lat_field_id=None)
+        MapView.objects.filter(lng_field_id=field.id).update(lng_field_id=None)
+
+    def export_serialized(
+        self,
+        map_view: View,
+        import_export_config: ImportExportConfig,
+        cache: Dict,
+        files_zip=None,
+        storage=None,
+    ):
+        serialized = super().export_serialized(
+            map_view, import_export_config, cache, files_zip, storage
+        )
+        if map_view.address_field_id:
+            serialized["address_field_id"] = map_view.address_field_id
+        if map_view.lat_field_id:
+            serialized["lat_field_id"] = map_view.lat_field_id
+        if map_view.lng_field_id:
+            serialized["lng_field_id"] = map_view.lng_field_id
+
+        serialized_field_options = []
+        for field_option in map_view.get_field_options():
+            serialized_field_options.append(
+                {
+                    "id": field_option.id,
+                    "field_id": field_option.field_id,
+                    "hidden": field_option.hidden,
+                    "order": field_option.order,
+                }
+            )
+        serialized["field_options"] = serialized_field_options
+        return serialized
+
+    def import_serialized(
+        self,
+        table,
+        serialized_values: Dict[str, Any],
+        import_export_config: ImportExportConfig,
+        id_mapping: Dict[str, Any],
+        cache: Dict,
+        files_zip=None,
+        storage=None,
+    ):
+        serialized_copy = serialized_values.copy()
+
+        for field_key in ("address_field_id", "lat_field_id", "lng_field_id"):
+            if serialized_copy.get(field_key):
+                serialized_copy[field_key] = id_mapping["database_fields"][
+                    serialized_copy[field_key]
+                ]
+
+        field_options = serialized_copy.pop("field_options", [])
+
+        map_view = super().import_serialized(
+            table,
+            serialized_copy,
+            import_export_config,
+            id_mapping,
+            cache,
+            files_zip,
+            storage,
+        )
+
+        if map_view is not None:
+            if "database_map_view_field_options" not in id_mapping:
+                id_mapping["database_map_view_field_options"] = {}
+
+            for field_option in field_options:
+                field_option_copy = field_option.copy()
+                field_option_id = field_option_copy.pop("id")
+                field_option_copy["field_id"] = id_mapping["database_fields"][
+                    field_option["field_id"]
+                ]
+                field_option_object = MapViewFieldOptions.objects.create(
+                    map_view=map_view, **field_option_copy
+                )
+                id_mapping["database_map_view_field_options"][field_option_id] = (
+                    field_option_object.id
+                )
+
+        return map_view
 
 
 class FormViewType(ViewType):

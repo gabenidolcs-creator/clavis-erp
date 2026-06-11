@@ -18,6 +18,8 @@ from baserow.contrib.database.views.models import (
     GridViewFieldOptions,
     KanbanView,
     KanbanViewFieldOptions,
+    MapView,
+    MapViewFieldOptions,
     TimelineView,
     TimelineViewFieldOptions,
     ViewDecoration,
@@ -234,6 +236,21 @@ class ViewFixtures:
             gantt_view=gantt_view, field=field, defaults=kwargs
         )
         return field_options
+
+    def create_map_view(self, user=None, create_options=True, **kwargs):
+        if "table" not in kwargs:
+            kwargs["table"] = self.create_database_table(user=user)
+        if "name" not in kwargs:
+            kwargs["name"] = self.fake.name()
+        if "order" not in kwargs:
+            kwargs["order"] = 0
+        map_view = MapView.objects.create(**kwargs)
+        if create_options:
+            for field in Field.objects.filter(table=map_view.table):
+                MapViewFieldOptions.objects.get_or_create(
+                    map_view=map_view, field=field
+                )
+        return map_view
 
     def create_form_view(self, user=None, **kwargs):
         if "table" not in kwargs:

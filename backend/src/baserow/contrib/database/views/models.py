@@ -1095,6 +1095,81 @@ class GanttViewFieldOptions(HierarchicalModelMixin, models.Model):
         unique_together = ("gantt_view", "field")
 
 
+class MapView(View):
+    # Bucket B greenfield — no premium/enterprise twin.
+    view_ptr = models.OneToOneField(
+        View,
+        on_delete=models.CASCADE,
+        parent_link=True,
+        primary_key=True,
+        serialize=False,
+        related_name="map_view",
+    )
+    field_options = models.ManyToManyField(
+        Field,
+        through="MapViewFieldOptions",
+        related_name="map_view_field_options",
+    )
+    address_field = models.ForeignKey(
+        Field,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="map_view_address_field",
+        help_text="Text/long-text field whose value is geocoded to produce pin coordinates. "
+        "Mutually exclusive with lat_field/lng_field.",
+    )
+    lat_field = models.ForeignKey(
+        Field,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="map_view_lat_field",
+        help_text="Numeric field holding the latitude value. Used with lng_field.",
+    )
+    lng_field = models.ForeignKey(
+        Field,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="map_view_lng_field",
+        help_text="Numeric field holding the longitude value. Used with lat_field.",
+    )
+
+    class Meta:
+        db_table = "database_mapview"
+
+
+class MapViewFieldOptionsManager(models.Manager):
+    def get_queryset(self):
+        trashed_Q = Q(map_view__trashed=True) | Q(field__trashed=True)
+        return super().get_queryset().filter(~trashed_Q)
+
+
+class MapViewFieldOptions(HierarchicalModelMixin, models.Model):
+    objects = MapViewFieldOptionsManager()
+    objects_and_trash = models.Manager()
+
+    map_view = models.ForeignKey(MapView, on_delete=models.CASCADE)
+    field = models.ForeignKey(Field, on_delete=models.CASCADE)
+    hidden = models.BooleanField(
+        default=True,
+        help_text="Whether or not the field should be hidden.",
+    )
+    order = models.SmallIntegerField(
+        default=32767,
+        help_text="The order that the field has. Lower value is first.",
+    )
+
+    def get_parent(self):
+        return self.map_view
+
+    class Meta:
+        db_table = "database_mapviewfieldoptions"
+        ordering = ("order", "field_id")
+        unique_together = ("map_view", "field")
+
+
 class FormView(View):
     field_options = models.ManyToManyField(Field, through="FormViewFieldOptions")
     title = models.TextField(

@@ -8,7 +8,10 @@ from baserow.config.celery import app
     rate_limit=settings.GEOCODING_RATE_LIMIT,
 )
 def geocode_address_task(self, address: str, row_id: int, field_id: int):
-    # row_id and field_id are reserved for Story 3.13 (WebSocket signal on geocode completion)
+    from baserow.contrib.database.views.map.signals import geocode_pin_updated
     from baserow.geocoding.service import GeocodingService
 
-    GeocodingService().geocode(address)
+    lat, lng = GeocodingService().geocode(address)
+    geocode_pin_updated.send(
+        sender=None, row_id=row_id, field_id=field_id, lat=lat, lng=lng
+    )

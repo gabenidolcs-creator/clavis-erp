@@ -12,6 +12,8 @@ import TimelineView from '@baserow/modules/database/components/view/timeline/Tim
 import TimelineViewHeader from '@baserow/modules/database/components/view/timeline/TimelineViewHeader'
 import GanttView from '@baserow/modules/database/components/view/gantt/GanttView'
 import GanttViewHeader from '@baserow/modules/database/components/view/gantt/GanttViewHeader'
+import MapView from '@baserow/modules/database/components/view/map/MapView'
+import MapViewHeader from '@baserow/modules/database/components/view/map/MapViewHeader'
 import FormView from '@baserow/modules/database/components/view/form/FormView'
 import FormViewHeader from '@baserow/modules/database/components/view/form/FormViewHeader'
 import {
@@ -1626,6 +1628,67 @@ export class GanttViewType extends BaseBufferedRowViewTypeMixin(ViewType) {
       {
         root: true,
       }
+    )
+  }
+}
+
+export class MapViewType extends BaseBufferedRowViewTypeMixin(ViewType) {
+  static getType() {
+    return 'map'
+  }
+
+  getIconClass() {
+    return 'iconoir-maps'
+  }
+
+  getColorClass() {
+    return 'color-cyan'
+  }
+
+  getName() {
+    const { $i18n: i18n } = this.app
+    return i18n.t('viewType.map')
+  }
+
+  getHeaderComponent() {
+    return MapViewHeader
+  }
+
+  getComponent() {
+    return MapView
+  }
+
+  canFilter() {
+    return true
+  }
+
+  canSort() {
+    return true
+  }
+
+  canShare() {
+    return true
+  }
+
+  canShowRowModal() {
+    return true
+  }
+
+  getDefaultFieldOptionValues() {
+    return {
+      hidden: true,
+      order: maxPossibleOrderValue,
+    }
+  }
+
+  async afterFieldDeleted(context, field, fieldType, storePrefix = '') {
+    this._setFieldToNull(context, field, 'address_field')
+    this._setFieldToNull(context, field, 'lat_field')
+    this._setFieldToNull(context, field, 'lng_field')
+    await context.dispatch(
+      storePrefix + 'view/' + this.getType() + '/forceDeleteFieldOptions',
+      field.id,
+      { root: true }
     )
   }
 }

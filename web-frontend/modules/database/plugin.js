@@ -15,6 +15,7 @@ import {
   CalendarViewType,
   TimelineViewType,
   GanttViewType,
+  MapViewType,
   FormViewType,
 } from '@baserow/modules/database/viewTypes'
 import {
@@ -440,6 +441,8 @@ export default defineNuxtPlugin({
     // The Gantt view has no premium twin, so it registers plainly (no
     // last-wins gating needed).
     $registry.register('view', new GanttViewType(context))
+    // Map view — Bucket B greenfield, no premium twin.
+    $registry.register('view', new MapViewType(context))
     $registry.register('view', new FormViewType(context))
     $registry.register('viewFilter', new EqualViewFilterType(context))
     $registry.register('viewFilter', new NotEqualViewFilterType(context))

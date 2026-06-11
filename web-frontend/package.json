@@ -95,6 +95,7 @@
     "jwt-decode": "^3.1.2",
     "lodash.debounce": "^4.0.8",
     "lowlight": "^3.3.0",
+    "maplibre-gl": "5.24",
     "markdown-it": "14.1.1",
     "markdown-it-regexp": "^0.4.0",
     "markdown-it-task-lists": "^2.1.1",

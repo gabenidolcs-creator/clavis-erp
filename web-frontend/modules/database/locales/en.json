@@ -1274,5 +1274,18 @@
   "rowEditFieldFormViewEditRow": {
     "copyLink": "Copy link",
     "noFormView": "No form view configured"
+  },
+  "mapViewHeader": {
+    "chooseLocation": "Choose location source",
+    "addressField": "Address field",
+    "latField": "Latitude field",
+    "lngField": "Longitude field",
+    "none": "None",
+    "or": "or"
+  },
+  "mapView": {
+    "noLocationSource": "Choose an address field or lat/lng field pair in the header to display pins.",
+    "couldNotLocate": "Could not locate",
+    "row": "Row"
   }
 }

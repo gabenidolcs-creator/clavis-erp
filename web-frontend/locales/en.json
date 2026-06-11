@@ -354,6 +354,7 @@
     "calendar": "Calendar",
     "timeline": "Timeline",
     "gantt": "Gantt",
+    "map": "Map",
     "form": "Form",
     "sharing": {
       "linkName": "view",
