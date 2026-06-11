@@ -572,19 +572,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -595,19 +599,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -618,19 +626,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -641,19 +653,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -664,19 +680,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -687,19 +707,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -710,19 +734,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -733,19 +761,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -756,19 +788,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -779,19 +815,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -802,19 +842,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -825,19 +869,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -848,19 +896,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -871,19 +923,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -894,19 +950,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -917,19 +977,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -940,19 +1004,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     },
@@ -963,19 +1031,23 @@ createdAt: "2026-06-06T10:38:43Z"
       "tasks": {
         "create": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "dev": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "auto": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-sonnet-4-6"
         },
         "review": {
           "primary": "claude",
-          "fallback": false
+          "fallback": false,
+          "model": "claude-haiku-4-5-20251001"
         }
       }
     }
