@@ -92,6 +92,7 @@ INSTALLED_APPS = [
     "baserow.contrib.builder",
     "baserow.contrib.dashboard",
     "baserow.contrib.automation",
+    "baserow.geocoding",
     *BASEROW_BUILT_IN_PLUGINS,
 ]
 
@@ -189,6 +190,7 @@ CELERY_TASK_ROUTES = {
     "baserow.core.usage.tasks": {"queue": BASEROW_GROUP_STORAGE_USAGE_QUEUE},
     "baserow.contrib.database.table.tasks.run_row_count_job": {"queue": "export"},
     "baserow.core.jobs.tasks.clean_up_jobs": {"queue": "export"},
+    "baserow.geocoding.tasks.geocode_address_task": {"queue": "geocoding"},
 }
 CELERY_TASK_SOFT_TIME_LIMIT = int(
     os.getenv("CELERY_TASK_SOFT_TIME_LIMIT") or 60 * 5
@@ -869,6 +871,17 @@ INTEGRATION_LOCAL_BASEROW_PAGE_SIZE_LIMIT = int(
 )
 INTEGRATION_ALLOW_SMTP_SERVICE_TO_USE_INSTANCE_SETTINGS = str_to_bool(
     os.getenv("BASEROW_INTEGRATION_ALLOW_SMTP_SERVICE_TO_USE_INSTANCE_SETTINGS", "true")
+)
+
+# Geocoding provider: "nominatim" (default, OSM/self-host) or "google" (requires API key)
+GEOCODING_PROVIDER = os.getenv("BASEROW_GEOCODING_PROVIDER", "nominatim")
+# Google Geocoding REST API key — required when GEOCODING_PROVIDER="google"
+GEOCODING_GOOGLE_API_KEY = os.getenv("BASEROW_GEOCODING_GOOGLE_API_KEY", "")
+# Celery rate_limit format (e.g. "10/m", "50/s") — 10/m is safe for Nominatim free tier
+GEOCODING_RATE_LIMIT = os.getenv("BASEROW_GEOCODING_RATE_LIMIT", "10/m")
+# OSM Terms of Service require a descriptive User-Agent on every request
+GEOCODING_NOMINATIM_USER_AGENT = os.getenv(
+    "BASEROW_GEOCODING_NOMINATIM_USER_AGENT", "baserow-geocoder/1.0"
 )
 
 AUTOMATION_HISTORY_PAGE_SIZE_LIMIT = int(

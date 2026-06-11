@@ -395,3 +395,13 @@ domain than your Baserow, you need to make sure CORS is configured correctly.
 |----------------------------|-----------------------------------------------------------------|-------------------------------------------------------------------------------|
 | POSTHOG\_PROJECT\_API\_KEY | Set this to your Posthog project API key for product analytics. |                                                                               |
 | POSTHOG\_HOST              | Set this to your Posthog host for product analytics.            |                                                                               |
+
+
+### Geocoding
+
+| Name | Description | Defaults |
+|---|---|---|
+| BASEROW\_GEOCODING\_PROVIDER | Geocoding backend to use. Set to `nominatim` (OSM, self-host friendly, no key required) or `google` (requires `BASEROW_GEOCODING_GOOGLE_API_KEY`). | nominatim |
+| BASEROW\_GEOCODING\_GOOGLE\_API\_KEY | Google Geocoding REST API key. Required when `BASEROW_GEOCODING_PROVIDER=google`. Keep this secret. | |
+| BASEROW\_GEOCODING\_RATE\_LIMIT | Celery `rate_limit` string controlling how many geocoding tasks run per time unit (e.g. `10/m`, `50/s`). The default `10/m` is safe for Nominatim's free tier. Increase for Google (paid quota). | 10/m |
+| BASEROW\_GEOCODING\_NOMINATIM\_USER\_AGENT | HTTP `User-Agent` header sent to the Nominatim API. OSM Terms of Service require a descriptive value identifying your application. | baserow-geocoder/1.0 |

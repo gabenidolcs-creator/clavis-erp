@@ -77,7 +77,7 @@ development_status:
   3-9-define-task-dependencies-with-cycle-prevention: done
   3-10-prompt-first-reschedule-on-dependency: done
   3-11-milestones-and-critical-path-cpm: done
-  3-12-geocoding-infrastructure-provider-abstraction-throttled-queue: backlog
+  3-12-geocoding-infrastructure-provider-abstraction-throttled-queue: done
   3-13-configure-a-map-view: backlog
   3-14-geocode-and-interact-with-map-pins: backlog
   epic-3-retrospective: optional
