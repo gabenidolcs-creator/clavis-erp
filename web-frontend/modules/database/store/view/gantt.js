@@ -24,12 +24,17 @@ export const state = () => ({
   // connector strings. An edge is `{ id, table, predecessor_row_id,
   // successor_row_id, dependency_type }`.
   dependencies: [],
+  // Story 3.11: CPM result arrays (row ids on the critical path / in conflict).
+  criticalTaskIds: [],
+  conflictTaskIds: [],
 })
 
 export const mutations = {
   ...ganttBufferedRows.mutations,
-  SET_DEPENDENCIES(state, dependencies) {
-    state.dependencies = dependencies
+  SET_DEPENDENCIES(state, { data, cpm = {} }) {
+    state.dependencies = data
+    state.criticalTaskIds = cpm.critical_task_ids ?? []
+    state.conflictTaskIds = cpm.conflict_task_ids ?? []
   },
   ADD_DEPENDENCY(state, dependency) {
     state.dependencies.push(dependency)
@@ -63,7 +68,7 @@ export const actions = {
    */
   async fetchDependencies({ commit }, { viewId }) {
     const { data } = await GanttService(this.$client).fetchDependencies(viewId)
-    commit('SET_DEPENDENCIES', data)
+    commit('SET_DEPENDENCIES', { data: data.dependencies, cpm: data.cpm })
   },
   /**
    * Optimistically adds a `predecessor → successor` edge, then reconciles with
@@ -172,6 +177,12 @@ export const getters = {
   ...ganttBufferedRows.getters,
   getDependencies(state) {
     return state.dependencies
+  },
+  criticalTaskIds(state) {
+    return state.criticalTaskIds
+  },
+  conflictTaskIds(state) {
+    return state.conflictTaskIds
   },
 }
 

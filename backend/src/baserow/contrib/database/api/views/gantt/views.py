@@ -43,6 +43,7 @@ from baserow.contrib.database.api.views.errors import (
     ERROR_VIEW_FILTER_TYPE_UNSUPPORTED_FIELD,
 )
 from baserow.contrib.database.api.views.gantt.serializers import (
+    CpmResultSerializer,
     CreateTaskDependencySerializer,
     GanttViewFieldOptionsSerializer,
     RescheduleCascadePreviewRequestSerializer,
@@ -116,7 +117,9 @@ def _violated_edge_set(view, handler: TaskDependencyHandler) -> set:
         return set()
     return set(
         handler.find_violations(
-            view.table, view.start_date_field, view.end_date_field
+            view.table,
+            view.start_date_field.specific,
+            view.end_date_field.specific,
         )
     )
 
@@ -646,10 +649,26 @@ class GanttViewDependenciesView(APIView):
         handler = TaskDependencyHandler()
         dependencies = handler.list_dependencies(request.user, view.table)
         context = {"violated_edges": _violated_edge_set(view, handler)}
+        # Guard: no CPM without both date fields configured.
+        if (
+            view.start_date_field_id is None
+            or view.end_date_field_id is None
+        ):
+            cpm_data = {"critical_task_ids": [], "conflict_task_ids": []}
+        else:
+            cpm_result = handler.compute_cpm(
+                view.table,
+                view.start_date_field.specific,
+                view.end_date_field.specific,
+            )
+            cpm_data = CpmResultSerializer(cpm_result).data
         return Response(
-            TaskDependencySerializer(
-                dependencies, many=True, context=context
-            ).data
+            {
+                "dependencies": TaskDependencySerializer(
+                    dependencies, many=True, context=context
+                ).data,
+                "cpm": cpm_data,
+            }
         )
 
     @extend_schema(
@@ -807,12 +826,28 @@ class PublicGanttViewDependenciesView(APIView):
         # directly so an anonymous viewer can render the connectors.
         from baserow.contrib.database.views.gantt.models import TaskDependency
 
+        handler = TaskDependencyHandler()
         dependencies = TaskDependency.objects.filter(table=view.table)
-        context = {"violated_edges": _violated_edge_set(view, TaskDependencyHandler())}
+        context = {"violated_edges": _violated_edge_set(view, handler)}
+        if (
+            view.start_date_field_id is None
+            or view.end_date_field_id is None
+        ):
+            cpm_data = {"critical_task_ids": [], "conflict_task_ids": []}
+        else:
+            cpm_result = handler.compute_cpm(
+                view.table,
+                view.start_date_field.specific,
+                view.end_date_field.specific,
+            )
+            cpm_data = CpmResultSerializer(cpm_result).data
         return Response(
-            TaskDependencySerializer(
-                dependencies, many=True, context=context
-            ).data
+            {
+                "dependencies": TaskDependencySerializer(
+                    dependencies, many=True, context=context
+                ).data,
+                "cpm": cpm_data,
+            }
         )
 
 

@@ -76,6 +76,20 @@ class RescheduleCascadePreviewResponseSerializer(serializers.Serializer):
     )
 
 
+class CpmResultSerializer(serializers.Serializer):
+    critical_task_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        help_text="Row ids on the zero-float critical path (FS network only).",
+    )
+    conflict_task_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        help_text=(
+            "Row ids whose stored start date is before the dependency-implied "
+            "earliest start (scheduling conflict)."
+        ),
+    )
+
+
 class CreateTaskDependencySerializer(serializers.Serializer):
     predecessor_row_id = serializers.IntegerField(
         min_value=1,

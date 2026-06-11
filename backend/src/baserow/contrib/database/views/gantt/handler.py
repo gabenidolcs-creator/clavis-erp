@@ -34,6 +34,23 @@ Edge = Tuple[int, int]
 
 
 @dataclasses.dataclass
+class CpmResult:
+    """
+    Result of :meth:`TaskDependencyHandler.compute_cpm` (Story 3.11 / FR-11).
+    Pure data — no DB handle.
+
+    ``critical_task_ids``: row ids on the zero-float critical path (FS network
+    nodes only; isolated rows never appear here).
+    ``conflict_task_ids``: row ids whose stored start date is earlier than the
+    dependency-implied earliest start — scheduling conflicts that must be
+    resolved before those nodes can join the critical path.
+    """
+
+    critical_task_ids: List[int]
+    conflict_task_ids: List[int]
+
+
+@dataclasses.dataclass
 class CascadePlan:
     """
     The result of :meth:`TaskDependencyHandler.compute_cascade` (Story 3.10 /
@@ -220,6 +237,139 @@ class TaskDependencyHandler:
             }
             for row in rows
         }
+
+    # -- CPM (Story 3.11 / FR-11) -----------------------------------------
+
+    def compute_cpm(
+        self,
+        table: Table,
+        start_date_field: Optional[Field],
+        end_date_field: Optional[Field],
+        model=None,
+    ) -> CpmResult:
+        """
+        Run a forward + backward CPM pass over the FS dependency graph and
+        return which rows are on the critical path (zero float) and which are
+        in conflict (stored start before dependency-implied earliest start).
+
+        Only nodes that appear in at least one FS edge participate.  Isolated
+        rows (no edges at all) are never critical.  Unscheduled nodes (start
+        or end is None) are silently skipped.
+
+        Algorithm: Kahn's BFS topological sort for the forward pass (natural
+        level-by-level processing), then reverse-topological order for the
+        backward pass.
+        """
+
+        if start_date_field is None or end_date_field is None:
+            return CpmResult(critical_task_ids=[], conflict_task_ids=[])
+
+        edges = self._load_fs_edges(table)
+        if not edges:
+            return CpmResult(critical_task_ids=[], conflict_task_ids=[])
+
+        # Collect all nodes in the dependency network.
+        node_ids = set(p for p, _ in edges) | set(s for _, s in edges)
+
+        # Load dates for network nodes only.
+        dates = self._load_row_dates(
+            table, node_ids, start_date_field, end_date_field, model=model
+        )
+
+        # Drop unscheduled nodes (start or end is None).
+        scheduled = {
+            nid
+            for nid in node_ids
+            if dates.get(nid, {}).get("start") is not None
+            and dates.get(nid, {}).get("end") is not None
+        }
+
+        # Filter edges to scheduled nodes only.
+        active_edges = [
+            (p, s) for p, s in edges if p in scheduled and s in scheduled
+        ]
+
+        if not active_edges:
+            return CpmResult(critical_task_ids=[], conflict_task_ids=[])
+
+        # Build adjacency structures for Kahn's BFS.
+        successors: Dict[int, List[int]] = {n: [] for n in scheduled}
+        predecessors: Dict[int, List[int]] = {n: [] for n in scheduled}
+        in_degree: Dict[int, int] = {n: 0 for n in scheduled}
+
+        for p, s in active_edges:
+            successors[p].append(s)
+            predecessors[s].append(p)
+            in_degree[s] += 1
+
+        # Duration helper — always non-negative.
+        def duration(node: int) -> timedelta:
+            d = dates[node]
+            raw = d["end"] - d["start"]
+            # date arithmetic can return timedelta — keep it as-is
+            return max(timedelta(0), raw) if isinstance(raw, timedelta) else timedelta(0)
+
+        # Forward pass (Kahn's BFS).
+        from collections import deque
+
+        queue: deque = deque(n for n in scheduled if in_degree[n] == 0)
+        topo_order: List[int] = []
+        ES: Dict[int, Any] = {}
+        EF: Dict[int, Any] = {}
+
+        for n in scheduled:
+            if in_degree[n] == 0:
+                # Root node: ES = stored start date.
+                ES[n] = dates[n]["start"]
+                EF[n] = ES[n] + duration(n)
+
+        while queue:
+            node = queue.popleft()
+            topo_order.append(node)
+            for succ in successors[node]:
+                # ES of successor = max(EF of all predecessors).
+                pred_ef = EF[node]
+                if succ not in ES:
+                    ES[succ] = pred_ef
+                    EF[succ] = ES[succ] + duration(succ)
+                else:
+                    if pred_ef > ES[succ]:
+                        ES[succ] = pred_ef
+                        EF[succ] = ES[succ] + duration(succ)
+                in_degree[succ] -= 1
+                if in_degree[succ] == 0:
+                    queue.append(succ)
+
+        # Conflict detection: stored start < ES (before dependency-implied ES).
+        conflict_task_ids = [
+            n for n in topo_order if dates[n]["start"] < ES[n]
+        ]
+        conflict_set = set(conflict_task_ids)
+
+        # Backward pass in reverse topological order.
+        project_end = max(EF.values())
+        LF: Dict[int, Any] = {}
+        LS: Dict[int, Any] = {}
+
+        for node in reversed(topo_order):
+            succs = [s for s in successors[node] if s in topo_order]
+            if not succs:
+                LF[node] = project_end
+            else:
+                LF[node] = min(LS[s] for s in succs if s in LS)
+            LS[node] = LF[node] - duration(node)
+
+        # Critical path: float == 0 and not conflicted.
+        critical_task_ids = [
+            n
+            for n in topo_order
+            if n not in conflict_set and (LF[n] - EF[n]) == timedelta(0)
+        ]
+
+        return CpmResult(
+            critical_task_ids=critical_task_ids,
+            conflict_task_ids=conflict_task_ids,
+        )
 
     def compute_cascade(
         self,

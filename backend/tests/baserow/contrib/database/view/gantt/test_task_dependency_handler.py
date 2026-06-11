@@ -245,3 +245,122 @@ def test_export_import_round_trip_acyclic(data_fixture):
     imported = handler.import_serialized(target, serialized)
     assert len(imported) == 2
     assert TaskDependency.objects.filter(table=target).count() == 2
+
+
+# ---------------------------------------------------------------------------
+# CPM tests (Story 3.11 / FR-11)
+# ---------------------------------------------------------------------------
+
+from datetime import date
+
+
+def _setup_cpm(data_fixture):
+    """Table + start/end date fields + gantt view wired to both."""
+    user = data_fixture.create_user()
+    table = data_fixture.create_database_table(user=user)
+    start_field = data_fixture.create_date_field(table=table, name="Start")
+    end_field = data_fixture.create_date_field(table=table, name="End")
+    data_fixture.create_gantt_view(
+        table=table, start_date_field=start_field, end_date_field=end_field
+    )
+    return table, start_field, end_field
+
+
+def _row_with_dates(table, start_field, end_field, start, end):
+    model = table.get_model()
+    return model.objects.create(
+        **{f"field_{start_field.id}": start, f"field_{end_field.id}": end}
+    ).id
+
+
+@pytest.mark.django_db
+def test_cpm_no_edges_returns_empty_result(data_fixture):
+    table, start_field, end_field = _setup_cpm(data_fixture)
+    _row_with_dates(table, start_field, end_field, date(2026, 1, 1), date(2026, 1, 5))
+    _row_with_dates(table, start_field, end_field, date(2026, 1, 6), date(2026, 1, 10))
+
+    result = TaskDependencyHandler().compute_cpm(table, start_field, end_field)
+
+    assert result.critical_task_ids == []
+    assert result.conflict_task_ids == []
+
+
+@pytest.mark.django_db
+def test_cpm_linear_chain_critical_path(data_fixture):
+    table, start_field, end_field = _setup_cpm(data_fixture)
+    # A=5d, B=5d, C=5d — perfectly aligned, zero slack.
+    a = _row_with_dates(table, start_field, end_field, date(2026, 1, 1), date(2026, 1, 5))
+    b = _row_with_dates(table, start_field, end_field, date(2026, 1, 5), date(2026, 1, 10))
+    c = _row_with_dates(table, start_field, end_field, date(2026, 1, 10), date(2026, 1, 15))
+    data_fixture.create_task_dependency(table, a, b)
+    data_fixture.create_task_dependency(table, b, c)
+
+    result = TaskDependencyHandler().compute_cpm(table, start_field, end_field)
+
+    assert set(result.critical_task_ids) == {a, b, c}
+    assert result.conflict_task_ids == []
+
+
+@pytest.mark.django_db
+def test_cpm_parallel_paths_only_longest_is_critical(data_fixture):
+    table, start_field, end_field = _setup_cpm(data_fixture)
+    # A(1d) -> C(1d) and A(1d) -> B(3d) -> C(1d)
+    # Longest path: A->B->C (1+3+1=5d). A->C path (1+1=2d) has slack.
+    a = _row_with_dates(table, start_field, end_field, date(2026, 1, 1), date(2026, 1, 2))
+    b = _row_with_dates(table, start_field, end_field, date(2026, 1, 2), date(2026, 1, 5))
+    c = _row_with_dates(table, start_field, end_field, date(2026, 1, 5), date(2026, 1, 6))
+    data_fixture.create_task_dependency(table, a, b)
+    data_fixture.create_task_dependency(table, b, c)
+    data_fixture.create_task_dependency(table, a, c)
+
+    result = TaskDependencyHandler().compute_cpm(table, start_field, end_field)
+
+    # A, B, C are all on the critical path (longest chain A->B->C has zero float).
+    assert set(result.critical_task_ids) == {a, b, c}
+    assert result.conflict_task_ids == []
+
+
+@pytest.mark.django_db
+def test_cpm_conflict_detection(data_fixture):
+    table, start_field, end_field = _setup_cpm(data_fixture)
+    # A ends day 5, B starts day 3 — B starts before A finishes → conflict.
+    a = _row_with_dates(table, start_field, end_field, date(2026, 1, 1), date(2026, 1, 5))
+    b = _row_with_dates(table, start_field, end_field, date(2026, 1, 3), date(2026, 1, 8))
+    data_fixture.create_task_dependency(table, a, b)
+
+    result = TaskDependencyHandler().compute_cpm(table, start_field, end_field)
+
+    assert b in result.conflict_task_ids
+    assert b not in result.critical_task_ids
+
+
+@pytest.mark.django_db
+def test_cpm_isolated_nodes_not_critical(data_fixture):
+    table, start_field, end_field = _setup_cpm(data_fixture)
+    # Rows a & b are connected (chain), row c has no edges.
+    a = _row_with_dates(table, start_field, end_field, date(2026, 1, 1), date(2026, 1, 5))
+    b = _row_with_dates(table, start_field, end_field, date(2026, 1, 5), date(2026, 1, 10))
+    c = _row_with_dates(table, start_field, end_field, date(2026, 1, 1), date(2026, 1, 3))
+    data_fixture.create_task_dependency(table, a, b)
+
+    result = TaskDependencyHandler().compute_cpm(table, start_field, end_field)
+
+    assert c not in result.critical_task_ids
+    assert c not in result.conflict_task_ids
+
+
+@pytest.mark.django_db
+def test_cpm_unscheduled_nodes_skipped(data_fixture):
+    table, start_field, end_field = _setup_cpm(data_fixture)
+    # a is scheduled, b has no dates.
+    a = _row_with_dates(table, start_field, end_field, date(2026, 1, 1), date(2026, 1, 5))
+    model = table.get_model()
+    b = model.objects.create(
+        **{f"field_{start_field.id}": None, f"field_{end_field.id}": None}
+    ).id
+    data_fixture.create_task_dependency(table, a, b)
+
+    result = TaskDependencyHandler().compute_cpm(table, start_field, end_field)
+
+    assert b not in result.critical_task_ids
+    assert b not in result.conflict_task_ids

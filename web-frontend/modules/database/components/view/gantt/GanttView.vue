@@ -334,6 +334,11 @@ export default {
           this.startDateField,
           this.endDateField
         )
+        const isMilestone = start.format('YYYY-MM-DD') === end.format('YYYY-MM-DD')
+        const classes = []
+        if (isMilestone) classes.push('gantt-view__milestone')
+        if (this.criticalTaskIds.includes(row.id)) classes.push('gantt-view__critical')
+        if (this.conflictTaskIds.includes(row.id)) classes.push('gantt-view__conflict')
         return {
           id: String(row.id),
           name: this.rowName(row),
@@ -341,6 +346,7 @@ export default {
           end: end.format('YYYY-MM-DD'),
           progress: 0,
           dependencies: this.dependenciesForRow(row),
+          custom_class: classes.join(' '),
         }
       })
     },
@@ -379,6 +385,12 @@ export default {
       return this.$store.getters[
         `${this.storePrefix}view/gantt/getDependencies`
       ]
+    },
+    criticalTaskIds() {
+      return this.$store.getters[`${this.storePrefix}view/gantt/criticalTaskIds`]
+    },
+    conflictTaskIds() {
+      return this.$store.getters[`${this.storePrefix}view/gantt/conflictTaskIds`]
     },
     /**
      * The row whose modal is currently open (the picker target), or null.
@@ -485,6 +497,14 @@ export default {
     // refreshed rather than recreated.
     ganttTasks() {
       this.refreshGantt()
+    },
+    // Story 3.11: repaint critical-path / conflict classes whenever the CPM
+    // result arrays change (no full gantt rebuild needed — DOM-only pass).
+    criticalTaskIds() {
+      this.$nextTick(() => this.markCriticalPath())
+    },
+    conflictTaskIds() {
+      this.$nextTick(() => this.markCriticalPath())
     },
     // Switching zoom re-renders through the lib's own `change_view_mode`.
     viewMode(mode) {
@@ -641,7 +661,10 @@ export default {
           return false
         },
       })
-      this.$nextTick(() => this.markViolatedConnectors())
+      this.$nextTick(() => {
+        this.markViolatedConnectors()
+        this.markCriticalPath()
+      })
     },
     /**
      * Re-renders the existing instance with the current task set, building it
@@ -653,7 +676,10 @@ export default {
         return
       }
       this.ganttInstance.refresh(this.ganttTasks)
-      this.$nextTick(() => this.markViolatedConnectors())
+      this.$nextTick(() => {
+        this.markViolatedConnectors()
+        this.markCriticalPath()
+      })
     },
     /**
      * Tears down the instance and empties the host node so the per-instance SVG
@@ -913,6 +939,35 @@ export default {
             arrow.classList.add('gantt-view__arrow--violated')
           }
         })
+    },
+    /**
+     * Story 3.11 / AC #2 & #3. Post-render DOM pass that adds/removes
+     * `gantt-view__critical` and `gantt-view__conflict` classes on `.bar-wrapper`
+     * elements so the stylesheet can repaint critical-path bars and conflict bars.
+     * Mirrors `markViolatedConnectors` in structure. Called from `refreshGantt`
+     * and `ensureGantt` via `$nextTick`, and from dedicated watchers on the two
+     * CPM id arrays so changes take effect without a full gantt rebuild.
+     */
+    markCriticalPath() {
+      const host = this.$refs.ganttHost
+      if (!host) {
+        return
+      }
+      // Clear previous state.
+      host
+        .querySelectorAll('.bar-wrapper.gantt-view__critical')
+        .forEach((el) => el.classList.remove('gantt-view__critical'))
+      host
+        .querySelectorAll('.bar-wrapper.gantt-view__conflict')
+        .forEach((el) => el.classList.remove('gantt-view__conflict'))
+      this.criticalTaskIds.forEach((id) => {
+        const bar = host.querySelector(`.bar-wrapper[data-id="${id}"]`)
+        if (bar) bar.classList.add('gantt-view__critical')
+      })
+      this.conflictTaskIds.forEach((id) => {
+        const bar = host.querySelector(`.bar-wrapper[data-id="${id}"]`)
+        if (bar) bar.classList.add('gantt-view__conflict')
+      })
     },
     async updateValue({ field, row, value, oldValue }) {
       try {

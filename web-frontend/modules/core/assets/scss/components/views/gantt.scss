@@ -75,6 +75,31 @@
   stroke-width: 2px;
 }
 
+// Story 3.11 / AC #1. Milestone diamond: zero-duration task rendered as a
+// diamond via clip-path on the SVG rect. `min-width` ensures the near-zero-
+// width rect Frappe produces is large enough to be visible as a diamond.
+.gantt .bar-wrapper.gantt-view__milestone .bar {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  transform-box: fill-box;
+  transform-origin: center;
+  min-width: 14px;
+}
+
+.gantt .bar-wrapper.gantt-view__milestone .bar-label {
+  display: none;
+}
+
+// Story 3.11 / AC #2. Critical-path bar: zero-float chain highlighted in red.
+.gantt .bar-wrapper.gantt-view__critical .bar {
+  fill: #e74c3c;
+}
+
+// Story 3.11 / AC #3. Conflict bar: successor starts before predecessor
+// finishes (scheduling conflict). Distinct warning orange.
+.gantt .bar-wrapper.gantt-view__conflict .bar {
+  fill: #f39c12;
+}
+
 .gantt-view__empty-text {
   color: $palette-neutral-700;
 }

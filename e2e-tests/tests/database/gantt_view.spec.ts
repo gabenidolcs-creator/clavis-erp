@@ -658,3 +658,153 @@ test.describe("Gantt view", () => {
     ).toHaveCount(1);
   });
 });
+
+// Story 3.11 / FR-11: Milestones and Critical Path (CPM)
+// NOTE: authored only — not run locally (Docker e2e stack required).
+describe("Story 3.11 — Milestones and Critical Path", () => {
+  test("zero-duration task renders with gantt-view__milestone class (AC #1)", async ({
+    page,
+  }) => {
+    const { database } = await createDatabase(page);
+    const { table } = await createTable(page, database.id);
+    const fields = await getFieldsForTable(page, database.id, table.id);
+    await deleteAllNonPrimaryFieldsFromTable(page, database.id, table.id);
+    const startField = await createField(page, table.id, {
+      name: "Start",
+      type: "date",
+    });
+    const endField = await createField(page, table.id, {
+      name: "End",
+      type: "date",
+    });
+    const today = dayKey(0);
+    // Milestone: start == end (zero-duration).
+    const milestone = await createRow(page, database.id, table.id, {
+      [`field_${fields[0].id}`]: "Milestone",
+      [`field_${startField.id}`]: today,
+      [`field_${endField.id}`]: today,
+    });
+    const view = await createGanttView(page, table.id, {
+      start_date_field: startField.id,
+      end_date_field: endField.id,
+    });
+    const tablePage = new TablePage(page);
+    await tablePage.goto(database.id, table.id, view.id);
+    await expect(
+      page.locator(
+        `.gantt-view__host .bar-wrapper.gantt-view__milestone[data-id="${milestone.id}"]`,
+      ),
+    ).toHaveCount(1);
+  });
+
+  test(
+    "aligned A→B chain gets gantt-view__critical class on both bars (AC #2)",
+    async ({ page }) => {
+      const { database } = await createDatabase(page);
+      const { table } = await createTable(page, database.id);
+      const fields = await getFieldsForTable(page, database.id, table.id);
+      await deleteAllNonPrimaryFieldsFromTable(page, database.id, table.id);
+      const startField = await createField(page, table.id, {
+        name: "Start",
+        type: "date",
+      });
+      const endField = await createField(page, table.id, {
+        name: "End",
+        type: "date",
+      });
+      // A ends day 5, B starts day 5 → perfectly aligned, zero float.
+      const rowA = await createRow(page, database.id, table.id, {
+        [`field_${fields[0].id}`]: "Task A",
+        [`field_${startField.id}`]: dayKey(0),
+        [`field_${endField.id}`]: dayKey(5),
+      });
+      const rowB = await createRow(page, database.id, table.id, {
+        [`field_${fields[0].id}`]: "Task B",
+        [`field_${startField.id}`]: dayKey(5),
+        [`field_${endField.id}`]: dayKey(10),
+      });
+      const view = await createGanttView(page, table.id, {
+        start_date_field: startField.id,
+        end_date_field: endField.id,
+      });
+      const tablePage = new TablePage(page);
+      await tablePage.goto(database.id, table.id, view.id);
+      // Create A→B dependency.
+      await page
+        .locator(`.gantt-view__host .bar-wrapper[data-id="${rowB.id}"]`)
+        .click();
+      await page
+        .locator(".gantt-view__dependencies-add .dropdown__selected")
+        .click();
+      await page
+        .locator(
+          '.gantt-view__dependencies-add .select__item-name-text[title="Task A"]',
+        )
+        .click();
+      await page.keyboard.press("Escape");
+      await expect(
+        page.locator(
+          `.gantt-view__host .bar-wrapper.gantt-view__critical[data-id="${rowA.id}"]`,
+        ),
+      ).toHaveCount(1);
+      await expect(
+        page.locator(
+          `.gantt-view__host .bar-wrapper.gantt-view__critical[data-id="${rowB.id}"]`,
+        ),
+      ).toHaveCount(1);
+    },
+  );
+
+  test(
+    "B starts before A ends → gantt-view__conflict class on B (AC #3)",
+    async ({ page }) => {
+      const { database } = await createDatabase(page);
+      const { table } = await createTable(page, database.id);
+      const fields = await getFieldsForTable(page, database.id, table.id);
+      await deleteAllNonPrimaryFieldsFromTable(page, database.id, table.id);
+      const startField = await createField(page, table.id, {
+        name: "Start",
+        type: "date",
+      });
+      const endField = await createField(page, table.id, {
+        name: "End",
+        type: "date",
+      });
+      // A ends day 5, B starts day 3 → conflict.
+      const rowA = await createRow(page, database.id, table.id, {
+        [`field_${fields[0].id}`]: "Task A",
+        [`field_${startField.id}`]: dayKey(0),
+        [`field_${endField.id}`]: dayKey(5),
+      });
+      const rowB = await createRow(page, database.id, table.id, {
+        [`field_${fields[0].id}`]: "Task B",
+        [`field_${startField.id}`]: dayKey(3),
+        [`field_${endField.id}`]: dayKey(8),
+      });
+      const view = await createGanttView(page, table.id, {
+        start_date_field: startField.id,
+        end_date_field: endField.id,
+      });
+      const tablePage = new TablePage(page);
+      await tablePage.goto(database.id, table.id, view.id);
+      // Create A→B dependency (B starts before A ends — conflict).
+      await page
+        .locator(`.gantt-view__host .bar-wrapper[data-id="${rowB.id}"]`)
+        .click();
+      await page
+        .locator(".gantt-view__dependencies-add .dropdown__selected")
+        .click();
+      await page
+        .locator(
+          '.gantt-view__dependencies-add .select__item-name-text[title="Task A"]',
+        )
+        .click();
+      await page.keyboard.press("Escape");
+      await expect(
+        page.locator(
+          `.gantt-view__host .bar-wrapper.gantt-view__conflict[data-id="${rowB.id}"]`,
+        ),
+      ).toHaveCount(1);
+    },
+  );
+});

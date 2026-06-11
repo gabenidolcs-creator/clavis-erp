@@ -181,11 +181,13 @@ describe('GanttView.ganttTasks mapping (AC #2, #3)', () => {
   const endField = { id: 6, type: 'date' }
   const primaryField = { id: 9, type: 'text', primary: true }
 
-  const makeVm = ({ allRows }) => {
+  const makeVm = ({ allRows, criticalTaskIds = [], conflictTaskIds = [] }) => {
     const vm = {
       allRows,
       // No edges in the mapping fixtures → every task's `dependencies` is ''.
       dependencies: [],
+      criticalTaskIds,
+      conflictTaskIds,
       startDateField: startField,
       endDateField: endField,
       primaryField,
@@ -229,6 +231,7 @@ describe('GanttView.ganttTasks mapping (AC #2, #3)', () => {
         end: '2026-06-12',
         progress: 0,
         dependencies: '',
+        custom_class: '',
       },
     ])
   })
@@ -893,5 +896,98 @@ describe('GanttView.markViolatedConnectors (AC #3)', () => {
     expect(() =>
       GanttView.methods.markViolatedConnectors.call(vm)
     ).not.toThrow()
+  })
+})
+
+
+// Story 3.11 / AC #1, #2, #3: ganttTasks custom_class reflects milestone,
+// critical path, and conflict states.
+describe('GanttView.ganttTasks custom_class (Story 3.11)', () => {
+  const startField = { id: 5, type: 'date' }
+  const endField = { id: 6, type: 'date' }
+  const primaryField = { id: 9, type: 'text', primary: true }
+
+  const makeVm = ({ allRows, criticalTaskIds = [], conflictTaskIds = [] }) => {
+    const vm = {
+      allRows,
+      dependencies: [],
+      criticalTaskIds,
+      conflictTaskIds,
+      startDateField: startField,
+      endDateField: endField,
+      primaryField,
+      $registry: {
+        get: () => ({
+          toHumanReadableString: (field, value) => String(value ?? ''),
+        }),
+      },
+    }
+    for (const name of [
+      'partitioned',
+      'scheduledRows',
+      'unscheduledRows',
+      'ganttTasks',
+    ]) {
+      Object.defineProperty(vm, name, { get: GanttView.computed[name] })
+    }
+    vm.rowName = GanttView.methods.rowName.bind(vm)
+    vm.dependenciesForRow = GanttView.methods.dependenciesForRow.bind(vm)
+    return vm
+  }
+
+  test('ganttTasks milestone class (AC #1): start == end sets gantt-view__milestone', () => {
+    const vm = makeVm({
+      allRows: [{ id: 1, field_5: '2026-06-15', field_6: '2026-06-15', field_9: 'M' }],
+    })
+    expect(vm.ganttTasks[0].custom_class).toContain('gantt-view__milestone')
+  })
+
+  test('ganttTasks no milestone class when start != end', () => {
+    const vm = makeVm({
+      allRows: [{ id: 1, field_5: '2026-06-10', field_6: '2026-06-15', field_9: 'T' }],
+    })
+    expect(vm.ganttTasks[0].custom_class).not.toContain('gantt-view__milestone')
+  })
+
+  test('ganttTasks critical class (AC #2): row id in criticalTaskIds', () => {
+    const vm = makeVm({
+      allRows: [{ id: 7, field_5: '2026-06-10', field_6: '2026-06-15', field_9: 'A' }],
+      criticalTaskIds: [7],
+    })
+    expect(vm.ganttTasks[0].custom_class).toContain('gantt-view__critical')
+  })
+
+  test('ganttTasks no critical class when row id not in criticalTaskIds', () => {
+    const vm = makeVm({
+      allRows: [{ id: 7, field_5: '2026-06-10', field_6: '2026-06-15', field_9: 'A' }],
+      criticalTaskIds: [99],
+    })
+    expect(vm.ganttTasks[0].custom_class).not.toContain('gantt-view__critical')
+  })
+
+  test('ganttTasks conflict class (AC #3): row id in conflictTaskIds', () => {
+    const vm = makeVm({
+      allRows: [{ id: 3, field_5: '2026-06-10', field_6: '2026-06-15', field_9: 'B' }],
+      conflictTaskIds: [3],
+    })
+    expect(vm.ganttTasks[0].custom_class).toContain('gantt-view__conflict')
+  })
+
+  test('ganttTasks no conflict class when row id not in conflictTaskIds', () => {
+    const vm = makeVm({
+      allRows: [{ id: 3, field_5: '2026-06-10', field_6: '2026-06-15', field_9: 'B' }],
+      conflictTaskIds: [99],
+    })
+    expect(vm.ganttTasks[0].custom_class).not.toContain('gantt-view__conflict')
+  })
+
+  test('ganttTasks multiple classes can combine on a single task', () => {
+    const vm = makeVm({
+      allRows: [{ id: 5, field_5: '2026-06-15', field_6: '2026-06-15', field_9: 'C' }],
+      criticalTaskIds: [5],
+    })
+    const cls = vm.ganttTasks[0].custom_class
+    expect(cls).toContain('gantt-view__milestone')
+    expect(cls).toContain('gantt-view__critical')
   })
 })
