@@ -4,7 +4,7 @@ baseline_commit: 143ba77d5ce0b6ee9b52cbc2b8ebe076ff7efd9a
 
 # Story 3.11: Milestones and Critical Path (CPM)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

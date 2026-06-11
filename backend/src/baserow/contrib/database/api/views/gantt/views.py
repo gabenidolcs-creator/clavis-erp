@@ -31,6 +31,7 @@ from baserow.contrib.database.api.fields.errors import (
     ERROR_ORDER_BY_FIELD_NOT_FOUND,
     ERROR_ORDER_BY_FIELD_NOT_POSSIBLE,
 )
+from baserow.contrib.database.api.rows.errors import ERROR_ROW_DOES_NOT_EXIST
 from baserow.contrib.database.api.rows.serializers import (
     RowSerializer,
     get_example_multiple_rows_metadata_serializer,
@@ -62,6 +63,8 @@ from baserow.contrib.database.fields.exceptions import (
     OrderByFieldNotFound,
     OrderByFieldNotPossible,
 )
+from baserow.contrib.database.rows.exceptions import RowDoesNotExist
+from baserow.contrib.database.rows.operations import UpdateDatabaseRowOperationType
 from baserow.contrib.database.rows.registries import row_metadata_registry
 from baserow.contrib.database.table.operations import ListRowsDatabaseTableOperationType
 from baserow.contrib.database.views.exceptions import (
@@ -71,8 +74,6 @@ from baserow.contrib.database.views.exceptions import (
     ViewFilterTypeNotAllowedForField,
 )
 from baserow.contrib.database.views.filters import AdHocFilters
-from baserow.contrib.database.rows.exceptions import RowDoesNotExist
-from baserow.contrib.database.rows.operations import UpdateDatabaseRowOperationType
 from baserow.contrib.database.views.gantt.exceptions import (
     GanttViewNotConfiguredForReschedule,
     InvalidTaskDependencyType,
@@ -89,8 +90,6 @@ from baserow.contrib.database.views.registries import view_type_registry
 from baserow.contrib.database.views.signals import view_loaded
 from baserow.contrib.database.views.utils import check_permissions_with_view_fallback
 from baserow.core.exceptions import UserNotInWorkspace
-
-from baserow.contrib.database.api.rows.errors import ERROR_ROW_DOES_NOT_EXIST
 from baserow.core.handler import CoreHandler
 
 from .errors import (
