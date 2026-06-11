@@ -6,7 +6,11 @@ from django.db import IntegrityError
 from baserow.core.exceptions import PermissionDenied
 from baserow.geocoding.exceptions import GeocodingProviderNotConfigured
 from baserow.geocoding.models import GeocodedAddress
-from baserow.geocoding.providers import GoogleGeocodingProvider, NominatimProvider
+from baserow.geocoding.providers import (
+    GeocodingProvider,
+    GoogleGeocodingProvider,
+    NominatimProvider,
+)
 
 
 def _hash_address(address: str) -> str:
@@ -19,7 +23,7 @@ class GeocodingService:
         "google": GoogleGeocodingProvider,
     }
 
-    def _get_provider(self):
+    def _get_provider(self) -> GeocodingProvider:
         provider_name = settings.GEOCODING_PROVIDER
         cls = self._providers.get(provider_name)
         if cls is None:
@@ -56,8 +60,10 @@ class GeocodingService:
             pass
         return lat, lng
 
-    def get_cached(self, address: str, actor=None, field=None):
-        """Return cached (lat, lng) or None. Enforces field read permission when provided."""
+    def get_cached(
+        self, address: str, actor=None, field=None
+    ) -> tuple[float | None, float | None]:
+        """Return cached (lat, lng) or (None, None). Enforces field read permission when provided."""
         if actor is not None and field is not None:
             from baserow.contrib.database.fields.operations import (
                 ReadFieldOperationType,
@@ -82,7 +88,7 @@ class GeocodingService:
         except GeocodedAddress.DoesNotExist:
             return None, None
 
-    def enqueue(self, address: str, row_id: int, field_id: int):
+    def enqueue(self, address: str, row_id: int, field_id: int) -> None:
         """Non-blocking entrypoint — fires geocode_address_task and returns immediately."""
         from baserow.geocoding.tasks import geocode_address_task
 
