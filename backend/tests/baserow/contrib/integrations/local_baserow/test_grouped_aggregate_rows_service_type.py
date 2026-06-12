@@ -304,6 +304,85 @@ def test_generate_schema_without_series(data_fixture):
 
 
 @pytest.mark.django_db
+def test_dispatch_honors_field_hide_on_series_field(data_fixture):
+    user = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=user)
+    database = data_fixture.create_database_application(workspace=workspace)
+    table = data_fixture.create_database_table(database=database)
+    cat_field = data_fixture.create_text_field(table=table)
+    series_field = data_fixture.create_text_field(table=table)
+    RbacHandler().assign_role(user, workspace, "EDITOR")
+    FieldPermission.objects.create(field=series_field, readable_by_role="ADMIN")
+
+    service = _make_service(
+        data_fixture, table, user,
+        group_by_field=cat_field,
+        series_field=series_field,
+        aggregation_type="count",
+    )
+
+    dispatch_context = FakeDispatchContext()
+    service_type = LocalBaserowGroupedAggregateRowsServiceType()
+
+    with pytest.raises(ServiceImproperlyConfiguredDispatchException) as exc_info:
+        service_type.resolve_service_formulas(service, dispatch_context)
+    assert "series_field" in exc_info.value.args[0]
+
+
+@pytest.mark.django_db
+def test_dispatch_null_category_becomes_empty_string(data_fixture):
+    user = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=user)
+    database = data_fixture.create_database_application(workspace=workspace)
+    table = data_fixture.create_database_table(database=database)
+    text_field = data_fixture.create_text_field(table=table)
+    RowHandler().create_rows(
+        user,
+        table,
+        [
+            {f"field_{text_field.id}": None},
+            {f"field_{text_field.id}": "A"},
+        ],
+    )
+    service = _make_service(
+        data_fixture, table, user,
+        group_by_field=text_field,
+        aggregation_type="count",
+    )
+
+    dispatch_context = FakeDispatchContext()
+    service_type = LocalBaserowGroupedAggregateRowsServiceType()
+    result = service_type.dispatch_data(service, {}, dispatch_context)
+
+    categories = {r["category"] for r in result["results"]}
+    assert "" in categories, "NULL category must become empty string"
+    assert "A" in categories
+    assert all(isinstance(r["category"], str) for r in result["results"])
+
+
+@pytest.mark.django_db
+def test_prepare_values_raises_when_non_count_has_no_value_field(data_fixture):
+    user = data_fixture.create_user()
+    workspace = data_fixture.create_workspace(user=user)
+    database = data_fixture.create_database_application(workspace=workspace)
+    table = data_fixture.create_database_table(database=database)
+    text_field = data_fixture.create_text_field(table=table)
+
+    service_type = LocalBaserowGroupedAggregateRowsServiceType()
+    with pytest.raises(DRFValidationError) as exc_info:
+        service_type.prepare_values(
+            {
+                "table": table,
+                "group_by_field_id": text_field.id,
+                "aggregation_type": "sum",
+                "value_field_id": None,
+            },
+            user,
+        )
+    assert "value_field" in str(exc_info.value.detail)
+
+
+@pytest.mark.django_db
 def test_generate_schema_with_series(data_fixture):
     user = data_fixture.create_user()
     workspace = data_fixture.create_workspace(user=user)

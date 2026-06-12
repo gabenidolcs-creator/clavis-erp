@@ -254,6 +254,11 @@ class BaserowPremiumConfig(AppConfig):
             LocalBaserowGroupedAggregateRowsUserServiceType,
         )
 
+        # Replace the core OSS service type with the premium version (richer
+        # aggregation registry, series support).
+        service_type_registry.unregister(
+            LocalBaserowGroupedAggregateRowsUserServiceType.type
+        )
         service_type_registry.register(
             LocalBaserowGroupedAggregateRowsUserServiceType()
         )
