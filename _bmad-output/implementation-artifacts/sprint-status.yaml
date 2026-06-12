@@ -79,7 +79,7 @@ development_status:
   3-11-milestones-and-critical-path-cpm: done
   3-12-geocoding-infrastructure-provider-abstraction-throttled-queue: done
   3-13-configure-a-map-view: done
-  3-14-geocode-and-interact-with-map-pins: backlog
+  3-14-geocode-and-interact-with-map-pins: done
   epic-3-retrospective: optional
 
   # Epic 4: Dashboards & Charts
