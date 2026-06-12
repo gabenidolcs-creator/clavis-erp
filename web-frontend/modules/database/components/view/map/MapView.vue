@@ -25,15 +25,31 @@
         </ul>
       </div>
     </template>
+    <RowEditModal
+      ref="rowEditModal"
+      :database="database"
+      :table="table"
+      :view="view"
+      :all-fields-in-table="fields"
+      :rows="[]"
+      :read-only="readOnly"
+      @hidden="$emit('selected-row', undefined)"
+      @update="$emit('refresh')"
+      @field-updated="$emit('refresh', $event)"
+      @field-deleted="$emit('refresh')"
+    />
   </div>
 </template>
 
 <script>
+import RowEditModal from '@baserow/modules/database/components/row/RowEditModal'
+
 const TILE_URL =
   'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 
 export default {
   name: 'MapView',
+  components: { RowEditModal },
   props: {
     database: {
       type: Object,
@@ -60,7 +76,7 @@ export default {
       required: true,
     },
   },
-  emits: ['refresh'],
+  emits: ['refresh', 'selected-row'],
   data() {
     return {
       mapInstance: null,
@@ -90,6 +106,9 @@ export default {
     },
     'view.lng_field'() {
       this.fetchRows()
+    },
+    pins() {
+      this._updatePinsSource()
     },
   },
   async mounted() {
@@ -141,29 +160,101 @@ export default {
       })
 
       this.mapInstance.on('load', () => {
-        this.renderPins()
+        this._initPinsSource()
       })
     },
-    renderPins() {
-      if (!this.mapInstance) return
-      // Remove existing markers (simple approach for Story 3.13)
-      const existingMarkers = this._markers || []
-      existingMarkers.forEach((m) => m.remove())
-      this._markers = []
+    _initPinsSource() {
+      this.mapInstance.addSource('pins', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+        cluster: true,
+        clusterMaxZoom: 14,
+        clusterRadius: 50,
+      })
 
-      this.pins.forEach((pin) => {
-        import('maplibre-gl').then((maplibregl) => {
-          const marker = new maplibregl.default.Marker()
-            .setLngLat([pin.lng, pin.lat])
-            .addTo(this.mapInstance)
-          marker.getElement().addEventListener('click', () => {
-            this.$store.dispatch(
-              this.storePrefix + 'view/map/selectRow',
-              pin.row_id
-            )
+      this.mapInstance.addLayer({
+        id: 'clusters',
+        type: 'circle',
+        source: 'pins',
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color': '#1a73e8',
+          'circle-radius': [
+            'step',
+            ['get', 'point_count'],
+            20,
+            100,
+            30,
+            750,
+            40,
+          ],
+        },
+      })
+
+      this.mapInstance.addLayer({
+        id: 'cluster-count',
+        type: 'symbol',
+        source: 'pins',
+        filter: ['has', 'point_count'],
+        layout: {
+          'text-field': '{point_count_abbreviated}',
+          'text-size': 12,
+        },
+        paint: { 'text-color': '#ffffff' },
+      })
+
+      this.mapInstance.addLayer({
+        id: 'unclustered-point',
+        type: 'circle',
+        source: 'pins',
+        filter: ['!', ['has', 'point_count']],
+        paint: { 'circle-color': '#e53935', 'circle-radius': 8 },
+      })
+
+      this.mapInstance.on('click', 'clusters', (e) => {
+        const feat = e.features[0]
+        const clusterId = feat.properties.cluster_id
+        this.mapInstance
+          .getSource('pins')
+          .getClusterExpansionZoom(clusterId, (err, zoom) => {
+            if (err) return
+            this.mapInstance.easeTo({
+              center: feat.geometry.coordinates,
+              zoom,
+            })
           })
-          this._markers.push(marker)
-        })
+      })
+
+      this.mapInstance.on('click', 'unclustered-point', (e) => {
+        const rowId = e.features[0].properties.row_id
+        this.$refs.rowEditModal.show(rowId)
+      })
+
+      this.mapInstance.on('mouseenter', 'clusters', () => {
+        this.mapInstance.getCanvas().style.cursor = 'pointer'
+      })
+      this.mapInstance.on('mouseleave', 'clusters', () => {
+        this.mapInstance.getCanvas().style.cursor = ''
+      })
+      this.mapInstance.on('mouseenter', 'unclustered-point', () => {
+        this.mapInstance.getCanvas().style.cursor = 'pointer'
+      })
+      this.mapInstance.on('mouseleave', 'unclustered-point', () => {
+        this.mapInstance.getCanvas().style.cursor = ''
+      })
+
+      this._updatePinsSource()
+    },
+    _updatePinsSource() {
+      const source = this.mapInstance?.getSource('pins')
+      if (!source) return
+      source.setData({
+        type: 'FeatureCollection',
+        features: this.pins.map((pin) => ({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [pin.lng, pin.lat] },
+          properties: { row_id: pin.row_id },
+        })),
       })
     },
   },

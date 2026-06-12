@@ -12,6 +12,7 @@ from .views.gantt.signals import (  # noqa: F401
     task_dependency_created,
     task_dependency_deleted,
 )
+from .views.map.signals import broadcast_geocode_pin_updated  # noqa: F401
 from .views.rows.signals import (
     views_before_rows_delete,
     views_before_rows_update,
@@ -78,5 +79,6 @@ __all__ = [
     "views_rows_deleted",
     "views_before_rows_update",
     "views_before_rows_delete",
+    "broadcast_geocode_pin_updated",
     *PUBLIC_SIGNALS,
 ]

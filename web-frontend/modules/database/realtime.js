@@ -707,4 +707,15 @@ export const registerRealtimeEvents = (realtime) => {
       })
     }
   })
+
+  realtime.registerEvent('geocode_pin_updated', ({ store }, data) => {
+    const selected = store.getters['view/getSelected']
+    if (selected !== undefined && selected.type === 'map') {
+      store.dispatch('page/view/map/pinUpdated', {
+        rowId: data.row_id,
+        lat: data.lat,
+        lng: data.lng,
+      })
+    }
+  })
 }
