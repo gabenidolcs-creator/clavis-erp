@@ -8875,6 +8875,7 @@ __metadata:
     chart.js: "npm:3.9.1"
     chartjs-adapter-moment: "npm:1.0.1"
     decamelize: "npm:^6.0.1"
+    echarts: "npm:6.0"
     eslint: "npm:^9.39.3"
     eslint-config-prettier: "npm:^10.1.8"
     eslint-plugin-vitest: "npm:^0.5.4"
@@ -8923,6 +8924,7 @@ __metadata:
     vitest: "npm:^4.0.17"
     vue: "npm:^3.5.25"
     vue-chartjs: "npm:^5.3.3"
+    vue-echarts: "npm:8.0.1"
     vue-router: "npm:^4.6.3"
     vuejs3-datepicker: "npm:1.1.3"
     vuex: "npm:^4.1.0"
@@ -10616,6 +10618,16 @@ __metadata:
   version: 0.2.0
   resolution: "eastasianwidth@npm:0.2.0"
   checksum: 10c0/26f364ebcdb6395f95124fda411f63137a4bfb5d3a06453f7f23dfe52502905bd84e0488172e0f9ec295fdc45f05c23d5d91baf16bd26f0fe9acd777a188dc39
+  languageName: node
+  linkType: hard
+
+"echarts@npm:6.0":
+  version: 6.0.0
+  resolution: "echarts@npm:6.0.0"
+  dependencies:
+    tslib: "npm:2.3.0"
+    zrender: "npm:6.0.0"
+  checksum: 10c0/60bbb4f00ac679d2f81d7a0aa684597c8ccc46041c5ae536def4c4bbb85d5557c1653a536ac6e11f42757718ab66e2bbc35d53d795173c50e8541154c8d59bbd
   languageName: node
   linkType: hard
 
@@ -18671,6 +18683,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"tslib@npm:2.3.0":
+  version: 2.3.0
+  resolution: "tslib@npm:2.3.0"
+  checksum: 10c0/a845aed84e7e7dbb4c774582da60d7030ea39d67307250442d35c4c5dd77e4b44007098c37dd079e100029c76055f2a362734b8442ba828f8cc934f15ed9be61
+  languageName: node
+  linkType: hard
+
 "tslib@npm:^2.0.1, tslib@npm:^2.4.0":
   version: 2.8.1
   resolution: "tslib@npm:2.8.1"
@@ -19955,6 +19974,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"vue-echarts@npm:8.0.1":
+  version: 8.0.1
+  resolution: "vue-echarts@npm:8.0.1"
+  peerDependencies:
+    echarts: ^6.0.0
+    vue: ^3.3.0
+  checksum: 10c0/75d9215fce78e692a93b12df5e5a901ce01e106f732d1d1ec2143d20e37d0021f9adf313d53e07840048bdf2062632bf6e4d2d77f8c7552239880267c54020fd
+  languageName: node
+  linkType: hard
+
 "vue-eslint-parser@npm:^10.2.0":
   version: 10.2.0
   resolution: "vue-eslint-parser@npm:10.2.0"
@@ -20541,5 +20570,14 @@ __metadata:
     compress-commons: "npm:^6.0.2"
     readable-stream: "npm:^4.0.0"
   checksum: 10c0/50f2fb30327fb9d09879abf7ae2493705313adf403e794b030151aaae00009162419d60d0519e807673ec04d442e140c8879ca14314df0a0192de3b233e8f28b
+  languageName: node
+  linkType: hard
+
+"zrender@npm:6.0.0":
+  version: 6.0.0
+  resolution: "zrender@npm:6.0.0"
+  dependencies:
+    tslib: "npm:2.3.0"
+  checksum: 10c0/c794e05ee969c750de6d17cfff60d9d4e6342d1591cf6ba3e488fb084ac7a0415355fe4aec55f83a400fd4cda63792db0533362455058ac06f6e1343be28d0ce
   languageName: node
   linkType: hard
