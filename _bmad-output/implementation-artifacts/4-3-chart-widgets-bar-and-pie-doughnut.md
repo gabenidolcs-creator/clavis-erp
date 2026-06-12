@@ -4,7 +4,7 @@ baseline_commit: ac24f350b
 
 # Story 4.3: Chart Widgets — bar and pie/doughnut (clean-room)
 
-Status: review
+Status: done
 
 ## Story
 
