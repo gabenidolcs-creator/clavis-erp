@@ -262,6 +262,8 @@ class BaserowPremiumConfig(AppConfig):
         service_type_registry.register(
             LocalBaserowGroupedAggregateRowsUserServiceType()
         )
+        # Replace core OSS chart widget type with the premium version.
+        widget_type_registry.unregister(ChartWidgetType.type)
         widget_type_registry.register(ChartWidgetType())
         widget_type_registry.register(PieChartWidgetType())
 

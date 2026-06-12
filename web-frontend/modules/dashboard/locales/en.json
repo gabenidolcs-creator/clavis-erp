@@ -60,5 +60,17 @@
   },
   "trashType": {
     "widget": "widget"
+  },
+  "chartWidget": {
+    "name": "Chart"
+  },
+  "barChartWidget": {
+    "name": "Bar chart"
+  },
+  "pieChartWidget": {
+    "name": "Pie chart"
+  },
+  "doughnutChartWidget": {
+    "name": "Doughnut chart"
   }
 }

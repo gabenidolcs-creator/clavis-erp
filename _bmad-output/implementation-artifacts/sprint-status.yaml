@@ -86,7 +86,7 @@ development_status:
   epic-4: in-progress
   4-1-charting-foundation-shared-lazy-loaded: done
   4-2-grouped-aggregate-data-source: done
-  4-3-chart-widgets-bar-and-pie-doughnut-clean-room: backlog
+  4-3-chart-widgets-bar-and-pie-doughnut-clean-room: review
   4-4-chart-widgets-line-and-scatter: backlog
   4-5-metric-widget-non-regression: backlog
   4-6-dashboard-public-share-with-least-privilege-principal: backlog

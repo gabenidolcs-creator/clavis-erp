@@ -2,7 +2,7 @@ import { DashboardSearchType } from '@baserow/modules/dashboard/searchTypes'
 import { searchTypeRegistry } from '@baserow/modules/core/search/types/registry'
 import dashboardApplicationStore from '@baserow/modules/dashboard/store/dashboardApplication'
 import { DashboardApplicationType } from '@baserow/modules/dashboard/applicationTypes'
-import { SummaryWidgetType } from '@baserow/modules/dashboard/widgetTypes'
+import { SummaryWidgetType, ChartWidgetType } from '@baserow/modules/dashboard/widgetTypes'
 
 export default defineNuxtPlugin({
   name: 'dashboard',
@@ -25,6 +25,7 @@ export default defineNuxtPlugin({
     $registry.registerNamespace('dashboardWidget')
     $registry.register('application', new DashboardApplicationType(context))
     $registry.register('dashboardWidget', new SummaryWidgetType(context))
+    $registry.register('dashboardWidget', new ChartWidgetType(context))
 
     searchTypeRegistry.register(new DashboardSearchType(context))
   },

@@ -2,6 +2,10 @@ import { Registerable } from '@baserow/modules/core/registry'
 import SummaryWidgetSvg from '@baserow/modules/dashboard/assets/images/widgets/summary_widget.svg?url'
 import SummaryWidget from '@baserow/modules/dashboard/components/widget/SummaryWidget'
 import SummaryWidgetSettings from '@baserow/modules/dashboard/components/widget/SummaryWidgetSettings'
+import BarChartWidgetSvg from '@baserow/modules/dashboard/assets/images/widgets/bar_chart_widget.svg?url'
+import PieChartWidgetSvg from '@baserow/modules/dashboard/assets/images/widgets/pie_chart_widget.svg?url'
+import ChartWidget from '@baserow/modules/dashboard/components/widget/ChartWidget'
+import ChartWidgetSettings from '@baserow/modules/dashboard/components/widget/ChartWidgetSettings'
 
 export class WidgetType extends Registerable {
   constructor(...args) {
@@ -87,6 +91,59 @@ export class SummaryWidgetType extends WidgetType {
 
   get settingsComponent() {
     return SummaryWidgetSettings
+  }
+
+  isLoading(widget, data) {
+    const dataSourceId = widget.data_source_id
+    if (data[dataSourceId] && Object.keys(data[dataSourceId]).length !== 0) {
+      return false
+    }
+    return true
+  }
+}
+
+export class ChartWidgetType extends WidgetType {
+  static getType() {
+    return 'chart'
+  }
+
+  get name() {
+    return this.app.$i18n.t('chartWidget.name')
+  }
+
+  get component() {
+    return ChartWidget
+  }
+
+  get settingsComponent() {
+    return ChartWidgetSettings
+  }
+
+  get variations() {
+    const { $i18n: i18n } = this.app
+    return [
+      {
+        name: i18n.t('barChartWidget.name'),
+        createWidgetImage: BarChartWidgetSvg,
+        type: this,
+        params: { chart_type: 'bar' },
+        dropdownIcon: '',
+      },
+      {
+        name: i18n.t('pieChartWidget.name'),
+        createWidgetImage: PieChartWidgetSvg,
+        type: this,
+        params: { chart_type: 'pie' },
+        dropdownIcon: '',
+      },
+      {
+        name: i18n.t('doughnutChartWidget.name'),
+        createWidgetImage: PieChartWidgetSvg,
+        type: this,
+        params: { chart_type: 'doughnut' },
+        dropdownIcon: '',
+      },
+    ]
   }
 
   isLoading(widget, data) {

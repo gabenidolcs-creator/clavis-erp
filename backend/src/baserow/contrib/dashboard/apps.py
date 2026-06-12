@@ -67,9 +67,13 @@ class DashboardConfig(AppConfig):
         operation_type_registry.register(DispatchDashboardDataSourceOperationType())
 
         from baserow.contrib.dashboard.widgets.registries import widget_type_registry
-        from baserow.contrib.dashboard.widgets.widget_types import SummaryWidgetType
+        from baserow.contrib.dashboard.widgets.widget_types import (
+            ChartWidgetType,
+            SummaryWidgetType,
+        )
 
         widget_type_registry.register(SummaryWidgetType())
+        widget_type_registry.register(ChartWidgetType())
 
         from baserow.contrib.dashboard.widgets.trash_types import (
             WidgetTrashableItemType,

@@ -16,6 +16,21 @@ class DashboardDataSourceFixtures:
             service_model_class=LocalBaserowAggregateRows, **kwargs
         )
 
+    def create_dashboard_local_baserow_grouped_aggregate_rows_data_source(
+        self, **kwargs
+    ):
+        from baserow.contrib.integrations.local_baserow.service_types import (
+            LocalBaserowGroupedAggregateRowsServiceType,
+        )
+        from baserow.core.services.registries import service_type_registry
+
+        registered = service_type_registry.get(
+            LocalBaserowGroupedAggregateRowsServiceType.type
+        )
+        return self.create_dashboard_data_source(
+            service_model_class=registered.model_class, **kwargs
+        )
+
     def create_dashboard_data_source(
         self,
         dashboard=None,

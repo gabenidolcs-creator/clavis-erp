@@ -99,3 +99,24 @@ class SummaryWidget(Widget):
         on_delete=models.PROTECT,
         help_text="Data source for fetching the result to display.",
     )
+
+
+class ChartWidget(Widget):
+    CHART_TYPE_BAR = "bar"
+    CHART_TYPE_PIE = "pie"
+    CHART_TYPE_DOUGHNUT = "doughnut"
+    CHART_TYPE_CHOICES = [
+        (CHART_TYPE_BAR, "Bar"),
+        (CHART_TYPE_PIE, "Pie"),
+        (CHART_TYPE_DOUGHNUT, "Doughnut"),
+    ]
+    chart_type = models.CharField(
+        max_length=32,
+        choices=CHART_TYPE_CHOICES,
+        default=CHART_TYPE_BAR,
+    )
+    data_source = models.ForeignKey(
+        "dashboard.DashboardDataSource",
+        on_delete=models.PROTECT,
+        help_text="Data source providing grouped-aggregate rows for chart rendering.",
+    )
