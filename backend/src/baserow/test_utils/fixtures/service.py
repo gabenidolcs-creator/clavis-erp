@@ -13,6 +13,7 @@ from baserow.contrib.integrations.local_baserow.models import (
     LocalBaserowAggregateRows,
     LocalBaserowDeleteRow,
     LocalBaserowGetRow,
+    LocalBaserowGroupedAggregateRows,
     LocalBaserowListRows,
     LocalBaserowRowsCreated,
     LocalBaserowRowsDeleted,
@@ -50,6 +51,12 @@ class ServiceFixtures:
         self, **kwargs
     ) -> LocalBaserowAggregateRows:
         service = self.create_service(LocalBaserowAggregateRows, **kwargs)
+        return service
+
+    def create_local_baserow_grouped_aggregate_rows_service(
+        self, **kwargs
+    ) -> LocalBaserowGroupedAggregateRows:
+        service = self.create_service(LocalBaserowGroupedAggregateRows, **kwargs)
         return service
 
     def create_local_baserow_rows_created_service(

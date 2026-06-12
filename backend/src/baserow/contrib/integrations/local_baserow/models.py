@@ -123,6 +123,50 @@ class LocalBaserowAggregateRows(
     )
 
 
+class LocalBaserowGroupedAggregateRows(
+    LocalBaserowViewService, LocalBaserowFilterableServiceMixin
+):
+    """Grouped-aggregate service — GROUP BY group_by_field, aggregate value_field."""
+
+    AGGREGATION_CHOICES = [
+        ("count", "Count"),
+        ("sum", "Sum"),
+        ("avg", "Average"),
+        ("min", "Minimum"),
+        ("max", "Maximum"),
+    ]
+
+    group_by_field = models.ForeignKey(
+        "database.Field",
+        help_text="The field to group by (provides categories).",
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="grouped_aggregate_group_by",
+    )
+    value_field = models.ForeignKey(
+        "database.Field",
+        help_text="The field to aggregate. May be null for count aggregation.",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="grouped_aggregate_value",
+    )
+    series_field = models.ForeignKey(
+        "database.Field",
+        help_text="Optional secondary group-by for multi-series charts.",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="grouped_aggregate_series",
+    )
+    aggregation_type = models.CharField(
+        default="count",
+        max_length=16,
+        choices=AGGREGATION_CHOICES,
+        help_text="Aggregation function: count/sum/avg/min/max.",
+    )
+
+
 class LocalBaserowGetRow(
     LocalBaserowViewService,
     LocalBaserowFilterableServiceMixin,

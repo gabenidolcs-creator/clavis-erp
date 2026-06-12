@@ -38,6 +38,23 @@
     "aggregationFieldLabel": "Field",
     "aggregationTypeLabel": "Summary"
   },
+  "groupedAggregateRowsDataSourceForm": {
+    "data": "Data",
+    "sourceFieldLabel": "Table",
+    "viewFieldLabel": "Filter by view",
+    "notSelected": "Not selected",
+    "groupByFieldLabel": "Group by",
+    "aggregationTypeLabel": "Aggregation",
+    "valueFieldLabel": "Value field",
+    "seriesFieldLabel": "Series field (optional)",
+    "aggregationTypes": {
+      "count": "Count",
+      "sum": "Sum",
+      "avg": "Average",
+      "min": "Minimum",
+      "max": "Maximum"
+    }
+  },
   "widgetContext": {
     "delete": "Delete"
   },

@@ -91,6 +91,7 @@ from baserow.contrib.integrations.local_baserow.models import (
     LocalBaserowAggregateRows,
     LocalBaserowDeleteRow,
     LocalBaserowGetRow,
+    LocalBaserowGroupedAggregateRows,
     LocalBaserowListRows,
     LocalBaserowRowsCreated,
     LocalBaserowRowsDeleted,
@@ -1557,6 +1558,226 @@ class LocalBaserowAggregateRowsUserServiceType(
             return ["result"]
 
         return []
+
+
+class LocalBaserowGroupedAggregateRowsServiceType(
+    LocalBaserowTableServiceFilterableMixin,
+    LocalBaserowViewServiceType,
+):
+    """
+    Service type for grouped-aggregate queries: GROUP BY a field, aggregate a value.
+    Returns (category, value[, series]) tuples for chart rendering.
+    """
+
+    type = "local_baserow_grouped_aggregate_rows"
+    model_class = LocalBaserowGroupedAggregateRows
+    dispatch_types = [DispatchTypes.DATA]
+    returns_list = True
+    serializer_mixins = LocalBaserowTableServiceFilterableMixin.mixin_serializer_mixins
+
+    def get_schema_name(self, service: LocalBaserowGroupedAggregateRows) -> str:
+        return f"GroupedAggregation{service.id}Schema"
+
+    def generate_schema(
+        self,
+        service: LocalBaserowGroupedAggregateRows,
+        allowed_fields=None,
+    ):
+        if not service.group_by_field:
+            return None
+        has_series = bool(service.series_field)
+        item_props = {
+            "category": {"type": "string"},
+            "value": {"type": "number"},
+        }
+        if has_series:
+            item_props["series"] = {"type": "string"}
+        return {
+            "title": self.get_schema_name(service),
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": item_props,
+            },
+        }
+
+    @property
+    def allowed_fields(self):
+        return (
+            super().allowed_fields
+            + LocalBaserowTableServiceFilterableMixin.mixin_allowed_fields
+            + ["group_by_field", "value_field", "series_field", "aggregation_type"]
+        )
+
+    @property
+    def serializer_field_names(self):
+        return (
+            super().serializer_field_names
+            + LocalBaserowTableServiceFilterableMixin.mixin_serializer_field_names
+            + ["group_by_field_id", "value_field_id", "series_field_id", "aggregation_type"]
+        )
+
+    @property
+    def serializer_field_overrides(self):
+        return {
+            **super().serializer_field_overrides,
+            **LocalBaserowTableServiceFilterableMixin.mixin_serializer_field_overrides,
+            "group_by_field_id": serializers.IntegerField(
+                required=False,
+                allow_null=True,
+                help_text="The id of the field to group by.",
+            ),
+            "value_field_id": serializers.IntegerField(
+                required=False,
+                allow_null=True,
+                help_text="The id of the field to aggregate (null for count).",
+            ),
+            "series_field_id": serializers.IntegerField(
+                required=False,
+                allow_null=True,
+                help_text="The id of the optional secondary group-by field.",
+            ),
+        }
+
+    class SerializedDict(
+        LocalBaserowViewServiceType.SerializedDict,
+        LocalBaserowTableServiceFilterableMixin.SerializedDict,
+    ):
+        group_by_field_id: int
+        value_field_id: int
+        series_field_id: int
+        aggregation_type: str
+
+    def _resolve_field_id(self, field_id, table, field_attr_name):
+        """Resolve a field_id to a Field and validate it belongs to table."""
+        if field_id is None:
+            return None
+        field = FieldHandler().get_field(field_id)
+        if field.table_id != table.id:
+            raise DRFValidationError(
+                detail=f"The field with ID {field_id} is not related to the given table.",
+                code="invalid_field",
+            )
+        return field
+
+    def prepare_values(self, values, user, instance=None):
+        values = super().prepare_values(values, user, instance)
+
+        aggregation_type = values.get(
+            "aggregation_type", getattr(instance, "aggregation_type", "count")
+        )
+        valid_types = {"count", "sum", "avg", "min", "max"}
+        if aggregation_type not in valid_types:
+            raise DRFValidationError(
+                detail=f"Invalid aggregation_type '{aggregation_type}'.",
+                code="invalid_aggregation_type",
+            )
+
+        if "table" in values:
+            new_table = values["table"]
+            if instance and instance.table != new_table:
+                values["group_by_field"] = None
+                values["value_field"] = None
+                values["series_field"] = None
+
+        table = values.get("table", getattr(instance, "table", None))
+
+        if "group_by_field_id" in values:
+            field_id = values.pop("group_by_field_id")
+            values["group_by_field"] = self._resolve_field_id(field_id, table, "group_by_field") if field_id is not None else None
+
+        if "value_field_id" in values:
+            field_id = values.pop("value_field_id")
+            values["value_field"] = self._resolve_field_id(field_id, table, "value_field") if field_id is not None else None
+
+        if "series_field_id" in values:
+            field_id = values.pop("series_field_id")
+            values["series_field"] = self._resolve_field_id(field_id, table, "series_field") if field_id is not None else None
+
+        value_field = values.get("value_field", getattr(instance, "value_field", None))
+        if aggregation_type != "count" and value_field is None:
+            raise DRFValidationError(
+                detail="value_field is required when aggregation_type is not 'count'.",
+                code="missing_value_field",
+            )
+
+        return values
+
+    def resolve_service_formulas(self, service, dispatch_context):
+        if not service.group_by_field:
+            raise ServiceImproperlyConfiguredDispatchException(
+                "The group_by_field property is missing."
+            )
+        if service.aggregation_type != "count" and not service.value_field:
+            raise ServiceImproperlyConfiguredDispatchException(
+                "The value_field property is required for non-count aggregations."
+            )
+
+        from baserow.contrib.database.fields.field_permission_handler import (
+            FieldPermissionHandler,
+        )
+
+        authorized_user = service.integration.authorized_user
+        table = service.table
+        hidden_ids = FieldPermissionHandler.get_hidden_field_ids(authorized_user, table)
+        if service.group_by_field_id in hidden_ids:
+            raise ServiceImproperlyConfiguredDispatchException(
+                "The group_by_field is hidden from the authorized user (field permission)."
+            )
+        if service.value_field_id and service.value_field_id in hidden_ids:
+            raise ServiceImproperlyConfiguredDispatchException(
+                "The value_field is hidden from the authorized user (field permission)."
+            )
+        if service.series_field_id and service.series_field_id in hidden_ids:
+            raise ServiceImproperlyConfiguredDispatchException(
+                "The series_field is hidden from the authorized user (field permission)."
+            )
+
+        return super().resolve_service_formulas(service, dispatch_context)
+
+    def dispatch_data(self, service, resolved_values, dispatch_context):
+        from django.db.models import Avg, Count, Max, Min, Sum
+
+        AGG_FUNCS = {"count": Count, "sum": Sum, "avg": Avg, "min": Min, "max": Max}
+
+        table = service.table
+        model = self.get_table_model(service)
+        queryset = self.build_queryset(service, table, dispatch_context, model=model)
+
+        group_by_db_col = service.group_by_field.specific.db_column
+        agg_func_cls = AGG_FUNCS[service.aggregation_type]
+
+        if service.aggregation_type == "count":
+            agg_expr = agg_func_cls("id")
+        else:
+            value_db_col = service.value_field.specific.db_column
+            agg_expr = agg_func_cls(value_db_col)
+
+        if service.series_field:
+            series_db_col = service.series_field.specific.db_column
+            qs = queryset.order_by().values(group_by_db_col, series_db_col).annotate(value=agg_expr)
+            results = [
+                {
+                    "category": str(row[group_by_db_col]) if row[group_by_db_col] is not None else "",
+                    "series": str(row[series_db_col]) if row[series_db_col] is not None else "",
+                    "value": row["value"],
+                }
+                for row in qs
+            ]
+        else:
+            qs = queryset.order_by().values(group_by_db_col).annotate(value=agg_expr)
+            results = [
+                {
+                    "category": str(row[group_by_db_col]) if row[group_by_db_col] is not None else "",
+                    "value": row["value"],
+                }
+                for row in qs
+            ]
+
+        return {"results": results, "service": service}
+
+    def dispatch_transform(self, data):
+        return DispatchResult(data={"results": data["results"]})
 
 
 class LocalBaserowGetRowUserServiceType(

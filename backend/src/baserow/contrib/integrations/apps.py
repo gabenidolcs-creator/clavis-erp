@@ -27,6 +27,7 @@ class IntegrationsConfig(AppConfig):
             LocalBaserowAggregateRowsUserServiceType,
             LocalBaserowDeleteRowServiceType,
             LocalBaserowGetRowUserServiceType,
+            LocalBaserowGroupedAggregateRowsServiceType,
             LocalBaserowListRowsUserServiceType,
             LocalBaserowRowsCreatedServiceType,
             LocalBaserowRowsDeletedServiceType,
@@ -37,6 +38,7 @@ class IntegrationsConfig(AppConfig):
         service_type_registry.register(LocalBaserowGetRowUserServiceType())
         service_type_registry.register(LocalBaserowListRowsUserServiceType())
         service_type_registry.register(LocalBaserowAggregateRowsUserServiceType())
+        service_type_registry.register(LocalBaserowGroupedAggregateRowsServiceType())
         service_type_registry.register(LocalBaserowUpsertRowServiceType())
         service_type_registry.register(LocalBaserowDeleteRowServiceType())
         service_type_registry.register(LocalBaserowRowsCreatedServiceType())

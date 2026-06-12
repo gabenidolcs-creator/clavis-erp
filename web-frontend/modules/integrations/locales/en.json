@@ -29,6 +29,8 @@
     "localBaserowListRowsDescription": "Reads multiple rows from a Baserow table.",
     "localBaserowAggregateRows": "Summarize field",
     "localBaserowAggregateRowsDescription": "Summarizes a field in a Baserow table.",
+    "localBaserowGroupedAggregateRows": "Grouped Aggregate",
+    "localBaserowGroupedAggregateRowsDescription": "Groups rows by a field and aggregates a value per group.",
     "localBaserowCreateRow": "Create a row",
     "localBaserowCreateRowDescription": "Creates a new row in a Baserow table.",
     "localBaserowUpdateRow": "Update a row",

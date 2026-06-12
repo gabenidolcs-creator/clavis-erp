@@ -15,6 +15,7 @@ import LocalBaserowSignalTriggerServiceForm from '@baserow/modules/integrations/
 import LocalBaserowGetRowForm from '@baserow/modules/integrations/localBaserow/components/services/LocalBaserowGetRowForm'
 import LocalBaserowListRowsForm from '@baserow/modules/integrations/localBaserow/components/services/LocalBaserowListRowsForm'
 import LocalBaserowAggregateRowsForm from '@baserow/modules/integrations/localBaserow/components/services/LocalBaserowAggregateRowsForm'
+import GroupedAggregateRowsDataSourceForm from '@baserow/modules/dashboard/components/data_source/GroupedAggregateRowsDataSourceForm'
 
 export class LocalBaserowTableServiceType extends ServiceType {
   get integrationType() {
@@ -415,6 +416,32 @@ export class LocalBaserowAggregateRowsServiceType extends DataSourceLocalBaserow
 
   getOrder() {
     return 30
+  }
+}
+
+export class LocalBaserowGroupedAggregateRowsServiceType extends DataSourceLocalBaserowTableServiceType {
+  static getType() {
+    return 'local_baserow_grouped_aggregate_rows'
+  }
+
+  get name() {
+    return this.app.$i18n.t('serviceType.localBaserowGroupedAggregateRows')
+  }
+
+  get description() {
+    return this.app.$i18n.t('serviceType.localBaserowGroupedAggregateRowsDescription')
+  }
+
+  get formComponent() {
+    return GroupedAggregateRowsDataSourceForm
+  }
+
+  get icon() {
+    return 'iconoir-bar-chart-alt'
+  }
+
+  getOrder() {
+    return 35
   }
 }
 

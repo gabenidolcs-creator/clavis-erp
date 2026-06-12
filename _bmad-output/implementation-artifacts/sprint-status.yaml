@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-06
-last_updated: 2026-06-11T00:00:00Z
+last_updated: 2026-06-12T07:30:00Z
 project: clavis-erp
 project_key: NOKEY
 tracking_system: file-system
@@ -85,7 +85,7 @@ development_status:
   # Epic 4: Dashboards & Charts
   epic-4: in-progress
   4-1-charting-foundation-shared-lazy-loaded: done
-  4-2-grouped-aggregate-data-source: backlog
+  4-2-grouped-aggregate-data-source: review
   4-3-chart-widgets-bar-and-pie-doughnut-clean-room: backlog
   4-4-chart-widgets-line-and-scatter: backlog
   4-5-metric-widget-non-regression: backlog
