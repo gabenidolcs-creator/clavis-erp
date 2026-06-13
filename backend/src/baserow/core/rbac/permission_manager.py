@@ -28,10 +28,13 @@ from baserow.core.subjects import UserSubjectType
 
 from . import roles
 from .enforcement import COMMENTER_DENIED_OPS, VIEWER_DENIED_OPS
-from .models import RoleAssignment
+from .models import InterfaceCollaboratorPageGrant, RoleAssignment
 from .operations import (
     AssignRoleWorkspaceOperationType,
+    GrantPageAccessOperationType,
+    ListPageGrantsOperationType,
     ReadRoleAssignmentsWorkspaceOperationType,
+    RevokePageAccessOperationType,
 )
 
 # Operations owned by this manager (introduced by Story 1.2). They are also listed in
@@ -39,12 +42,36 @@ from .operations import (
 RBAC_MANAGED_OPERATIONS = {
     AssignRoleWorkspaceOperationType.type,
     ReadRoleAssignmentsWorkspaceOperationType.type,
+    GrantPageAccessOperationType.type,
+    RevokePageAccessOperationType.type,
+    ListPageGrantsOperationType.type,
 }
 
 
 class RbacPermissionManagerType(PermissionManagerType):
     type = "rbac"
     supported_actor_types = [UserSubjectType.type]
+
+    @staticmethod
+    def _get_page_id_from_context(context):
+        """Extract page_id from builder contexts without importing builder models.
+
+        Avoids a core → contrib/builder import cycle (layering violation).
+        """
+        if context is None:
+            return None
+        # Page itself — has .id but no .page FK
+        if hasattr(context, "id") and type(context).__name__ == "Page":
+            return context.id
+        # Page itself via page_id attribute (some serialized forms)
+        if hasattr(context, "page_id") and not hasattr(context, "page"):
+            return context.page_id
+        # DataSource, Element, WorkflowAction → have .page FK
+        if hasattr(context, "page") and hasattr(context.page, "id"):
+            return context.page.id
+        if hasattr(context, "page_id"):
+            return context.page_id
+        return None
 
     def _application_from_context(self, context):
         """Return the Application context (for database-scoped roles), else ``None``.
@@ -79,6 +106,19 @@ class RbacPermissionManagerType(PermissionManagerType):
             (user_id, application_id): role for user_id, application_id, role in rows
         }
 
+    def _build_page_grant_index(self, interface_only_actor_ids, workspace):
+        """Load all page grants for interface-only actors in one query.
+
+        Returns a set of (user_id, page_id) tuples.
+        """
+        if not interface_only_actor_ids:
+            return set()
+        rows = InterfaceCollaboratorPageGrant.objects.filter(
+            user_id__in=interface_only_actor_ids,
+            workspace=workspace,
+        ).values_list("user_id", "page_id")
+        return set(rows)
+
     @staticmethod
     def _effective_role_from_index(role_index, actor, application):
         """Resolve the effective role from the prefetched index (most-specific wins)."""
@@ -107,6 +147,22 @@ class RbacPermissionManagerType(PermissionManagerType):
         # check would issue 1-2 queries each — an N+1 on the security-critical permission
         # chain (the same path the recent permissions-endpoint perf work optimized).
         role_index = self._build_role_index(checks, workspace)
+
+        # Pre-identify interface-only actors so we can batch-load page grants once.
+        interface_only_actor_ids = {
+            getattr(check.actor, "id", None)
+            for check in checks
+            if self._effective_role_from_index(
+                role_index,
+                check.actor,
+                self._application_from_context(check.context),
+            )
+            == roles.INTERFACE_ONLY
+        } - {None}
+        page_grant_index = self._build_page_grant_index(
+            interface_only_actor_ids, workspace
+        )
+
         result = {}
 
         for check in checks:
@@ -122,6 +178,26 @@ class RbacPermissionManagerType(PermissionManagerType):
 
             if role is None:
                 # No assignment in scope — defer entirely to preserve pre-1.2 behavior.
+                continue
+
+            # Story 6.3: Interface-only collaborators are denied all database operations
+            # (prefix-based, robust against new op additions) and all builder ops not on
+            # a granted page. This block must appear before the Viewer/Commenter checks.
+            if role == roles.INTERFACE_ONLY:
+                if operation.startswith("database."):
+                    result[check] = RoleProhibitedError(check.actor)
+                    continue
+                # For builder page/element/data-source ops, enforce page grant.
+                page_id = self._get_page_id_from_context(check.context)
+                actor_id = getattr(check.actor, "id", None)
+                if page_id is not None:
+                    if (actor_id, page_id) in page_grant_index:
+                        result[check] = True
+                    else:
+                        result[check] = RoleProhibitedError(check.actor)
+                else:
+                    # Workspace-level ops (not page-scoped) → deny for interface-only.
+                    result[check] = RoleProhibitedError(check.actor)
                 continue
 
             # Story 1.3 deny side: read-scoped tiers are prohibited from the enumerated

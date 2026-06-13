@@ -1151,5 +1151,12 @@
   },
   "adminWorkspaces": {
     "title": "Workspaces"
+  },
+  "interfaceCollaboratorPageGrants": {
+    "title": "Granted App Pages",
+    "description": "Select which App Builder pages this collaborator can access.",
+    "noApps": "No App Builder applications found in this workspace.",
+    "grantAll": "Grant all",
+    "revokeAll": "Revoke all"
   }
 }

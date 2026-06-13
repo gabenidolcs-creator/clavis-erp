@@ -13,7 +13,13 @@ COMMENTER = "COMMENTER"
 EDITOR = "EDITOR"
 ADMIN = "ADMIN"
 
+# Interface-only is NOT a capability tier — it is orthogonal to the
+# VIEWER→COMMENTER→EDITOR→ADMIN ladder. It is absent from ROLE_ORDER so that
+# role_rank() and role_at_least() remain correct for the 4-tier ordering.
+INTERFACE_ONLY = "INTERFACE_ONLY"
+
 # Ordered from least to most capable. Index in this list == capability rank.
+# DO NOT add INTERFACE_ONLY here.
 ROLE_ORDER = [VIEWER, COMMENTER, EDITOR, ADMIN]
 
 ROLE_CHOICES = [
@@ -21,13 +27,14 @@ ROLE_CHOICES = [
     (COMMENTER, "Commenter"),
     (EDITOR, "Editor"),
     (ADMIN, "Admin"),
+    (INTERFACE_ONLY, "Interface Collaborator"),
 ]
 
-ALL_ROLES = [VIEWER, COMMENTER, EDITOR, ADMIN]
+ALL_ROLES = [VIEWER, COMMENTER, EDITOR, ADMIN, INTERFACE_ONLY]
 
 
 def is_valid_role(role: str) -> bool:
-    """Whether ``role`` is one of the four fixed tiers."""
+    """Whether ``role`` is one of the known roles (including interface-only)."""
 
     return role in ALL_ROLES
 

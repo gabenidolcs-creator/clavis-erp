@@ -21,3 +21,15 @@ class AssignRoleWorkspaceOperationType(RbacWorkspaceOperationType):
 
 class ReadRoleAssignmentsWorkspaceOperationType(RbacWorkspaceOperationType):
     type = "workspace.read_role_assignments"
+
+
+class GrantPageAccessOperationType(RbacWorkspaceOperationType):
+    type = "workspace.interface_only.grant_page_access"
+
+
+class RevokePageAccessOperationType(RbacWorkspaceOperationType):
+    type = "workspace.interface_only.revoke_page_access"
+
+
+class ListPageGrantsOperationType(RbacWorkspaceOperationType):
+    type = "workspace.interface_only.list_page_grants"

@@ -62,3 +62,26 @@ VIEWER_DENIED_OPS = frozenset(_STRUCTURAL_MUTATIONS | _COMMENT_WRITES)
 
 # Commenter: read + comment. Denied every structural mutation only.
 COMMENTER_DENIED_OPS = frozenset(_STRUCTURAL_MUTATIONS)
+
+# Interface-only: no database access at all. This frozenset is used in tests to
+# enumerate specific operations; the permission manager uses a prefix-based deny
+# (operation.startswith("database.")) for robustness against new op additions.
+INTERFACE_ONLY_DENIED_DATABASE_OPS = frozenset(
+    _STRUCTURAL_MUTATIONS
+    | _COMMENT_WRITES
+    | {
+        "database.table.list_rows",
+        "database.table.read_row",
+        "database.table.list_fields",
+        "database.table.list_views",
+        "database.table.list",
+        "database.read",
+        "database.list_tables",
+        "database.table.listen_to_all",
+        "database.table.row_comment.subscribe",
+        "database.table.row_comment.unsubscribe",
+        "database.table.view.create_comment",
+        "database.table.view.read_comment",
+        "database.table.view.list_comments",
+    }
+)

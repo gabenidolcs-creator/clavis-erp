@@ -47,6 +47,11 @@
           :workspace="workspace"
           @update-role="roleUpdate($event)"
         ></EditRoleContext>
+        <InterfaceCollaboratorPageGrants
+          v-if="editRoleMember.permissions === 'INTERFACE_ONLY'"
+          :workspace="workspace"
+          :member="editRoleMember"
+        ></InterfaceCollaboratorPageGrants>
       </template>
     </CrudTable>
     <WorkspaceMemberInviteModal
@@ -79,6 +84,7 @@ import MemberRoleField from '@baserow/modules/core/components/settings/members/M
 import WorkspaceMemberInviteModal from '@baserow/modules/core/components/workspace/WorkspaceMemberInviteModal'
 import EditMemberContext from '@baserow/modules/core/components/settings/members/EditMemberContext'
 import EditRoleContext from '@baserow/modules/core/components/settings/members/EditRoleContext'
+import InterfaceCollaboratorPageGrants from '@baserow/modules/core/components/settings/members/InterfaceCollaboratorPageGrants'
 
 export default {
   name: 'MembersTable',
@@ -87,6 +93,7 @@ export default {
     EditRoleContext,
     CrudTable,
     WorkspaceMemberInviteModal,
+    InterfaceCollaboratorPageGrants,
   },
   props: {
     workspace: {

@@ -45,7 +45,10 @@ from .operations import (
 )
 from .rbac.operations import (
     AssignRoleWorkspaceOperationType,
+    GrantPageAccessOperationType,
+    ListPageGrantsOperationType,
     ReadRoleAssignmentsWorkspaceOperationType,
+    RevokePageAccessOperationType,
 )
 from .registries import PermissionManagerType
 from .subjects import AnonymousUserSubjectType, UserSubjectType
@@ -312,6 +315,10 @@ class BasicPermissionManagerType(PermissionManagerType):
         # lockstep with RbacPermissionManagerType.RBAC_MANAGED_OPERATIONS.
         AssignRoleWorkspaceOperationType.type,
         ReadRoleAssignmentsWorkspaceOperationType.type,
+        # Story 6.3: page grant management ops — admin-only, same lockstep pattern.
+        GrantPageAccessOperationType.type,
+        RevokePageAccessOperationType.type,
+        ListPageGrantsOperationType.type,
         # Field edit-restriction management (Story 1.4): admin-only. Listed as a literal
         # string (not the OperationType.type attribute) because `baserow.core` must not
         # import `baserow.contrib.database` operation classes — a core→contrib layering

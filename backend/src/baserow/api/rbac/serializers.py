@@ -24,7 +24,7 @@ class AssignRoleSerializer(serializers.Serializer):
     )
     role = serializers.ChoiceField(
         choices=ALL_ROLES,
-        help_text="The fixed role tier (VIEWER / COMMENTER / EDITOR / ADMIN).",
+        help_text="The fixed role tier (VIEWER / COMMENTER / EDITOR / ADMIN / INTERFACE_ONLY).",
     )
     application_id = serializers.IntegerField(
         required=False,
@@ -33,4 +33,16 @@ class AssignRoleSerializer(serializers.Serializer):
             "Optional database/application id for a database-scoped assignment. When "
             "omitted the assignment is workspace-scoped."
         ),
+    )
+
+
+class InterfaceCollaboratorPageGrantSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField(read_only=True)
+    page_id = serializers.IntegerField(read_only=True)
+    workspace_id = serializers.IntegerField(read_only=True)
+
+
+class GrantPageAccessSerializer(serializers.Serializer):
+    page_id = serializers.IntegerField(
+        help_text="The id of the App Builder page to grant access to."
     )

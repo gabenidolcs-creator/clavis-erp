@@ -78,3 +78,35 @@ class RoleAssignment(CreatedAndUpdatedOnMixin, models.Model):
             else f"workspace={self.workspace_id}"
         )
         return f"<RoleAssignment user={self.user_id} role={self.role} {scope}>"
+
+
+class InterfaceCollaboratorPageGrant(models.Model):
+    """Grants an interface-only workspace member access to a specific App Builder Page.
+
+    Only users with ``RoleAssignment.role == INTERFACE_ONLY`` should have rows here.
+    The grant is workspace-scoped so the batch-load index can filter efficiently.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="interface_page_grants",
+    )
+    workspace = models.ForeignKey(
+        "core.Workspace",
+        on_delete=models.CASCADE,
+        related_name="interface_page_grants",
+    )
+    page = models.ForeignKey(
+        "builder.Page",
+        on_delete=models.CASCADE,
+        related_name="interface_page_grants",
+    )
+
+    class Meta:
+        app_label = "core"
+        unique_together = [["user", "page"]]
+        indexes = [models.Index(fields=["user", "workspace"])]
+
+    def __str__(self):
+        return f"<InterfaceCollaboratorPageGrant user={self.user_id} page={self.page_id}>"

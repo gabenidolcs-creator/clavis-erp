@@ -38,6 +38,7 @@ describe('RbacPermissionManagerType', () => {
       'ADMIN',
       'COMMENTER',
       'EDITOR',
+      'INTERFACE_ONLY',
       'VIEWER',
     ])
     for (const role of Object.values(roles)) {

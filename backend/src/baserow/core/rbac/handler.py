@@ -93,3 +93,35 @@ class RbacHandler:
         RoleAssignment.objects.filter(
             user=user, workspace=workspace, application=application
         ).delete()
+
+    # ------------------------------------------------------------------
+    # Interface-only page grant CRUD (Story 6.3)
+    # ------------------------------------------------------------------
+
+    def grant_page_access(self, user, workspace, page):
+        """Idempotently grant an interface-only collaborator access to a page."""
+        from .models import InterfaceCollaboratorPageGrant
+
+        grant, _ = InterfaceCollaboratorPageGrant.objects.get_or_create(
+            user=user,
+            page=page,
+            defaults={"workspace": workspace},
+        )
+        return grant
+
+    def revoke_page_access(self, user, page) -> None:
+        """Remove a page grant (no-op if absent)."""
+        from .models import InterfaceCollaboratorPageGrant
+
+        InterfaceCollaboratorPageGrant.objects.filter(user=user, page=page).delete()
+
+    def list_granted_pages(self, user, workspace):
+        """Return all page grants for an interface-only collaborator in a workspace."""
+        from .models import InterfaceCollaboratorPageGrant
+
+        return list(
+            InterfaceCollaboratorPageGrant.objects.filter(
+                user=user,
+                workspace=workspace,
+            ).select_related("page")
+        )

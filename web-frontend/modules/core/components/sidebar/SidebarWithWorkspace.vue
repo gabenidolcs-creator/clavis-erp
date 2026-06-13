@@ -18,7 +18,7 @@
           <li
             v-for="(
               applicationGroup, index
-            ) in groupedApplicationsForSelectedWorkspace"
+            ) in visibleApplicationGroups"
             :key="applicationGroup.type"
           >
             <div
@@ -26,7 +26,7 @@
               :class="{
                 'margin-bottom-2':
                   applicationGroup.applications.length === 0 &&
-                  index < groupedApplicationsForSelectedWorkspace.length - 1,
+                  index < visibleApplicationGroups.length - 1,
               }"
             >
               <div class="tree__heading-name">
@@ -83,7 +83,7 @@
               </component>
             </ul>
             <div
-              v-if="index < groupedApplicationsForSelectedWorkspace.length - 1"
+              v-if="index < visibleApplicationGroups.length - 1"
               class="tree__separator"
             ></div>
           </li>
@@ -122,6 +122,7 @@
 </template>
 
 <script>
+import { mapGetters } from 'vuex'
 import { notifyIf } from '@baserow/modules/core/utils/error'
 import CreateApplicationModal from '@baserow/modules/core/components/application/CreateApplicationModal'
 import CreateApplicationContext from '@baserow/modules/core/components/application/CreateApplicationContext'
@@ -140,6 +141,20 @@ export default {
     },
   },
   computed: {
+    ...mapGetters({ getUserId: 'auth/getUserId' }),
+    isInterfaceOnlyCollaborator() {
+      const users = this.selectedWorkspace?.users || []
+      const me = users.find((u) => u.user_id === this.getUserId)
+      return me?.permissions === 'INTERFACE_ONLY'
+    },
+    visibleApplicationGroups() {
+      if (!this.isInterfaceOnlyCollaborator) {
+        return this.groupedApplicationsForSelectedWorkspace
+      }
+      return this.groupedApplicationsForSelectedWorkspace.filter(
+        (group) => group.type === 'builder'
+      )
+    },
     /**
      * Because all the applications that belong to the user are in the store we will
      * filter on the selected workspace here.

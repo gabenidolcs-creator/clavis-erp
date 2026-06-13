@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-06
-last_updated: 2026-06-13T07:00:00Z
+last_updated: 2026-06-13T01:15:00Z
 project: clavis-erp
 project_key: NOKEY
 tracking_system: file-system
@@ -104,6 +104,6 @@ development_status:
   epic-6: in-progress
   6-1-row-comments-with-mentions: done
   6-2-comment-notifications: done
-  6-3-interface-only-collaborator-role: backlog
+  6-3-interface-only-collaborator-role: done
   6-4-security-release-gate-threat-model-role-combination-matrix: done
   epic-6-retrospective: optional

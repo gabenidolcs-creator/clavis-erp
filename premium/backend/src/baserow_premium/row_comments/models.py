@@ -42,6 +42,10 @@ class RowComment(
 
     class Meta:
         db_table = "database_rowcomment"
+        # managed=False: the core `database` app owns this table (creates/drops it).
+        # Premium adds its extra columns (trashed, mentions) via migrations only.
+        # Without this, Django syncdb tries to CREATE the table twice → DuplicateTable.
+        managed = False
         ordering = ("-created_on",)
         indexes = [models.Index(fields=["table", "row_id", "-created_on"])]
 

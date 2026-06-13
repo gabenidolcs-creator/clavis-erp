@@ -333,11 +333,18 @@ class CoreConfig(AppConfig):
         # Clean-room RBAC role-management operations (Story 1.2, Bucket A).
         from baserow.core.rbac.operations import (
             AssignRoleWorkspaceOperationType,
+            GrantPageAccessOperationType,
+            ListPageGrantsOperationType,
             ReadRoleAssignmentsWorkspaceOperationType,
+            RevokePageAccessOperationType,
         )
 
         operation_type_registry.register(AssignRoleWorkspaceOperationType())
         operation_type_registry.register(ReadRoleAssignmentsWorkspaceOperationType())
+        # Story 6.3 — interface-only page grant operations.
+        operation_type_registry.register(GrantPageAccessOperationType())
+        operation_type_registry.register(RevokePageAccessOperationType())
+        operation_type_registry.register(ListPageGrantsOperationType())
         operation_type_registry.register(UpdateApplicationOperationType())
         operation_type_registry.register(DuplicateApplicationOperationType())
         operation_type_registry.register(DeleteApplicationOperationType())

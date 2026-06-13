@@ -97,6 +97,10 @@ export class RbacPermissionManagerType extends PermissionManagerType {
         name: i18n.t('permission.rbacViewer'),
         description: i18n.t('permission.rbacViewerDescription'),
       },
+      INTERFACE_ONLY: {
+        name: i18n.t('permission.rbacInterfaceOnly'),
+        description: i18n.t('permission.rbacInterfaceOnlyDescription'),
+      },
     }
   }
 
