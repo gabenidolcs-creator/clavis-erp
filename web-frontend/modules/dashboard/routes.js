@@ -6,4 +6,9 @@ export const routes = [
     path: '/dashboard/:dashboardId',
     file: path.resolve(__dirname, 'pages/dashboard.vue'),
   },
+  {
+    name: 'public-dashboard',
+    path: '/public/dashboard/:slug',
+    file: path.resolve(__dirname, 'pages/publicDashboard.vue'),
+  },
 ]

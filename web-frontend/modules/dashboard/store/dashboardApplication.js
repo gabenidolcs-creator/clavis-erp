@@ -16,6 +16,8 @@ export const state = () => ({
   // returned as a result of dispatching
   // a data source. The keys are data source ids.
   data: {},
+  public: false,
+  slug: null,
 })
 
 let debouncedWidgetUpdate = null
@@ -30,6 +32,12 @@ export const mutations = {
     state.dataSources = []
     state.integrations = []
     state.data = {}
+    state.public = false
+    state.slug = null
+  },
+  SET_SHARING(state, { public: isPublic, slug }) {
+    state.public = isPublic
+    state.slug = slug
   },
   SET_DASHBOARD_ID(state, dashboardId) {
     state.dashboardId = dashboardId
@@ -84,6 +92,9 @@ export const mutations = {
 export const actions = {
   setLoading({ commit }, value) {
     commit('SET_LOADING', value)
+  },
+  setSharingState({ commit }, { dashboardId, public: isPublic, slug }) {
+    commit('SET_SHARING', { public: isPublic, slug })
   },
   reset({ commit }) {
     commit('RESET')

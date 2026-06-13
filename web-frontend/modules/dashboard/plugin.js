@@ -20,6 +20,10 @@ export default defineNuxtPlugin({
         'template/dashboardApplication',
         dashboardApplicationStore
       )
+      $store.registerModuleNuxtSafe(
+        'public/dashboardApplication',
+        dashboardApplicationStore
+      )
     }
 
     $registry.registerNamespace('dashboardWidget')
