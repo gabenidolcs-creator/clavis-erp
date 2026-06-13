@@ -1164,6 +1164,16 @@ class ChartElement(Element):
     )
 
 
+class MetricElement(Element):
+    data_source = models.ForeignKey(
+        "builder.DataSource",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Builder data source providing aggregate rows for metric rendering.",
+    )
+
+
 class SimpleContainerElement(ContainerElement):
     """
     A simple container to group elements

@@ -185,6 +185,7 @@ class BuilderConfig(AppConfig):
             InputTextElementType,
             LinkElementType,
             MenuElementType,
+            MetricElementType,
             RatingElementType,
             RatingInputElementType,
             RecordSelectorElementType,
@@ -217,6 +218,7 @@ class BuilderConfig(AppConfig):
         element_type_registry.register(MenuElementType())
         element_type_registry.register(SimpleContainerElementType())
         element_type_registry.register(ChartElementType())
+        element_type_registry.register(MetricElementType())
 
         from .domains.domain_types import CustomDomainType, SubDomainType
         from .domains.registries import domain_type_registry

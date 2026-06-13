@@ -147,6 +147,8 @@
     "menuDescription": "Menu element",
     "chart": "Chart",
     "chartDescription": "Display a bar, line, pie, doughnut, or scatter chart from a data source.",
+    "metric": "Metric",
+    "metricDescription": "Display a single aggregated value from a data source.",
     "simpleContainer": "Container",
     "simpleContainerDescription": "A container for other elements",
     "fileInput": "File input",
@@ -183,6 +185,13 @@
     "pie": "Pie",
     "doughnut": "Doughnut",
     "scatter": "Scatter"
+  },
+  "metricElement": {
+    "dataSourceError": "Data source misconfigured. Check the element settings.",
+    "noData": "No data to display."
+  },
+  "metricElementForm": {
+    "dataSource": "Data source"
   },
   "addElementButton": {
     "label": "Element"

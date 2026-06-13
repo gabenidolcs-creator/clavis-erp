@@ -97,6 +97,7 @@ import elementImageRatingInput from '@baserow/modules/builder/assets/icons/eleme
 import elementImageRating from '@baserow/modules/builder/assets/icons/element-rating.svg?url'
 import elementImageRecordSelector from '@baserow/modules/builder/assets/icons/element-record_selector.svg?url'
 import elementImageChart from '@baserow/modules/builder/assets/icons/element-chart.svg?url'
+import elementImageMetric from '@baserow/modules/builder/assets/icons/element-metric.svg?url'
 import elementImageRepeat from '@baserow/modules/builder/assets/icons/element-repeat.svg?url'
 import elementImageSimpleContainer from '@baserow/modules/builder/assets/icons/element-simple_container.svg?url'
 import elementImageTable from '@baserow/modules/builder/assets/icons/element-table.svg?url'
@@ -107,6 +108,8 @@ import _ from 'lodash'
 import { getValueAtPath } from '../core/utils/object'
 import ChartElement from '@baserow/modules/builder/components/elements/components/ChartElement'
 import ChartElementForm from '@baserow/modules/builder/components/elements/components/forms/general/ChartElementForm'
+import MetricElement from '@baserow/modules/builder/components/elements/components/MetricElement'
+import MetricElementForm from '@baserow/modules/builder/components/elements/components/forms/general/MetricElementForm'
 
 export class ElementType extends Registerable {
   get name() {
@@ -2789,6 +2792,42 @@ export class ChartElementType extends ElementType {
   getDefaultValues(page, context) {
     return {
       chart_type: 'bar',
+      data_source_id: null,
+    }
+  }
+}
+
+export class MetricElementType extends ElementType {
+  static getType() {
+    return 'metric'
+  }
+
+  get name() {
+    return this.app.i18n.t('elementType.metric')
+  }
+
+  get description() {
+    return this.app.i18n.t('elementType.metricDescription')
+  }
+
+  get iconClass() {
+    return 'iconoir-sigma-function'
+  }
+
+  get image() {
+    return elementImageMetric
+  }
+
+  get component() {
+    return MetricElement
+  }
+
+  get generalFormComponent() {
+    return MetricElementForm
+  }
+
+  getDefaultValues(page, context) {
+    return {
       data_source_id: null,
     }
   }

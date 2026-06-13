@@ -60,6 +60,7 @@ from baserow.contrib.builder.elements.models import (
     LinkElement,
     MenuElement,
     MenuItemElement,
+    MetricElement,
     NavigationElementMixin,
     RatingElement,
     RatingInputElement,
@@ -2556,5 +2557,31 @@ class ChartElementType(ElementType):
     def get_pytest_params(self, pytest_data_fixture):
         return {
             "chart_type": ChartElement.CHART_TYPE_BAR,
+            "data_source_id": None,
+        }
+
+
+class MetricElementType(ElementType):
+    type = "metric"
+    model_class = MetricElement
+    allowed_fields = ["data_source", "data_source_id"]
+    serializer_field_names = ["data_source_id"]
+    request_serializer_field_names = ["data_source_id"]
+
+    class SerializedDict(ElementDict):
+        data_source_id: int
+
+    @property
+    def serializer_field_overrides(self):
+        return {
+            "data_source_id": serializers.IntegerField(
+                allow_null=True,
+                default=None,
+                required=False,
+            ),
+        }
+
+    def get_pytest_params(self, pytest_data_fixture):
+        return {
             "data_source_id": None,
         }
