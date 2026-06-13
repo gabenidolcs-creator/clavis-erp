@@ -167,12 +167,7 @@ describe('FieldPermissionManagerType', () => {
     const permissions = { hidden_field_ids: [42] }
 
     expect(
-      type.hasPermission(
-        permissions,
-        'database.table.field.read',
-        { id: 7 },
-        1
-      )
+      type.hasPermission(permissions, 'database.table.field.read', { id: 7 }, 1)
     ).toBe(null)
   })
 

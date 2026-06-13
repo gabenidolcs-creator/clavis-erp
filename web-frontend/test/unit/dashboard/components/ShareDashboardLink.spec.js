@@ -1,9 +1,15 @@
 import { TestApp } from '@baserow/test/helpers/testApp'
 import ShareDashboardLink from '@baserow/modules/dashboard/components/ShareDashboardLink'
 
-const mockEnableSharing = vi.fn().mockResolvedValue({ data: { public: true, slug: 'abc123' } })
-const mockDisableSharing = vi.fn().mockResolvedValue({ data: { public: false, slug: 'abc123' } })
-const mockRotateSlug = vi.fn().mockResolvedValue({ data: { public: true, slug: 'newslug99' } })
+const mockEnableSharing = vi
+  .fn()
+  .mockResolvedValue({ data: { public: true, slug: 'abc123' } })
+const mockDisableSharing = vi
+  .fn()
+  .mockResolvedValue({ data: { public: false, slug: 'abc123' } })
+const mockRotateSlug = vi
+  .fn()
+  .mockResolvedValue({ data: { public: true, slug: 'newslug99' } })
 
 vi.mock('@baserow/modules/dashboard/services/share', () => ({
   default: () => ({
@@ -44,7 +50,10 @@ describe('ShareDashboardLink.vue', () => {
   }
 
   it('renders share URL correctly when dashboard.public=true', async () => {
-    const wrapper = await makeWrapper({ dashboardPublic: true, slug: 'test-slug' })
+    const wrapper = await makeWrapper({
+      dashboardPublic: true,
+      slug: 'test-slug',
+    })
     const input = wrapper.find('input[readonly]')
     expect(input.exists()).toBe(true)
     expect(input.element.value).toBe(

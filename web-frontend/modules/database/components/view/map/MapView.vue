@@ -44,8 +44,7 @@
 <script>
 import RowEditModal from '@baserow/modules/database/components/row/RowEditModal'
 
-const TILE_URL =
-  'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+const TILE_URL = 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 
 export default {
   name: 'MapView',

@@ -6,7 +6,12 @@
  * view.owned_by_id, userId, and the $hasPermission result.
  */
 
-function buildIsLockedForCurrentUser({ locked, ownedById, userId, hasPermission }) {
+function buildIsLockedForCurrentUser({
+  locked,
+  ownedById,
+  userId,
+  hasPermission,
+}) {
   // Replicate the computed property from ViewsContextItem.vue
   const view = { locked, owned_by_id: ownedById }
   const database = { workspace: { id: 1 } }
@@ -17,7 +22,14 @@ function buildIsLockedForCurrentUser({ locked, ownedById, userId, hasPermission 
   if (!view.locked) return false
   const resolvedUserId = $store.getters['auth/getUserId']
   if (view.owned_by_id === resolvedUserId) return false
-  if ($hasPermission('database.table.view.update_locked_config', view, database.workspace.id)) return false
+  if (
+    $hasPermission(
+      'database.table.view.update_locked_config',
+      view,
+      database.workspace.id
+    )
+  )
+    return false
   return true
 }
 

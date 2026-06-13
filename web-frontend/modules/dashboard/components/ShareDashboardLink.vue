@@ -10,7 +10,11 @@
         @input="toggleSharing"
       />
       <span v-else>
-        {{ dashboard.public ? $t('shareDashboardLink.enabled') : $t('shareDashboardLink.disabled') }}
+        {{
+          dashboard.public
+            ? $t('shareDashboardLink.enabled')
+            : $t('shareDashboardLink.disabled')
+        }}
       </span>
     </div>
 
@@ -73,7 +77,9 @@ export default {
     async toggleSharing() {
       const { $client } = this
       try {
-        const action = this.dashboard.public ? 'disableSharing' : 'enableSharing'
+        const action = this.dashboard.public
+          ? 'disableSharing'
+          : 'enableSharing'
         const { data } = await ShareService($client)[action](this.dashboard.id)
         this.$emit('sharing-changed', data)
       } catch (error) {

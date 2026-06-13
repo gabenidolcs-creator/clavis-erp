@@ -129,9 +129,7 @@ export default {
       return this.$store.getters['table/getLoading']
     },
     textFields() {
-      return this.fields.filter((f) =>
-        ['text', 'long_text'].includes(f.type)
-      )
+      return this.fields.filter((f) => ['text', 'long_text'].includes(f.type))
     },
     numericFields() {
       return this.fields.filter((f) => f.type === 'number')

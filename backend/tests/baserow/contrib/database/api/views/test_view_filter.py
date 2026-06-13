@@ -12,7 +12,11 @@ from rest_framework.status import (
 from baserow.contrib.database.fields.handler import FieldHandler
 from baserow.contrib.database.rows.handler import RowHandler
 from baserow.contrib.database.views.handler import ViewHandler
-from baserow.contrib.database.views.models import OWNERSHIP_TYPE_PERSONAL, ViewFilter, ViewFilterGroup
+from baserow.contrib.database.views.models import (
+    OWNERSHIP_TYPE_PERSONAL,
+    ViewFilter,
+    ViewFilterGroup,
+)
 from baserow.contrib.database.views.registries import (
     view_filter_type_registry,
     view_type_registry,

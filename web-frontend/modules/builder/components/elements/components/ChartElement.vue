@@ -37,10 +37,12 @@ export default {
       const content = this.$store.getters['elementContent/getElementContent'](
         this.element
       )
-      return !!(content?._error)
+      return !!content?._error
     },
     hasData() {
-      return Array.isArray(this.elementContent) && this.elementContent.length > 0
+      return (
+        Array.isArray(this.elementContent) && this.elementContent.length > 0
+      )
     },
     chartOption() {
       const result = this.elementContent

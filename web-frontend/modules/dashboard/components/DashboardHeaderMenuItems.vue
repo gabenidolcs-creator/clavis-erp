@@ -20,7 +20,11 @@
         }}</span>
       </a>
     </li>
-    <Modal v-if="canEdit" :open="showShareModal" @close="showShareModal = false">
+    <Modal
+      v-if="canEdit"
+      :open="showShareModal"
+      @close="showShareModal = false"
+    >
       <template #content>
         <ShareDashboardLink
           :dashboard="localDashboard"

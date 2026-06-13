@@ -334,11 +334,14 @@ export default {
           this.startDateField,
           this.endDateField
         )
-        const isMilestone = start.format('YYYY-MM-DD') === end.format('YYYY-MM-DD')
+        const isMilestone =
+          start.format('YYYY-MM-DD') === end.format('YYYY-MM-DD')
         const classes = []
         if (isMilestone) classes.push('gantt-view__milestone')
-        if (this.criticalTaskIds.includes(row.id)) classes.push('gantt-view__critical')
-        if (this.conflictTaskIds.includes(row.id)) classes.push('gantt-view__conflict')
+        if (this.criticalTaskIds.includes(row.id))
+          classes.push('gantt-view__critical')
+        if (this.conflictTaskIds.includes(row.id))
+          classes.push('gantt-view__conflict')
         return {
           id: String(row.id),
           name: this.rowName(row),
@@ -387,10 +390,14 @@ export default {
       ]
     },
     criticalTaskIds() {
-      return this.$store.getters[`${this.storePrefix}view/gantt/criticalTaskIds`]
+      return this.$store.getters[
+        `${this.storePrefix}view/gantt/criticalTaskIds`
+      ]
     },
     conflictTaskIds() {
-      return this.$store.getters[`${this.storePrefix}view/gantt/conflictTaskIds`]
+      return this.$store.getters[
+        `${this.storePrefix}view/gantt/conflictTaskIds`
+      ]
     },
     /**
      * The row whose modal is currently open (the picker target), or null.

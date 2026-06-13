@@ -17,7 +17,8 @@ function buildErrorState(statusCode) {
 
   const translations = {
     'publicViewAuthLogin.error.incorrectPasswordTitle': 'Incorrect password',
-    'publicViewAuthLogin.error.incorrectPasswordText': 'The provided password is incorrect.',
+    'publicViewAuthLogin.error.incorrectPasswordText':
+      'The provided password is incorrect.',
     'publicViewAuthLogin.error.rateLimitTitle': 'Too many attempts',
     'publicViewAuthLogin.error.rateLimitText':
       'Too many password attempts have been made. Please wait a minute before trying again.',

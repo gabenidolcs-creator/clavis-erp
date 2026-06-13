@@ -1,7 +1,5 @@
 import { TestApp } from '@baserow/test/helpers/testApp'
-import {
-  CurrencyFieldType,
-} from '@baserow/modules/database/fieldTypes'
+import { CurrencyFieldType } from '@baserow/modules/database/fieldTypes'
 import FieldCurrencySubForm from '@baserow/modules/database/components/field/FieldCurrencySubForm'
 
 describe('CurrencyFieldType', () => {

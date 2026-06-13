@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-06
-last_updated: 2026-06-12T20:18:00Z
+last_updated: 2026-06-12T20:26:00Z
 project: clavis-erp
 project_key: NOKEY
 tracking_system: file-system
@@ -96,7 +96,7 @@ development_status:
   epic-5: in-progress
   5-1-chart-element: done
   5-2-metric-element: done
-  5-3-kanban-calendar-timeline-embed-elements: backlog
+  5-3-kanban-calendar-timeline-embed-elements: done
   5-4-record-review-layout-element: backlog
   epic-5-retrospective: optional
 

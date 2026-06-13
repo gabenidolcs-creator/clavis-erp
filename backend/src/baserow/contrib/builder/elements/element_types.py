@@ -70,6 +70,7 @@ from baserow.contrib.builder.elements.models import (
     TableElement,
     TextElement,
     VerticalAlignments,
+    ViewEmbedElement,
     get_default_table_orientation,
 )
 from baserow.contrib.builder.elements.registries import (
@@ -2584,4 +2585,30 @@ class MetricElementType(ElementType):
     def get_pytest_params(self, pytest_data_fixture):
         return {
             "data_source_id": None,
+        }
+
+
+class ViewEmbedElementType(ElementType):
+    type = "view_embed"
+    model_class = ViewEmbedElement
+    allowed_fields = ["view", "view_id"]
+    serializer_field_names = ["view_id"]
+    request_serializer_field_names = ["view_id"]
+
+    class SerializedDict(ElementDict):
+        view_id: int
+
+    @property
+    def serializer_field_overrides(self):
+        return {
+            "view_id": serializers.IntegerField(
+                allow_null=True,
+                default=None,
+                required=False,
+            ),
+        }
+
+    def get_pytest_params(self, pytest_data_fixture):
+        return {
+            "view_id": None,
         }

@@ -8,7 +8,11 @@ const baseElement = {
   _: { content: null, hasNextPage: false },
 }
 
-const mountEl = (element = baseElement, getterContent = null, dataSource = baseDataSource) => {
+const mountEl = (
+  element = baseElement,
+  getterContent = null,
+  dataSource = baseDataSource
+) => {
   const mockGetResult = vi.fn((ds, content) => String(content.result))
   const mockStore = {
     getters: {

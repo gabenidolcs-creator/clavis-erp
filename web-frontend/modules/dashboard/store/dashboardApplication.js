@@ -245,7 +245,9 @@ export const actions = {
     if (!tableInvalidationDebouncers[tableId]) {
       tableInvalidationDebouncers[tableId] = debounce(async (id) => {
         const affected = state.dataSources.filter((ds) => ds.table_id === id)
-        await Promise.all(affected.map((ds) => dispatch('dispatchDataSource', ds.id)))
+        await Promise.all(
+          affected.map((ds) => dispatch('dispatchDataSource', ds.id))
+        )
         delete tableInvalidationDebouncers[id]
       }, 500)
     }

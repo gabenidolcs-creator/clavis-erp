@@ -3,7 +3,10 @@
     <p v-if="displayValue !== null" class="metric-element__value">
       {{ displayValue }}
     </p>
-    <p v-else-if="elementContent && elementContent._error" class="metric-element__error">
+    <p
+      v-else-if="elementContent && elementContent._error"
+      class="metric-element__error"
+    >
       {{ $t('metricElement.dataSourceError') }}
     </p>
     <p v-else class="metric-element__empty">
@@ -29,7 +32,7 @@ export default {
     },
     misconfigured() {
       const content = this.elementContent
-      return !!(content?._error) || !this.element.data_source_id
+      return !!content?._error || !this.element.data_source_id
     },
     dataSource() {
       if (!this.element.data_source_id) return null

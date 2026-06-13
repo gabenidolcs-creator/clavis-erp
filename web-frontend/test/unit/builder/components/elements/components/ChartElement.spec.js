@@ -3,18 +3,15 @@ import { mountSuspended } from '@nuxt/test-utils/runtime'
 import ChartElement from '@baserow/modules/builder/components/elements/components/ChartElement.vue'
 
 // Mock BaseChart to avoid lazy-loading ECharts in tests
-vi.mock(
-  '@baserow/modules/dashboard/components/chart/BaseChart',
-  () => ({
-    default: {
-      name: 'BaseChart',
-      props: ['option', 'type'],
-      render() {
-        return h('div', { class: 'base-chart-stub' })
-      },
+vi.mock('@baserow/modules/dashboard/components/chart/BaseChart', () => ({
+  default: {
+    name: 'BaseChart',
+    props: ['option', 'type'],
+    render() {
+      return h('div', { class: 'base-chart-stub' })
     },
-  })
-)
+  },
+}))
 
 const baseElement = {
   chart_type: 'bar',
@@ -67,7 +64,10 @@ describe('ChartElement', () => {
       { category: 'Q1', value: 100, series: null },
       { category: 'Q2', value: 200, series: null },
     ]
-    const wrapper = await mountEl({ ...baseElement, chart_type: 'bar' }, content)
+    const wrapper = await mountEl(
+      { ...baseElement, chart_type: 'bar' },
+      content
+    )
     const option = wrapper.vm.chartOption
     expect(option.xAxis.type).toBe('category')
     expect(option.xAxis.data).toEqual(['Q1', 'Q2'])
@@ -80,7 +80,10 @@ describe('ChartElement', () => {
       { category: 'A', value: 50, series: null },
       { category: 'B', value: 50, series: null },
     ]
-    const wrapper = await mountEl({ ...baseElement, chart_type: 'doughnut' }, content)
+    const wrapper = await mountEl(
+      { ...baseElement, chart_type: 'doughnut' },
+      content
+    )
     const option = wrapper.vm.chartOption
     expect(option.series[0].type).toBe('pie')
     expect(option.series[0].radius).toEqual(['40%', '70%'])

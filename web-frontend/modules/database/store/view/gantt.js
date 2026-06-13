@@ -142,13 +142,14 @@ export const actions = {
     { commit },
     { viewId, predecessorRowId, newStart, newEnd }
   ) {
-    const { data } = await GanttService(
-      this.$client
-    ).rescheduleCascadePreview(viewId, {
-      predecessorRowId,
-      newStart,
-      newEnd,
-    })
+    const { data } = await GanttService(this.$client).rescheduleCascadePreview(
+      viewId,
+      {
+        predecessorRowId,
+        newStart,
+        newEnd,
+      }
+    )
     return data
   },
   /**

@@ -7,17 +7,11 @@
       <div class="dashboard-app__content">
         <div class="dashboard-app__content-header">
           <div class="dashboard-app__title">{{ dashboard.name }}</div>
-          <div
-            v-if="dashboard.description"
-            class="dashboard-app__description"
-          >
+          <div v-if="dashboard.description" class="dashboard-app__description">
             {{ dashboard.description }}
           </div>
         </div>
-        <WidgetBoard
-          :dashboard="dashboard"
-          store-prefix="public/"
-        />
+        <WidgetBoard :dashboard="dashboard" store-prefix="public/" />
       </div>
     </template>
   </div>
@@ -46,7 +40,8 @@ const { data: pageData } = await useAsyncData(
   async () => {
     try {
       const slug = route.params.slug
-      const { data } = await PublicDashboardService($client).getPublicDashboard(slug)
+      const { data } =
+        await PublicDashboardService($client).getPublicDashboard(slug)
 
       await $store.dispatch('public/dashboardApplication/reset')
 

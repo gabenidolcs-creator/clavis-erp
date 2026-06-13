@@ -52,7 +52,9 @@
           <DropdownItem
             :name="$t('groupedAggregateRowsDataSourceForm.notSelected')"
             :value="null"
-            >{{ $t('groupedAggregateRowsDataSourceForm.notSelected') }}</DropdownItem
+            >{{
+              $t('groupedAggregateRowsDataSourceForm.notSelected')
+            }}</DropdownItem
           >
           <DropdownItem
             v-for="view in tableViews"
@@ -110,7 +112,11 @@
         </Dropdown>
       </FormGroup>
       <FormGroup
-        v-if="values.table_id && !fieldHasErrors('table_id') && values.aggregation_type !== 'count'"
+        v-if="
+          values.table_id &&
+          !fieldHasErrors('table_id') &&
+          values.aggregation_type !== 'count'
+        "
         class="margin-bottom-2"
         small-label
         :label="$t('groupedAggregateRowsDataSourceForm.valueFieldLabel')"
@@ -273,7 +279,9 @@ export default {
     },
     aggregationTypeChoices() {
       return {
-        count: this.$t('groupedAggregateRowsDataSourceForm.aggregationTypes.count'),
+        count: this.$t(
+          'groupedAggregateRowsDataSourceForm.aggregationTypes.count'
+        ),
         sum: this.$t('groupedAggregateRowsDataSourceForm.aggregationTypes.sum'),
         avg: this.$t('groupedAggregateRowsDataSourceForm.aggregationTypes.avg'),
         min: this.$t('groupedAggregateRowsDataSourceForm.aggregationTypes.min'),

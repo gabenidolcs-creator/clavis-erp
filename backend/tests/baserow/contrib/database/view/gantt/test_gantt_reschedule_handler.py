@@ -2,12 +2,11 @@ from datetime import date
 
 import pytest
 
+from baserow.contrib.database.action.scopes import TableActionScopeType
 from baserow.contrib.database.rows.actions import UpdateRowsActionType
 from baserow.contrib.database.views.gantt.handler import TaskDependencyHandler
 from baserow.contrib.database.views.gantt.models import TaskDependency
 from baserow.core.action.handler import ActionHandler
-from baserow.core.action.registries import action_type_registry
-from baserow.contrib.database.action.scopes import TableActionScopeType
 
 
 def _setup(data_fixture, date_include_time=False, session_id="session-id"):

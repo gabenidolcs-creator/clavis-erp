@@ -429,7 +429,9 @@ export class LocalBaserowGroupedAggregateRowsServiceType extends DataSourceLocal
   }
 
   get description() {
-    return this.app.$i18n.t('serviceType.localBaserowGroupedAggregateRowsDescription')
+    return this.app.$i18n.t(
+      'serviceType.localBaserowGroupedAggregateRowsDescription'
+    )
   }
 
   get formComponent() {

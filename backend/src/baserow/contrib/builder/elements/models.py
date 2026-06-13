@@ -1174,6 +1174,16 @@ class MetricElement(Element):
     )
 
 
+class ViewEmbedElement(Element):
+    view = models.ForeignKey(
+        "database.View",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="builder_embeds",
+    )
+
+
 class SimpleContainerElement(ContainerElement):
     """
     A simple container to group elements

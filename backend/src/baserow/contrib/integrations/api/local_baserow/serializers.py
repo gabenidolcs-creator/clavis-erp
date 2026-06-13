@@ -8,7 +8,7 @@ from baserow.contrib.database.views.models import View
 class LocalBaserowViewSerializer(serializers.ModelSerializer):
     class Meta:
         model = View
-        fields = ("id", "table_id", "name")
+        fields = ("id", "table_id", "name", "type")
 
 
 class LocalBaserowTableSerializer(serializers.ModelSerializer):

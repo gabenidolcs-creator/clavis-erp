@@ -34,9 +34,7 @@ describe('Map view store', () => {
     })
 
     test('replaces existing pin when row_id already in pins', async () => {
-      await store.commit('map/SET_PINS', [
-        { row_id: 5, lat: 1.0, lng: 2.0 },
-      ])
+      await store.commit('map/SET_PINS', [{ row_id: 5, lat: 1.0, lng: 2.0 }])
 
       await store.dispatch('map/pinUpdated', { rowId: 5, lat: 10.0, lng: 20.0 })
 
@@ -88,17 +86,19 @@ describe('Map view store', () => {
 
   describe('fetchRows', () => {
     test('loads pins and unresolvable from API response', async () => {
-      testApp.mock
-        .onGet('/database/views/map/1/rows/')
-        .reply(200, {
-          pins: [{ row_id: 1, lat: 10.0, lng: 20.0 }],
-          unresolvable: [{ row_id: 2, address: 'unknown' }],
-        })
+      testApp.mock.onGet('/database/views/map/1/rows/').reply(200, {
+        pins: [{ row_id: 1, lat: 10.0, lng: 20.0 }],
+        unresolvable: [{ row_id: 2, address: 'unknown' }],
+      })
 
       await store.dispatch('map/fetchRows', { viewId: 1 })
 
       expect(store.getters['map/getPins']).toHaveLength(1)
-      expect(store.getters['map/getPins'][0]).toEqual({ row_id: 1, lat: 10.0, lng: 20.0 })
+      expect(store.getters['map/getPins'][0]).toEqual({
+        row_id: 1,
+        lat: 10.0,
+        lng: 20.0,
+      })
       expect(store.getters['map/getUnresolvable']).toHaveLength(1)
       expect(store.getters['map/getUnresolvable'][0].row_id).toBe(2)
     })
@@ -124,9 +124,7 @@ describe('Map view store', () => {
     })
 
     test('handles empty pins and unresolvable fields in response', async () => {
-      testApp.mock
-        .onGet('/database/views/map/4/rows/')
-        .reply(200, {})
+      testApp.mock.onGet('/database/views/map/4/rows/').reply(200, {})
 
       await store.dispatch('map/fetchRows', { viewId: 4 })
 

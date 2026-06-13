@@ -149,6 +149,8 @@
     "chartDescription": "Display a bar, line, pie, doughnut, or scatter chart from a data source.",
     "metric": "Metric",
     "metricDescription": "Display a single aggregated value from a data source.",
+    "viewEmbed": "View Embed",
+    "viewEmbedDescription": "Embed a Kanban, Calendar, or Timeline view on the page.",
     "simpleContainer": "Container",
     "simpleContainerDescription": "A container for other elements",
     "fileInput": "File input",
@@ -192,6 +194,15 @@
   },
   "metricElementForm": {
     "dataSource": "Data source"
+  },
+  "viewEmbedElement": {
+    "loading": "Loading view…",
+    "fetchError": "Could not load view data.",
+    "notConfigured": "This view is not fully configured. Please ensure the required grouping/date fields are set."
+  },
+  "viewEmbedElementForm": {
+    "databaseLabel": "Database",
+    "viewLabel": "View"
   },
   "addElementButton": {
     "label": "Element"

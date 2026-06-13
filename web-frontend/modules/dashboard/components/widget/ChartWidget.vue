@@ -148,7 +148,7 @@ export default {
       }
     },
     dataSourceMisconfigured() {
-      return !!(this.dataForDataSource?._error)
+      return !!this.dataForDataSource?._error
     },
   },
 }

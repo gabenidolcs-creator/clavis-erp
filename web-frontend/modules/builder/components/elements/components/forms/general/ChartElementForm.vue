@@ -20,10 +20,7 @@
       small-label
       class="margin-bottom-2"
     >
-      <DataSourceDropdown
-        v-model="values.data_source_id"
-        small
-      />
+      <DataSourceDropdown v-model="values.data_source_id" small />
     </FormGroup>
   </form>
 </template>

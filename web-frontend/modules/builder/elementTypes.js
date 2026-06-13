@@ -98,6 +98,7 @@ import elementImageRating from '@baserow/modules/builder/assets/icons/element-ra
 import elementImageRecordSelector from '@baserow/modules/builder/assets/icons/element-record_selector.svg?url'
 import elementImageChart from '@baserow/modules/builder/assets/icons/element-chart.svg?url'
 import elementImageMetric from '@baserow/modules/builder/assets/icons/element-metric.svg?url'
+import elementImageViewEmbed from '@baserow/modules/builder/assets/icons/element-view-embed.svg?url'
 import elementImageRepeat from '@baserow/modules/builder/assets/icons/element-repeat.svg?url'
 import elementImageSimpleContainer from '@baserow/modules/builder/assets/icons/element-simple_container.svg?url'
 import elementImageTable from '@baserow/modules/builder/assets/icons/element-table.svg?url'
@@ -110,6 +111,8 @@ import ChartElement from '@baserow/modules/builder/components/elements/component
 import ChartElementForm from '@baserow/modules/builder/components/elements/components/forms/general/ChartElementForm'
 import MetricElement from '@baserow/modules/builder/components/elements/components/MetricElement'
 import MetricElementForm from '@baserow/modules/builder/components/elements/components/forms/general/MetricElementForm'
+import ViewEmbedElement from '@baserow/modules/builder/components/elements/components/ViewEmbedElement'
+import ViewEmbedElementForm from '@baserow/modules/builder/components/elements/components/forms/general/ViewEmbedElementForm'
 
 export class ElementType extends Registerable {
   get name() {
@@ -2829,6 +2832,46 @@ export class MetricElementType extends ElementType {
   getDefaultValues(page, context) {
     return {
       data_source_id: null,
+    }
+  }
+}
+
+export class ViewEmbedElementType extends ElementType {
+  static getType() {
+    return 'view_embed'
+  }
+
+  get name() {
+    return this.app.i18n.t('elementType.viewEmbed')
+  }
+
+  get description() {
+    return this.app.i18n.t('elementType.viewEmbedDescription')
+  }
+
+  get iconClass() {
+    return 'iconoir-kanban'
+  }
+
+  get image() {
+    return elementImageViewEmbed
+  }
+
+  get component() {
+    return ViewEmbedElement
+  }
+
+  get editComponent() {
+    return ViewEmbedElement
+  }
+
+  get generalFormComponent() {
+    return ViewEmbedElementForm
+  }
+
+  getDefaultValues(page, context) {
+    return {
+      view_id: null,
     }
   }
 }

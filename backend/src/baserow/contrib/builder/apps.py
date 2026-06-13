@@ -193,6 +193,7 @@ class BuilderConfig(AppConfig):
             SimpleContainerElementType,
             TableElementType,
             TextElementType,
+            ViewEmbedElementType,
         )
         from .elements.registries import element_type_registry
 
@@ -219,6 +220,7 @@ class BuilderConfig(AppConfig):
         element_type_registry.register(SimpleContainerElementType())
         element_type_registry.register(ChartElementType())
         element_type_registry.register(MetricElementType())
+        element_type_registry.register(ViewEmbedElementType())
 
         from .domains.domain_types import CustomDomainType, SubDomainType
         from .domains.registries import domain_type_registry

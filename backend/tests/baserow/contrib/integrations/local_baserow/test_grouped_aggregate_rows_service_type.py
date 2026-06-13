@@ -9,7 +9,9 @@ from baserow.contrib.integrations.local_baserow.service_types import (
     LocalBaserowGroupedAggregateRowsServiceType,
 )
 from baserow.core.rbac.handler import RbacHandler
-from baserow.core.services.exceptions import ServiceImproperlyConfiguredDispatchException
+from baserow.core.services.exceptions import (
+    ServiceImproperlyConfiguredDispatchException,
+)
 from baserow.test_utils.pytest_conftest import FakeDispatchContext
 
 

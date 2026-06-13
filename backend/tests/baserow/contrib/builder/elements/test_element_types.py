@@ -20,7 +20,6 @@ from baserow.contrib.builder.data_sources.builder_dispatch_context import (
 )
 from baserow.contrib.builder.elements.element_types import (
     ButtonElementType,
-    ChartElementType,
     CheckboxElementType,
     ChoiceElementType,
     ColumnElementType,

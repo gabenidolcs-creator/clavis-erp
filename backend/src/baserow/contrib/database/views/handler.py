@@ -872,9 +872,10 @@ class ViewHandler(metaclass=baserow_trace_methods(tracer)):
             return
         if view.owned_by_id is not None and getattr(user, "id", None) == view.owned_by_id:
             return
-        from .operations import UpdateLockedViewConfigOperationType
-        from .exceptions import ViewIsLockedException
         from baserow.core.exceptions import PermissionException
+
+        from .exceptions import ViewIsLockedException
+        from .operations import UpdateLockedViewConfigOperationType
 
         workspace = view.table.database.workspace
         try:

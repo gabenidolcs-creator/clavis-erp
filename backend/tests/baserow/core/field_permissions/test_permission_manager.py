@@ -10,14 +10,13 @@ from django.conf import settings
 
 import pytest
 
-from baserow.contrib.database.fields.models import FieldPermission
+from baserow.contrib.database.fields.models import Field, FieldPermission
 from baserow.contrib.database.fields.operations import (
     ReadFieldOperationType,
     UpdateFieldOperationType,
     UpdateFieldPermissionOperationType,
     WriteFieldValuesOperationType,
 )
-from baserow.contrib.database.fields.models import Field
 from baserow.core.exceptions import (
     FieldEditProhibitedError,
     FieldVisibilityProhibitedError,

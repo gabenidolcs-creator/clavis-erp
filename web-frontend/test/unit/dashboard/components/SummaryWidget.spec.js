@@ -53,7 +53,12 @@ describe('SummaryWidget.vue', () => {
     const dataSourceId = 99
     const wrapper = await testApp.mount(SummaryWidget, {
       props: {
-        widget: { id: 1, data_source_id: dataSourceId, title: 'M', description: '' },
+        widget: {
+          id: 1,
+          data_source_id: dataSourceId,
+          title: 'M',
+          description: '',
+        },
         dashboard: { id: 10 },
         loading: false,
       },
@@ -81,7 +86,9 @@ describe('SummaryWidget.vue', () => {
   })
 
   it('shows misconfigured badge when data has _error', async () => {
-    const wrapper = await makeWrapper({ storeData: { _error: 'Something failed' } })
+    const wrapper = await makeWrapper({
+      storeData: { _error: 'Something failed' },
+    })
     const badge = wrapper.findComponent({ name: 'Badge' })
     expect(badge.exists()).toBe(true)
     expect(badge.props('color')).toBe('red')
@@ -110,7 +117,10 @@ describe('SummaryWidget.vue', () => {
             getters: {
               'dashboardApplication/getDataSourceById': (id) => {
                 if (id === summarySourceId) {
-                  return { id: summarySourceId, type: 'local_baserow_aggregate_rows' }
+                  return {
+                    id: summarySourceId,
+                    type: 'local_baserow_aggregate_rows',
+                  }
                 }
                 if (id === chartSourceId) {
                   return {

@@ -43,15 +43,10 @@ export default {
     // Lazy-load ECharts — do NOT import at module level (bundle budget ≤400KB gzip SM-C3)
     const { default: VChart } = await import('vue-echarts')
     const { use } = await import('echarts/core')
-    const { BarChart, LineChart, PieChart, ScatterChart } = await import(
-      'echarts/charts'
-    )
-    const {
-      GridComponent,
-      TooltipComponent,
-      LegendComponent,
-      TitleComponent,
-    } = await import('echarts/components')
+    const { BarChart, LineChart, PieChart, ScatterChart } =
+      await import('echarts/charts')
+    const { GridComponent, TooltipComponent, LegendComponent, TitleComponent } =
+      await import('echarts/components')
     const { CanvasRenderer } = await import('echarts/renderers')
 
     // use() must be called before VChart renders; calling after mount silently fails

@@ -17,7 +17,9 @@ describe('AutonumberFieldType', () => {
   })
 
   test('getIconClass returns iconoir-numbered-list-left', () => {
-    expect(AutonumberFieldType.getIconClass()).toBe('iconoir-numbered-list-left')
+    expect(AutonumberFieldType.getIconClass()).toBe(
+      'iconoir-numbered-list-left'
+    )
   })
 
   test('isReadOnlyField returns true', () => {

@@ -15,7 +15,7 @@ from unittest.mock import patch
 from django.urls import reverse
 
 import pytest
-from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
+from rest_framework.status import HTTP_200_OK
 
 from baserow.contrib.database.fields.field_permission_handler import (
     FieldPermissionHandler,
