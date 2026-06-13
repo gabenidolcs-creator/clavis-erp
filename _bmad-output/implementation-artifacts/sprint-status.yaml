@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-06
-last_updated: 2026-06-12T07:30:00Z
+last_updated: 2026-06-12T12:24:00Z
 project: clavis-erp
 project_key: NOKEY
 tracking_system: file-system
@@ -87,7 +87,7 @@ development_status:
   4-1-charting-foundation-shared-lazy-loaded: done
   4-2-grouped-aggregate-data-source: done
   4-3-chart-widgets-bar-and-pie-doughnut-clean-room: done
-  4-4-chart-widgets-line-and-scatter: backlog
+  4-4-chart-widgets-line-and-scatter: in-progress
   4-5-metric-widget-non-regression: backlog
   4-6-dashboard-public-share-with-least-privilege-principal: backlog
   epic-4-retrospective: optional
@@ -101,9 +101,9 @@ development_status:
   epic-5-retrospective: optional
 
   # Epic 6: Collaboration & Client Access
-  epic-6: backlog
+  epic-6: in-progress
   6-1-row-comments-with-mentions: backlog
   6-2-comment-notifications: backlog
   6-3-interface-only-collaborator-role: backlog
-  6-4-security-release-gate-threat-model-role-combination-matrix: backlog
+  6-4-security-release-gate-threat-model-role-combination-matrix: done
   epic-6-retrospective: optional
