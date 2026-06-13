@@ -72,5 +72,11 @@
   },
   "doughnutChartWidget": {
     "name": "Doughnut chart"
+  },
+  "lineChartWidget": {
+    "name": "Line"
+  },
+  "scatterChartWidget": {
+    "name": "Scatter"
   }
 }

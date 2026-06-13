@@ -105,10 +105,14 @@ class ChartWidget(Widget):
     CHART_TYPE_BAR = "bar"
     CHART_TYPE_PIE = "pie"
     CHART_TYPE_DOUGHNUT = "doughnut"
+    CHART_TYPE_LINE = "line"
+    CHART_TYPE_SCATTER = "scatter"
     CHART_TYPE_CHOICES = [
         (CHART_TYPE_BAR, "Bar"),
         (CHART_TYPE_PIE, "Pie"),
         (CHART_TYPE_DOUGHNUT, "Doughnut"),
+        (CHART_TYPE_LINE, "Line"),
+        (CHART_TYPE_SCATTER, "Scatter"),
     ]
     chart_type = models.CharField(
         max_length=32,

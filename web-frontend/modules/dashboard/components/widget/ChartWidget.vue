@@ -108,6 +108,32 @@ export default {
           series: [{ type: 'bar', data: result.map((r) => r.value) }],
         }
       }
+      // line and scatter
+      if (chartType === 'line' || chartType === 'scatter') {
+        const categories = [...new Set(result.map((r) => r.category))]
+        const seriesValues = [
+          ...new Set(result.map((r) => r.series).filter(Boolean)),
+        ]
+        const buildSeries = (type) =>
+          seriesValues.length > 0
+            ? seriesValues.map((s) => ({
+                type,
+                name: s,
+                data: categories.map(
+                  (c) =>
+                    result.find((r) => r.category === c && r.series === s)
+                      ?.value ?? null
+                ),
+              }))
+            : [{ type, data: result.map((r) => r.value) }]
+        return {
+          xAxis: { type: 'category', data: categories },
+          yAxis: { type: 'value' },
+          series: buildSeries(chartType),
+          tooltip: { trigger: 'axis' },
+          legend: seriesValues.length > 0 ? {} : undefined,
+        }
+      }
       // pie and doughnut
       const seriesItem = {
         type: 'pie',

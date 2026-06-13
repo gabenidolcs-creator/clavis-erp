@@ -4,6 +4,8 @@ import SummaryWidget from '@baserow/modules/dashboard/components/widget/SummaryW
 import SummaryWidgetSettings from '@baserow/modules/dashboard/components/widget/SummaryWidgetSettings'
 import BarChartWidgetSvg from '@baserow/modules/dashboard/assets/images/widgets/bar_chart_widget.svg?url'
 import PieChartWidgetSvg from '@baserow/modules/dashboard/assets/images/widgets/pie_chart_widget.svg?url'
+import LineChartWidgetSvg from '@baserow/modules/dashboard/assets/images/widgets/line_chart_widget.svg?url'
+import ScatterChartWidgetSvg from '@baserow/modules/dashboard/assets/images/widgets/scatter_chart_widget.svg?url'
 import ChartWidget from '@baserow/modules/dashboard/components/widget/ChartWidget'
 import ChartWidgetSettings from '@baserow/modules/dashboard/components/widget/ChartWidgetSettings'
 
@@ -141,6 +143,20 @@ export class ChartWidgetType extends WidgetType {
         createWidgetImage: PieChartWidgetSvg,
         type: this,
         params: { chart_type: 'doughnut' },
+        dropdownIcon: '',
+      },
+      {
+        name: i18n.t('lineChartWidget.name'),
+        createWidgetImage: LineChartWidgetSvg,
+        type: this,
+        params: { chart_type: 'line' },
+        dropdownIcon: '',
+      },
+      {
+        name: i18n.t('scatterChartWidget.name'),
+        createWidgetImage: ScatterChartWidgetSvg,
+        type: this,
+        params: { chart_type: 'scatter' },
         dropdownIcon: '',
       },
     ]

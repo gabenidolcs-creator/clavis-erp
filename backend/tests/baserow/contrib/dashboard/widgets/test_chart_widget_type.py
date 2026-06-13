@@ -115,3 +115,51 @@ def test_chart_widget_and_summary_widget_coexist(data_fixture):
 
     assert widget_type_registry.get("summary") is not None
     assert widget_type_registry.get("chart") is not None
+
+
+@pytest.mark.django_db
+def test_create_line_chart_widget(data_fixture):
+    user = data_fixture.create_user()
+    dashboard = data_fixture.create_dashboard_application(user=user)
+
+    widget = WidgetHandler().create_widget(
+        CoreChartWidgetType(), dashboard, title="My line", chart_type="line"
+    )
+
+    assert widget.data_source is not None
+    assert widget.chart_type == "line"
+    expected_model = service_type_registry.get(
+        LocalBaserowGroupedAggregateRowsServiceType.type
+    ).model_class
+    assert widget.data_source.service.content_type == ContentType.objects.get_for_model(
+        expected_model
+    )
+
+
+@pytest.mark.django_db
+def test_create_scatter_chart_widget(data_fixture):
+    user = data_fixture.create_user()
+    dashboard = data_fixture.create_dashboard_application(user=user)
+
+    widget = WidgetHandler().create_widget(
+        CoreChartWidgetType(), dashboard, title="My scatter", chart_type="scatter"
+    )
+
+    assert widget.data_source is not None
+    assert widget.chart_type == "scatter"
+    expected_model = service_type_registry.get(
+        LocalBaserowGroupedAggregateRowsServiceType.type
+    ).model_class
+    assert widget.data_source.service.content_type == ContentType.objects.get_for_model(
+        expected_model
+    )
+
+
+def test_line_scatter_chart_type_choices():
+    from baserow.contrib.dashboard.widgets.models import ChartWidget
+
+    choice_keys = [c[0] for c in ChartWidget.CHART_TYPE_CHOICES]
+    assert ("line", "Line") in ChartWidget.CHART_TYPE_CHOICES
+    assert ("scatter", "Scatter") in ChartWidget.CHART_TYPE_CHOICES
+    assert "line" in choice_keys
+    assert "scatter" in choice_keys
