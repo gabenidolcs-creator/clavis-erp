@@ -42,6 +42,7 @@ from baserow.contrib.builder.elements.mixins import (
 from baserow.contrib.builder.elements.models import (
     INPUT_TEXT_TYPES,
     ButtonElement,
+    ChartElement,
     CheckboxElement,
     ChoiceElement,
     ChoiceElementOption,
@@ -2524,3 +2525,36 @@ class MenuElementType(ElementType):
                 if new_formula is not None:
                     setattr(item, formula_field, new_formula)
                     yield item
+
+
+class ChartElementType(ElementType):
+    type = "chart"
+    model_class = ChartElement
+    allowed_fields = ["chart_type", "data_source", "data_source_id"]
+    serializer_field_names = ["chart_type", "data_source_id"]
+    request_serializer_field_names = ["chart_type", "data_source_id"]
+
+    class SerializedDict(ElementDict):
+        chart_type: str
+        data_source_id: int
+
+    @property
+    def serializer_field_overrides(self):
+        return {
+            "chart_type": serializers.ChoiceField(
+                choices=ChartElement.CHART_TYPE_CHOICES,
+                required=False,
+                default=ChartElement.CHART_TYPE_BAR,
+            ),
+            "data_source_id": serializers.IntegerField(
+                allow_null=True,
+                default=None,
+                required=False,
+            ),
+        }
+
+    def get_pytest_params(self, pytest_data_fixture):
+        return {
+            "chart_type": ChartElement.CHART_TYPE_BAR,
+            "data_source_id": None,
+        }

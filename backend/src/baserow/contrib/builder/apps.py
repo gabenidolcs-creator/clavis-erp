@@ -171,6 +171,7 @@ class BuilderConfig(AppConfig):
 
         from .elements.element_types import (
             ButtonElementType,
+            ChartElementType,
             CheckboxElementType,
             ChoiceElementType,
             ColumnElementType,
@@ -215,6 +216,7 @@ class BuilderConfig(AppConfig):
         element_type_registry.register(FooterElementType())
         element_type_registry.register(MenuElementType())
         element_type_registry.register(SimpleContainerElementType())
+        element_type_registry.register(ChartElementType())
 
         from .domains.domain_types import CustomDomainType, SubDomainType
         from .domains.registries import domain_type_registry

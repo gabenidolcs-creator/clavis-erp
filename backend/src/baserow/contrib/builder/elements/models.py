@@ -1136,6 +1136,34 @@ class MenuElement(Element):
     menu_items = models.ManyToManyField(MenuItemElement)
 
 
+class ChartElement(Element):
+    CHART_TYPE_BAR = "bar"
+    CHART_TYPE_LINE = "line"
+    CHART_TYPE_PIE = "pie"
+    CHART_TYPE_DOUGHNUT = "doughnut"
+    CHART_TYPE_SCATTER = "scatter"
+    CHART_TYPE_CHOICES = [
+        (CHART_TYPE_BAR, "Bar"),
+        (CHART_TYPE_LINE, "Line"),
+        (CHART_TYPE_PIE, "Pie"),
+        (CHART_TYPE_DOUGHNUT, "Doughnut"),
+        (CHART_TYPE_SCATTER, "Scatter"),
+    ]
+
+    chart_type = models.CharField(
+        max_length=32,
+        choices=CHART_TYPE_CHOICES,
+        default=CHART_TYPE_BAR,
+    )
+    data_source = models.ForeignKey(
+        "builder.DataSource",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Builder data source providing grouped-aggregate rows for chart rendering.",
+    )
+
+
 class SimpleContainerElement(ContainerElement):
     """
     A simple container to group elements

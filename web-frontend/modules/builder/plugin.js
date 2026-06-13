@@ -49,6 +49,7 @@ import {
   RatingInputElementType,
   MenuElementType,
   SimpleContainerElementType,
+  ChartElementType,
 } from '@baserow/modules/builder/elementTypes'
 import {
   DesktopDeviceType,
@@ -227,6 +228,7 @@ export default defineNuxtPlugin({
     $registry.register('element', new RatingElementType(context))
     $registry.register('element', new TableElementType(context))
     $registry.register('element', new SimpleContainerElementType(context))
+    $registry.register('element', new ChartElementType(context))
     $registry.register('element', new ColumnElementType(context))
     $registry.register('element', new HeaderElementType(context))
     $registry.register('element', new FooterElementType(context))

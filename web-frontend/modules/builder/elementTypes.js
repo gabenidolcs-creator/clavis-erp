@@ -96,6 +96,7 @@ import elementImageMenu from '@baserow/modules/builder/assets/icons/element-menu
 import elementImageRatingInput from '@baserow/modules/builder/assets/icons/element-rating_input.svg?url'
 import elementImageRating from '@baserow/modules/builder/assets/icons/element-rating.svg?url'
 import elementImageRecordSelector from '@baserow/modules/builder/assets/icons/element-record_selector.svg?url'
+import elementImageChart from '@baserow/modules/builder/assets/icons/element-chart.svg?url'
 import elementImageRepeat from '@baserow/modules/builder/assets/icons/element-repeat.svg?url'
 import elementImageSimpleContainer from '@baserow/modules/builder/assets/icons/element-simple_container.svg?url'
 import elementImageTable from '@baserow/modules/builder/assets/icons/element-table.svg?url'
@@ -104,6 +105,8 @@ import moment from '@baserow/modules/core/moment'
 
 import _ from 'lodash'
 import { getValueAtPath } from '../core/utils/object'
+import ChartElement from '@baserow/modules/builder/components/elements/components/ChartElement'
+import ChartElementForm from '@baserow/modules/builder/components/elements/components/forms/general/ChartElementForm'
 
 export class ElementType extends Registerable {
   get name() {
@@ -2750,6 +2753,43 @@ export class MenuElementType extends ElementType {
     return {
       ...superValues,
       styles: { burger: { body_font_size: 25 } },
+    }
+  }
+}
+
+export class ChartElementType extends ElementType {
+  static getType() {
+    return 'chart'
+  }
+
+  get name() {
+    return this.app.i18n.t('elementType.chart')
+  }
+
+  get description() {
+    return this.app.i18n.t('elementType.chartDescription')
+  }
+
+  get iconClass() {
+    return 'iconoir-graph-up'
+  }
+
+  get image() {
+    return elementImageChart
+  }
+
+  get component() {
+    return ChartElement
+  }
+
+  get generalFormComponent() {
+    return ChartElementForm
+  }
+
+  getDefaultValues(page, context) {
+    return {
+      chart_type: 'bar',
+      data_source_id: null,
     }
   }
 }

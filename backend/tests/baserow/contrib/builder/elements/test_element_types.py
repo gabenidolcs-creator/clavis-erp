@@ -20,6 +20,7 @@ from baserow.contrib.builder.data_sources.builder_dispatch_context import (
 )
 from baserow.contrib.builder.elements.element_types import (
     ButtonElementType,
+    ChartElementType,
     CheckboxElementType,
     ChoiceElementType,
     ColumnElementType,
@@ -41,6 +42,7 @@ from baserow.contrib.builder.elements.mixins import (
 )
 from baserow.contrib.builder.elements.models import (
     ButtonElement,
+    ChartElement,
     CheckboxElement,
     ChoiceElement,
     ChoiceElementOption,
@@ -1652,3 +1654,19 @@ def test_datetime_picker_element_is_valid(
             element_type.is_valid(element, value, {})
     else:
         assert str(element_type.is_valid(element, value, {})) == expected
+
+
+class TestChartElementType:
+    @pytest.mark.django_db
+    def test_get_pytest_params(self, data_fixture):
+        element_type = element_type_registry.get("chart")
+        params = element_type.get_pytest_params(data_fixture)
+        assert params["chart_type"] == "bar"
+        assert params["data_source_id"] is None
+
+    def test_chart_element_type_string(self):
+        assert element_type_registry.get("chart").type == "chart"
+
+    def test_chart_element_model_class(self):
+        element_type = element_type_registry.get("chart")
+        assert element_type.model_class == ChartElement

@@ -145,6 +145,8 @@
     "notAllowedLocation": "This element is not allowed at this location",
     "menu": "Menu",
     "menuDescription": "Menu element",
+    "chart": "Chart",
+    "chartDescription": "Display a bar, line, pie, doughnut, or scatter chart from a data source.",
     "simpleContainer": "Container",
     "simpleContainerDescription": "A container for other elements",
     "fileInput": "File input",
@@ -168,6 +170,19 @@
     "errorNoMenuItem": "No menu item configured",
     "errorMenuItemInError": "At least one menu is misconfigured",
     "errorSubMenuItemInError": "At least one sub menu is misconfigured"
+  },
+  "chartElement": {
+    "dataSourceError": "Data source misconfigured. Check the element settings.",
+    "noData": "No data to display."
+  },
+  "chartElementForm": {
+    "chartType": "Chart type",
+    "dataSource": "Data source",
+    "bar": "Bar",
+    "line": "Line",
+    "pie": "Pie",
+    "doughnut": "Doughnut",
+    "scatter": "Scatter"
   },
   "addElementButton": {
     "label": "Element"
