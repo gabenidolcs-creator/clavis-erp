@@ -1149,6 +1149,26 @@ class DatabaseConfig(AppConfig):
         notification_type_registry.register(WebhookDeactivatedNotificationType())
         notification_type_registry.register(WebhookPayloadTooLargeNotificationType())
 
+        # Register only when baserow_premium is absent; premium provides its own version.
+        if "baserow_premium" not in settings.INSTALLED_APPS:
+            from baserow.contrib.database.row_comments.notification_types import (
+                RowCommentMentionNotificationType,
+            )
+            notification_type_registry.register(RowCommentMentionNotificationType())
+
+        from baserow.contrib.database.row_comments.operations import (
+            RowCommentCreateOperationType,
+            RowCommentDeleteOperationType,
+            RowCommentListOperationType,
+            RowCommentUpdateOperationType,
+        )
+        operation_type_registry.register(RowCommentListOperationType())
+        operation_type_registry.register(RowCommentCreateOperationType())
+        operation_type_registry.register(RowCommentUpdateOperationType())
+        operation_type_registry.register(RowCommentDeleteOperationType())
+
+        import baserow.contrib.database.ws.row_comments.signals  # noqa: F401
+
         from baserow.contrib.database.mcp.fields.tools import (
             CreateFieldsMcpTool,
             DeleteFieldsMcpTool,

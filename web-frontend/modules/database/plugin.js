@@ -342,8 +342,12 @@ import {
   UserMentionInRichTextFieldNotificationType,
   WebhookDeactivatedNotificationType,
   WebhookPayloadTooLargedNotificationType,
+  RowCommentMentionNotificationType,
 } from '@baserow/modules/database/notificationTypes'
-import { HistoryRowModalSidebarType } from '@baserow/modules/database/rowModalSidebarTypes'
+import {
+  HistoryRowModalSidebarType,
+  CommentsRowModalSidebarType,
+} from '@baserow/modules/database/rowModalSidebarTypes'
 import { FieldsDataProviderType } from '@baserow/modules/database/dataProviderTypes'
 
 import {
@@ -1046,10 +1050,18 @@ export default defineNuxtPlugin({
       'notification',
       new WebhookPayloadTooLargedNotificationType(context)
     )
+    $registry.register(
+      'notification',
+      new RowCommentMentionNotificationType(context)
+    )
 
     $registry.register(
       'rowModalSidebar',
       new HistoryRowModalSidebarType(context)
+    )
+    $registry.register(
+      'rowModalSidebar',
+      new CommentsRowModalSidebarType(context)
     )
 
     $registry.register('onboarding', new DatabaseOnboardingType(context))

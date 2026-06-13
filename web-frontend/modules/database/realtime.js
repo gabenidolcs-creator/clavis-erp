@@ -718,4 +718,28 @@ export const registerRealtimeEvents = (realtime) => {
       })
     }
   })
+
+  realtime.registerEvent('row_comment_created', ({ store }, data) => {
+    store.dispatch('rowComments/wsCommentCreated', {
+      tableId: data.table_id,
+      rowId: data.row_id,
+      comment: data.comment,
+    })
+  })
+
+  realtime.registerEvent('row_comment_updated', ({ store }, data) => {
+    store.dispatch('rowComments/wsCommentUpdated', {
+      tableId: data.table_id,
+      rowId: data.row_id,
+      comment: data.comment,
+    })
+  })
+
+  realtime.registerEvent('row_comment_deleted', ({ store }, data) => {
+    store.dispatch('rowComments/wsCommentDeleted', {
+      tableId: data.table_id,
+      rowId: data.row_id,
+      commentId: data.comment_id,
+    })
+  })
 }

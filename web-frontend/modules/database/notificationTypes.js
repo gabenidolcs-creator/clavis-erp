@@ -122,3 +122,25 @@ export class WebhookPayloadTooLargedNotificationType extends NotificationType {
     )
   }
 }
+
+export class RowCommentMentionNotificationType extends NotificationType {
+  static getType() {
+    return 'row_comment_mention'
+  }
+
+  getIconComponent() {
+    return NotificationSenderInitialsIcon
+  }
+
+  getContentComponent() {
+    return null
+  }
+
+  getRoute(notificationData) {
+    return tableRouteResetViewIfNeeded(this.app.$router, {
+      databaseId: notificationData.database_id,
+      tableId: notificationData.table_id,
+      rowId: notificationData.row_id,
+    })
+  }
+}

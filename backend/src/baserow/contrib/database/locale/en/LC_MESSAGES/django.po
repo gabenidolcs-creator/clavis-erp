@@ -736,3 +736,12 @@ msgid ""
 "large. The content has been split into multiple batches, but data above the "
 "batch limit of %(batch_limit)s was discarded."
 msgstr ""
+
+#: src/baserow/contrib/database/row_comments/notification_types.py:20
+#, python-format
+msgid "%(sender)s mentioned you in a comment on row %(row_id)s."
+msgstr ""
+
+#: src/baserow/contrib/database/row_comments/notification_types.py:15
+msgid "An unknown user"
+msgstr ""

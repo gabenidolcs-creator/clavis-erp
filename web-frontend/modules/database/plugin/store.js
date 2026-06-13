@@ -16,6 +16,7 @@ import publicStore from '@baserow/modules/database/store/view/public'
 import rowModalNavigationStore from '@baserow/modules/database/store/rowModalNavigation'
 import rowHistoryStore from '@baserow/modules/database/store/rowHistory'
 import fieldRulesStore from '@baserow/modules/database/store/fieldRules'
+import rowCommentsStore from '@baserow/modules/database/store/rowComments'
 
 /*
   store.registerModule('table', tableStore)
@@ -68,6 +69,7 @@ export default defineNuxtPlugin({
       )
       $store.registerModuleNuxtSafe('rowHistory', rowHistoryStore)
       $store.registerModuleNuxtSafe('fieldRules', fieldRulesStore)
+      $store.registerModuleNuxtSafe('rowComments', rowCommentsStore)
       $store.registerModuleNuxtSafe('page/view/grid', gridStore)
       $store.registerModuleNuxtSafe('page/view/gallery', galleryStore)
       $store.registerModuleNuxtSafe('page/view/kanban', kanbanStore)

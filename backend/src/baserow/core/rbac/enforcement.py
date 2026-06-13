@@ -11,8 +11,8 @@ Policy summary (see ``docs/clean-room/specs/1-3-role-enforcement.md``):
 
 - **Both Viewer and Commenter** are denied every structural mutation (Row/Field/View
   create/update/delete), table-scoped *and* view-scoped variants.
-- **Commenter** may create comments; **Viewer** may not. Comment update/delete are
-  denied to both (own-comment edit is an Epic 6 policy decision).
+- **Commenter** may create, update own, and delete own comments; **Viewer** may not do
+  any comment writes. Ownership enforcement (update/delete own-only) is in the handler.
 - Read / subscribe operations (``read_row``, ``list_rows``, ``list_fields``,
   ``list_views``, ``listen_to_all`` …) are **absent** from these sets, so the manager
   defers and the legacy chain preserves read access. NEVER deny-by-default for these
@@ -42,26 +42,23 @@ _STRUCTURAL_MUTATIONS = {
     "database.table.view.delete",
 }
 
-# Comment operations denied to both tiers (Commenter's create_comment is allowed and is
-# intentionally NOT in this set — it is handled below).
-_COMMENT_MUTATIONS_DENIED_TO_BOTH = {
+# Comment write operations denied to Viewer only (Commenter may create, update own,
+# delete own; ownership enforcement happens in the handler layer).
+_COMMENT_WRITES = {
     "database.table.view.update_comment",
     "database.table.view.delete_comment",
+    "database.table.view.create_comment",
+    # Table-scoped variants (free-core row_comments app).
+    "database.table.row_comment.create",
+    "database.table.row_comment.update",
+    "database.table.row_comment.delete",
 }
 
 # The single operation a Commenter may do that a Viewer may not.
 CREATE_COMMENT_OPERATION = "database.table.view.create_comment"
 
-# Viewer: read-only. Denied every structural mutation AND all comment writes (including
-# create_comment).
-VIEWER_DENIED_OPS = frozenset(
-    _STRUCTURAL_MUTATIONS
-    | _COMMENT_MUTATIONS_DENIED_TO_BOTH
-    | {CREATE_COMMENT_OPERATION}
-)
+# Viewer: read-only. Denied every structural mutation AND all comment writes.
+VIEWER_DENIED_OPS = frozenset(_STRUCTURAL_MUTATIONS | _COMMENT_WRITES)
 
-# Commenter: read + comment. Denied every structural mutation and comment update/delete,
-# but NOT create_comment.
-COMMENTER_DENIED_OPS = frozenset(
-    _STRUCTURAL_MUTATIONS | _COMMENT_MUTATIONS_DENIED_TO_BOTH
-)
+# Commenter: read + comment. Denied every structural mutation only.
+COMMENTER_DENIED_OPS = frozenset(_STRUCTURAL_MUTATIONS)

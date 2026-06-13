@@ -1,5 +1,6 @@
 import { Registerable } from '@baserow/modules/core/registry'
 import RowHistorySidebar from '@baserow/modules/database/components/row/RowHistorySidebar.vue'
+import RowCommentsPanel from '@baserow/modules/database/components/row/RowCommentsPanel'
 
 export class RowModalSidebarType extends Registerable {
   /**
@@ -72,5 +73,31 @@ export class HistoryRowModalSidebarType extends RowModalSidebarType {
 
   getOrder() {
     return 10
+  }
+}
+
+export class CommentsRowModalSidebarType extends RowModalSidebarType {
+  static getType() {
+    return 'comments'
+  }
+
+  getName() {
+    return this.app.$i18n.t('rowComments.sidebarName')
+  }
+
+  getComponent() {
+    return RowCommentsPanel
+  }
+
+  isDeactivated(database, table, readOnly, view) {
+    return false
+  }
+
+  isSelectedByDefault(database) {
+    return false
+  }
+
+  getOrder() {
+    return 20
   }
 }
