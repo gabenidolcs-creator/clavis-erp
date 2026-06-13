@@ -39,6 +39,17 @@
         >
           {{ $t('rowComments.post') }}
         </button>
+        <button
+          class="button button--tiny button--secondary"
+          :disabled="subscriptionLoading"
+          @click="toggleSubscription"
+        >
+          {{
+            subscribed
+              ? $t('rowComments.unsubscribe')
+              : $t('rowComments.subscribe')
+          }}
+        </button>
       </div>
     </div>
   </div>
@@ -80,13 +91,18 @@ export default {
     return {
       newMessage: { ...EMPTY_DOC },
       submitting: false,
+      subscriptionLoading: false,
     }
   },
   computed: {
     ...mapGetters({
       getComments: 'rowComments/getComments',
       isLoading: 'rowComments/isLoading',
+      isSubscribed: 'rowComments/isSubscribed',
     }),
+    subscribed() {
+      return this.isSubscribed(this.table.id, this.row.id)
+    },
     comments() {
       return this.getComments(this.table.id, this.row.id)
     },
@@ -106,6 +122,10 @@ export default {
   },
   mounted() {
     this.loadComments()
+    this.$store.dispatch('rowComments/fetchSubscriptionStatus', {
+      tableId: this.table.id,
+      rowId: this.row.id,
+    })
   },
   methods: {
     async loadComments() {
@@ -153,6 +173,20 @@ export default {
         rowId: this.row.id,
         commentId,
       })
+    },
+    async toggleSubscription() {
+      this.subscriptionLoading = true
+      try {
+        const action = this.subscribed
+          ? 'rowComments/unsubscribe'
+          : 'rowComments/subscribe'
+        await this.$store.dispatch(action, {
+          tableId: this.table.id,
+          rowId: this.row.id,
+        })
+      } finally {
+        this.subscriptionLoading = false
+      }
     },
   },
 }

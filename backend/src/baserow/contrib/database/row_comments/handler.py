@@ -10,11 +10,16 @@ from baserow.contrib.database.row_comments.exceptions import (
     RowCommentMentionAccessError,
     RowCommentNotOwnedByUser,
 )
-from baserow.contrib.database.row_comments.models import RowComment
+from baserow.contrib.database.row_comments.models import (
+    RowComment,
+    RowCommentSubscription,
+)
 from baserow.contrib.database.row_comments.operations import (
     RowCommentCreateOperationType,
     RowCommentDeleteOperationType,
     RowCommentListOperationType,
+    RowCommentSubscribeOperationType,
+    RowCommentUnsubscribeOperationType,
     RowCommentUpdateOperationType,
 )
 from baserow.contrib.database.row_comments.signals import (
@@ -101,6 +106,7 @@ class RowCommentHandler:
                     raise RowCommentMentionAccessError(user_id=uid)
                 mentioned_users.append(mentioned_user)
 
+        mention_user_ids_set = set(mention_user_ids)
         with transaction.atomic():
             comment = RowComment.objects.create(
                 table=table,
@@ -108,6 +114,15 @@ class RowCommentHandler:
                 user=user,
                 message=message,
             )
+            # Auto-subscribe commenter.
+            RowCommentSubscription.objects.get_or_create(
+                table=table, row_id=row_id, user=user
+            )
+            # Auto-subscribe @mentioned users.
+            for mentioned_user in mentioned_users:
+                RowCommentSubscription.objects.get_or_create(
+                    table=table, row_id=row_id, user=mentioned_user
+                )
 
         # Create notifications for valid @mentions.
         if mentioned_users:
@@ -127,6 +142,15 @@ class RowCommentHandler:
                 workspace=workspace,
             )
 
+        # Notify subscribers (excluding commenter and @mentioned users already notified).
+        RowCommentHandler.notify_subscribers(
+            comment=comment,
+            sender=user,
+            table=table,
+            workspace=workspace,
+            exclude_user_ids=mention_user_ids_set,
+        )
+
         row_comment_created.send(
             sender=RowCommentHandler,
             comment=comment,
@@ -134,6 +158,84 @@ class RowCommentHandler:
             table=table,
         )
         return comment
+
+    @staticmethod
+    def subscribe(user, table_id: int, row_id: int) -> RowCommentSubscription:
+        table = TableHandler().get_table(table_id)
+        CoreHandler().check_permissions(
+            user,
+            RowCommentSubscribeOperationType.type,
+            workspace=table.database.workspace,
+            context=table,
+        )
+        subscription, _ = RowCommentSubscription.objects.get_or_create(
+            table=table, row_id=row_id, user=user
+        )
+        return subscription
+
+    @staticmethod
+    def unsubscribe(user, table_id: int, row_id: int) -> None:
+        table = TableHandler().get_table(table_id)
+        CoreHandler().check_permissions(
+            user,
+            RowCommentUnsubscribeOperationType.type,
+            workspace=table.database.workspace,
+            context=table,
+        )
+        RowCommentSubscription.objects.filter(
+            table=table, row_id=row_id, user=user
+        ).delete()
+
+    @staticmethod
+    def is_subscribed(user, table_id: int, row_id: int) -> bool:
+        return RowCommentSubscription.objects.filter(
+            table_id=table_id, row_id=row_id, user=user
+        ).exists()
+
+    @staticmethod
+    def notify_subscribers(
+        comment, sender, table, workspace, exclude_user_ids=None
+    ) -> None:
+        if exclude_user_ids is None:
+            exclude_user_ids = set()
+        exclude_user_ids = set(exclude_user_ids)
+        exclude_user_ids.add(sender.id)
+
+        subscriptions = RowCommentSubscription.objects.filter(
+            table=table, row_id=comment.row_id
+        ).select_related("user")
+
+        valid_recipients = []
+        for sub in subscriptions:
+            if sub.user_id in exclude_user_ids:
+                continue
+            try:
+                CoreHandler().check_permissions(
+                    sub.user,
+                    RowCommentListOperationType.type,
+                    workspace=workspace,
+                    context=table,
+                )
+                valid_recipients.append(sub.user)
+            except (PermissionDenied, UserNotInWorkspace):
+                pass
+
+        if valid_recipients:
+            from baserow.core.notifications.handler import NotificationHandler
+
+            NotificationHandler.create_direct_notification_for_users(
+                notification_type="row_comment_created",
+                recipients=valid_recipients,
+                sender=sender,
+                data={
+                    "table_id": table.id,
+                    "database_id": table.database.id,
+                    "row_id": comment.row_id,
+                    "comment_id": comment.id,
+                    "comment_preview": _comment_preview(comment.message),
+                },
+                workspace=workspace,
+            )
 
     @staticmethod
     def update_comment(user, comment_id: int, message: dict) -> RowComment:

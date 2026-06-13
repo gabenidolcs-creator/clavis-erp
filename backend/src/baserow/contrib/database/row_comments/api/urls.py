@@ -1,6 +1,6 @@
 from django.urls import re_path
 
-from .views import RowCommentsView, RowCommentView
+from .views import RowCommentsView, RowCommentSubscriptionView, RowCommentView
 
 app_name = "baserow.contrib.database.row_comments.api"
 
@@ -14,5 +14,10 @@ urlpatterns = [
         r"^(?P<comment_id>[0-9]+)/$",
         RowCommentView.as_view(),
         name="item",
+    ),
+    re_path(
+        r"^subscriptions/$",
+        RowCommentSubscriptionView.as_view(),
+        name="subscriptions",
     ),
 ]

@@ -3,6 +3,7 @@ const key = (tableId, rowId) => `${tableId}-${rowId}`
 export const state = () => ({
   commentsByKey: {},
   loadingByKey: {},
+  subscribedByKey: {},
 })
 
 export const mutations = {
@@ -40,6 +41,12 @@ export const mutations = {
     state.commentsByKey = {
       ...state.commentsByKey,
       [k]: existing.filter((c) => c.id !== commentId),
+    }
+  },
+  SET_SUBSCRIBED(state, { tableId, rowId, subscribed }) {
+    state.subscribedByKey = {
+      ...state.subscribedByKey,
+      [key(tableId, rowId)]: subscribed,
     }
   },
 }
@@ -87,6 +94,24 @@ export const actions = {
   wsCommentDeleted({ commit }, { tableId, rowId, commentId }) {
     commit('REMOVE_COMMENT', { tableId, rowId, commentId })
   },
+  async fetchSubscriptionStatus({ commit }, { tableId, rowId }) {
+    const { data } = await this.$client.get(
+      `/database/rows/table/${tableId}/${rowId}/comments/subscriptions/`
+    )
+    commit('SET_SUBSCRIBED', { tableId, rowId, subscribed: data.subscribed })
+  },
+  async subscribe({ commit }, { tableId, rowId }) {
+    await this.$client.post(
+      `/database/rows/table/${tableId}/${rowId}/comments/subscriptions/`
+    )
+    commit('SET_SUBSCRIBED', { tableId, rowId, subscribed: true })
+  },
+  async unsubscribe({ commit }, { tableId, rowId }) {
+    await this.$client.delete(
+      `/database/rows/table/${tableId}/${rowId}/comments/subscriptions/`
+    )
+    commit('SET_SUBSCRIBED', { tableId, rowId, subscribed: false })
+  },
 }
 
 export const getters = {
@@ -95,6 +120,9 @@ export const getters = {
   },
   isLoading: (state) => (tableId, rowId) => {
     return state.loadingByKey[key(tableId, rowId)] || false
+  },
+  isSubscribed: (state) => (tableId, rowId) => {
+    return state.subscribedByKey[key(tableId, rowId)] || false
   },
 }
 

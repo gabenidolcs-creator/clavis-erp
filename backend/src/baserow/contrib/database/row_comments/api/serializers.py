@@ -27,3 +27,7 @@ class CreateRowCommentSerializer(serializers.Serializer):
 
 class UpdateRowCommentSerializer(serializers.Serializer):
     message = serializers.JSONField()
+
+
+class RowCommentSubscriptionStatusSerializer(serializers.Serializer):
+    subscribed = serializers.BooleanField()

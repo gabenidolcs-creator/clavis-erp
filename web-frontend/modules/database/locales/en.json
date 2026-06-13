@@ -1294,6 +1294,16 @@
     "placeholder": "Add a comment… (Shift+Enter to submit)",
     "post": "Post",
     "deleteConfirm": "Are you sure you want to delete this comment?",
-    "errorTitle": "Comment error"
+    "errorTitle": "Comment error",
+    "subscribe": "Subscribe",
+    "unsubscribe": "Unsubscribe"
+  },
+  "rowCommentMentionNotification": {
+    "title": "{sender} mentioned you in a comment on row {rowId}.",
+    "unknownUser": "Unknown user"
+  },
+  "rowCommentCreatedNotification": {
+    "title": "{sender} commented on row {rowId}.",
+    "unknownUser": "Unknown user"
   }
 }

@@ -15,3 +15,11 @@ class RowCommentUpdateOperationType(DatabaseTableOperationType):
 
 class RowCommentDeleteOperationType(DatabaseTableOperationType):
     type = "database.table.row_comment.delete"
+
+
+class RowCommentSubscribeOperationType(DatabaseTableOperationType):
+    type = "database.table.row_comment.subscribe"
+
+
+class RowCommentUnsubscribeOperationType(DatabaseTableOperationType):
+    type = "database.table.row_comment.unsubscribe"

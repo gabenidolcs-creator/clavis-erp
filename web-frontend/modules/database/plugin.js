@@ -343,6 +343,7 @@ import {
   WebhookDeactivatedNotificationType,
   WebhookPayloadTooLargedNotificationType,
   RowCommentMentionNotificationType,
+  RowCommentCreatedNotificationType,
 } from '@baserow/modules/database/notificationTypes'
 import {
   HistoryRowModalSidebarType,
@@ -1053,6 +1054,10 @@ export default defineNuxtPlugin({
     $registry.register(
       'notification',
       new RowCommentMentionNotificationType(context)
+    )
+    $registry.register(
+      'notification',
+      new RowCommentCreatedNotificationType(context)
     )
 
     $registry.register(

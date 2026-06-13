@@ -41,3 +41,24 @@ class RowComment(models.Model):
         db_table = "database_rowcomment"
         ordering = ["created_on"]
         indexes = [models.Index(fields=["table", "row_id"])]
+
+
+class RowCommentSubscription(models.Model):
+    table = models.ForeignKey(
+        Table,
+        on_delete=models.CASCADE,
+        related_name="+",
+    )
+    row_id = models.PositiveIntegerField()
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="+",
+    )
+    created_on = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = "database"
+        db_table = "database_rowcommentsubscription"
+        unique_together = ("table", "row_id", "user")
+        indexes = [models.Index(fields=["table", "row_id"])]

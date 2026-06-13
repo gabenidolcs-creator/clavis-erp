@@ -129,4 +129,64 @@ describe('RowCommentsPanel', () => {
       })
     )
   })
+
+  test('fetchSubscriptionStatus dispatched on mount', async () => {
+    const store = createTestStore([])
+    const dispatchSpy = vi.spyOn(store, 'dispatch').mockResolvedValue(undefined)
+    mountPanel(store)
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      'rowComments/fetchSubscriptionStatus',
+      { tableId: 1, rowId: 42 }
+    )
+  })
+
+  test('subscribe button shows when not subscribed', async () => {
+    const store = createTestStore([])
+    store.dispatch = vi.fn().mockResolvedValue(undefined)
+    const wrapper = mountPanel(store)
+    await wrapper.vm.$nextTick()
+    const btns = wrapper.findAll('button')
+    const subscribeBtn = btns.find((b) => b.text() === 'rowComments.subscribe')
+    expect(subscribeBtn).toBeTruthy()
+  })
+
+  test('unsubscribe button shows when subscribed', async () => {
+    const store = createTestStore([])
+    store.dispatch = vi.fn().mockResolvedValue(undefined)
+    store.commit('rowComments/SET_SUBSCRIBED', { tableId: 1, rowId: 42, subscribed: true })
+    const wrapper = mountPanel(store)
+    await wrapper.vm.$nextTick()
+    const btns = wrapper.findAll('button')
+    const unsubscribeBtn = btns.find((b) => b.text() === 'rowComments.unsubscribe')
+    expect(unsubscribeBtn).toBeTruthy()
+  })
+
+  test('subscribe button click dispatches subscribe action', async () => {
+    const store = createTestStore([])
+    const dispatchSpy = vi.spyOn(store, 'dispatch').mockResolvedValue(undefined)
+    const wrapper = mountPanel(store)
+    await wrapper.vm.$nextTick()
+    const btns = wrapper.findAll('button')
+    const subscribeBtn = btns.find((b) => b.text() === 'rowComments.subscribe')
+    await subscribeBtn.trigger('click')
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      'rowComments/subscribe',
+      { tableId: 1, rowId: 42 }
+    )
+  })
+
+  test('unsubscribe button click dispatches unsubscribe action', async () => {
+    const store = createTestStore([])
+    const dispatchSpy = vi.spyOn(store, 'dispatch').mockResolvedValue(undefined)
+    store.commit('rowComments/SET_SUBSCRIBED', { tableId: 1, rowId: 42, subscribed: true })
+    const wrapper = mountPanel(store)
+    await wrapper.vm.$nextTick()
+    const btns = wrapper.findAll('button')
+    const unsubscribeBtn = btns.find((b) => b.text() === 'rowComments.unsubscribe')
+    await unsubscribeBtn.trigger('click')
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      'rowComments/unsubscribe',
+      { tableId: 1, rowId: 42 }
+    )
+  })
 })

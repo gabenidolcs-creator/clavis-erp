@@ -6,6 +6,11 @@ from baserow.core.notifications.registries import (
 )
 
 
+class RowCommentCreatedNotificationType(NotificationType):
+    type = "row_comment_created"
+    has_web_frontend_route = True
+
+
 class RowCommentMentionNotificationType(EmailNotificationTypeMixin, NotificationType):
     type = "row_comment_mention"
     has_web_frontend_route = True

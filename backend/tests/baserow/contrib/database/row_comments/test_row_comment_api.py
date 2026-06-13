@@ -126,3 +126,74 @@ def test_delete_any_comment_as_admin_204(api_client, data_fixture):
     delete_url = f"/api/database/rows/table/{table.id}/1/comments/{comment_id}/"
     response = api_client.delete(delete_url)
     assert response.status_code == 204
+
+
+# ─── Story 6.2: Subscription API Tests ─────────────────────────────────────
+
+@pytest.mark.django_db
+def test_get_subscription_status_not_subscribed(api_client, data_fixture):
+    owner, viewer, workspace, table = _setup(data_fixture, VIEWER)
+    api_client.force_authenticate(user=viewer)
+    url = f"/api/database/rows/table/{table.id}/1/comments/subscriptions/"
+    response = api_client.get(url)
+    assert response.status_code == 200
+    assert response.data["subscribed"] is False
+
+
+@pytest.mark.django_db
+def test_post_subscribe_returns_200_with_subscribed_true(api_client, data_fixture):
+    owner, viewer, workspace, table = _setup(data_fixture, VIEWER)
+    api_client.force_authenticate(user=viewer)
+    url = f"/api/database/rows/table/{table.id}/1/comments/subscriptions/"
+    response = api_client.post(url)
+    assert response.status_code == 200
+    assert response.data["subscribed"] is True
+
+
+@pytest.mark.django_db
+def test_post_subscribe_then_get_returns_subscribed_true(api_client, data_fixture):
+    owner, viewer, workspace, table = _setup(data_fixture, VIEWER)
+    api_client.force_authenticate(user=viewer)
+    url = f"/api/database/rows/table/{table.id}/1/comments/subscriptions/"
+    api_client.post(url)
+    response = api_client.get(url)
+    assert response.status_code == 200
+    assert response.data["subscribed"] is True
+
+
+@pytest.mark.django_db
+def test_post_subscribe_idempotent(api_client, data_fixture):
+    owner, viewer, workspace, table = _setup(data_fixture, VIEWER)
+    api_client.force_authenticate(user=viewer)
+    url = f"/api/database/rows/table/{table.id}/1/comments/subscriptions/"
+    api_client.post(url)
+    response = api_client.post(url)
+    assert response.status_code == 200
+    assert response.data["subscribed"] is True
+
+
+@pytest.mark.django_db
+def test_delete_unsubscribe_returns_204(api_client, data_fixture):
+    owner, viewer, workspace, table = _setup(data_fixture, VIEWER)
+    api_client.force_authenticate(user=viewer)
+    url = f"/api/database/rows/table/{table.id}/1/comments/subscriptions/"
+    api_client.post(url)
+    response = api_client.delete(url)
+    assert response.status_code == 204
+
+
+@pytest.mark.django_db
+def test_delete_unsubscribe_when_not_subscribed_is_noop(api_client, data_fixture):
+    owner, viewer, workspace, table = _setup(data_fixture, VIEWER)
+    api_client.force_authenticate(user=viewer)
+    url = f"/api/database/rows/table/{table.id}/1/comments/subscriptions/"
+    response = api_client.delete(url)
+    assert response.status_code == 204
+
+
+@pytest.mark.django_db
+def test_subscription_unauthenticated_returns_401(api_client, data_fixture):
+    owner, viewer, workspace, table = _setup(data_fixture, VIEWER)
+    url = f"/api/database/rows/table/{table.id}/1/comments/subscriptions/"
+    response = api_client.get(url)
+    assert response.status_code == 401

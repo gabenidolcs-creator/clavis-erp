@@ -1,7 +1,7 @@
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.status import HTTP_201_CREATED, HTTP_204_NO_CONTENT
+from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT
 from rest_framework.views import APIView
 
 from baserow.api.decorators import map_exceptions, validate_body
@@ -16,6 +16,7 @@ from baserow.contrib.database.row_comments.api.errors import (
 from baserow.contrib.database.row_comments.api.serializers import (
     CreateRowCommentSerializer,
     RowCommentSerializer,
+    RowCommentSubscriptionStatusSerializer,
     UpdateRowCommentSerializer,
 )
 from baserow.contrib.database.row_comments.exceptions import (
@@ -100,4 +101,43 @@ class RowCommentView(APIView):
         self, request: Request, table_id: int, row_id: int, comment_id: int
     ) -> Response:
         RowCommentHandler.delete_comment(request.user, comment_id)
+        return Response(status=HTTP_204_NO_CONTENT)
+
+
+class RowCommentSubscriptionView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    @map_exceptions(
+        {
+            TableDoesNotExist: ERROR_TABLE_DOES_NOT_EXIST,
+            UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
+            PermissionDenied: ERROR_PERMISSION_DENIED,
+        }
+    )
+    def get(self, request: Request, table_id: int, row_id: int) -> Response:
+        subscribed = RowCommentHandler.is_subscribed(request.user, table_id, row_id)
+        return Response(
+            RowCommentSubscriptionStatusSerializer({"subscribed": subscribed}).data
+        )
+
+    @map_exceptions(
+        {
+            TableDoesNotExist: ERROR_TABLE_DOES_NOT_EXIST,
+            UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
+            PermissionDenied: ERROR_PERMISSION_DENIED,
+        }
+    )
+    def post(self, request: Request, table_id: int, row_id: int) -> Response:
+        RowCommentHandler.subscribe(request.user, table_id, row_id)
+        return Response({"subscribed": True}, status=HTTP_200_OK)
+
+    @map_exceptions(
+        {
+            TableDoesNotExist: ERROR_TABLE_DOES_NOT_EXIST,
+            UserNotInWorkspace: ERROR_USER_NOT_IN_GROUP,
+            PermissionDenied: ERROR_PERMISSION_DENIED,
+        }
+    )
+    def delete(self, request: Request, table_id: int, row_id: int) -> Response:
+        RowCommentHandler.unsubscribe(request.user, table_id, row_id)
         return Response(status=HTTP_204_NO_CONTENT)

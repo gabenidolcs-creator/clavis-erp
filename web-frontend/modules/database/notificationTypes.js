@@ -5,6 +5,8 @@ import UserMentionInRichTextFieldNotification from '@baserow/modules/database/co
 import FormSubmittedNotification from '@baserow/modules/database/components/notifications/FormSubmittedNotification'
 import WebhookDeactivatedNotification from '@baserow/modules/database/components/notifications/WebhookDeactivatedNotification'
 import WebhookPayloadTooLargeNotification from '@baserow/modules/database/components/notifications/WebhookPayloadTooLargeNotification'
+import RowCommentMentionNotification from '@baserow/modules/database/components/notifications/RowCommentMentionNotification'
+import RowCommentCreatedNotification from '@baserow/modules/database/components/notifications/RowCommentCreatedNotification'
 import { tableRouteResetViewIfNeeded } from '@baserow/modules/database/utils/routing'
 
 export class CollaboratorAddedToRowNotificationType extends NotificationType {
@@ -133,7 +135,29 @@ export class RowCommentMentionNotificationType extends NotificationType {
   }
 
   getContentComponent() {
-    return null
+    return RowCommentMentionNotification
+  }
+
+  getRoute(notificationData) {
+    return tableRouteResetViewIfNeeded(this.app.$router, {
+      databaseId: notificationData.database_id,
+      tableId: notificationData.table_id,
+      rowId: notificationData.row_id,
+    })
+  }
+}
+
+export class RowCommentCreatedNotificationType extends NotificationType {
+  static getType() {
+    return 'row_comment_created'
+  }
+
+  getIconComponent() {
+    return NotificationSenderInitialsIcon
+  }
+
+  getContentComponent() {
+    return RowCommentCreatedNotification
   }
 
   getRoute(notificationData) {

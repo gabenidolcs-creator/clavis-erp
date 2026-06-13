@@ -1152,20 +1152,26 @@ class DatabaseConfig(AppConfig):
         # Register only when baserow_premium is absent; premium provides its own version.
         if "baserow_premium" not in settings.INSTALLED_APPS:
             from baserow.contrib.database.row_comments.notification_types import (
+                RowCommentCreatedNotificationType,
                 RowCommentMentionNotificationType,
             )
             notification_type_registry.register(RowCommentMentionNotificationType())
+            notification_type_registry.register(RowCommentCreatedNotificationType())
 
         from baserow.contrib.database.row_comments.operations import (
             RowCommentCreateOperationType,
             RowCommentDeleteOperationType,
             RowCommentListOperationType,
+            RowCommentSubscribeOperationType,
+            RowCommentUnsubscribeOperationType,
             RowCommentUpdateOperationType,
         )
         operation_type_registry.register(RowCommentListOperationType())
         operation_type_registry.register(RowCommentCreateOperationType())
         operation_type_registry.register(RowCommentUpdateOperationType())
         operation_type_registry.register(RowCommentDeleteOperationType())
+        operation_type_registry.register(RowCommentSubscribeOperationType())
+        operation_type_registry.register(RowCommentUnsubscribeOperationType())
 
         import baserow.contrib.database.ws.row_comments.signals  # noqa: F401
 
