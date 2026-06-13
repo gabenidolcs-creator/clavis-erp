@@ -188,6 +188,7 @@ class BuilderConfig(AppConfig):
             MetricElementType,
             RatingElementType,
             RatingInputElementType,
+            RecordReviewElementType,
             RecordSelectorElementType,
             RepeatElementType,
             SimpleContainerElementType,
@@ -221,6 +222,7 @@ class BuilderConfig(AppConfig):
         element_type_registry.register(ChartElementType())
         element_type_registry.register(MetricElementType())
         element_type_registry.register(ViewEmbedElementType())
+        element_type_registry.register(RecordReviewElementType())
 
         from .domains.domain_types import CustomDomainType, SubDomainType
         from .domains.registries import domain_type_registry

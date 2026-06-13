@@ -52,6 +52,7 @@ import {
   ChartElementType,
   MetricElementType,
   ViewEmbedElementType,
+  RecordReviewElementType,
 } from '@baserow/modules/builder/elementTypes'
 import {
   DesktopDeviceType,
@@ -233,6 +234,7 @@ export default defineNuxtPlugin({
     $registry.register('element', new ChartElementType(context))
     $registry.register('element', new MetricElementType(context))
     $registry.register('element', new ViewEmbedElementType(context))
+    $registry.register('element', new RecordReviewElementType(context))
     $registry.register('element', new ColumnElementType(context))
     $registry.register('element', new HeaderElementType(context))
     $registry.register('element', new FooterElementType(context))

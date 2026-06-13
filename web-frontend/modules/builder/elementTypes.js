@@ -99,6 +99,7 @@ import elementImageRecordSelector from '@baserow/modules/builder/assets/icons/el
 import elementImageChart from '@baserow/modules/builder/assets/icons/element-chart.svg?url'
 import elementImageMetric from '@baserow/modules/builder/assets/icons/element-metric.svg?url'
 import elementImageViewEmbed from '@baserow/modules/builder/assets/icons/element-view-embed.svg?url'
+import elementImageRecordReview from '@baserow/modules/builder/assets/icons/element-record-review.svg?url'
 import elementImageRepeat from '@baserow/modules/builder/assets/icons/element-repeat.svg?url'
 import elementImageSimpleContainer from '@baserow/modules/builder/assets/icons/element-simple_container.svg?url'
 import elementImageTable from '@baserow/modules/builder/assets/icons/element-table.svg?url'
@@ -113,6 +114,8 @@ import MetricElement from '@baserow/modules/builder/components/elements/componen
 import MetricElementForm from '@baserow/modules/builder/components/elements/components/forms/general/MetricElementForm'
 import ViewEmbedElement from '@baserow/modules/builder/components/elements/components/ViewEmbedElement'
 import ViewEmbedElementForm from '@baserow/modules/builder/components/elements/components/forms/general/ViewEmbedElementForm'
+import RecordReviewElement from '@baserow/modules/builder/components/elements/components/RecordReviewElement'
+import RecordReviewElementForm from '@baserow/modules/builder/components/elements/components/forms/general/RecordReviewElementForm'
 
 export class ElementType extends Registerable {
   get name() {
@@ -2872,6 +2875,46 @@ export class ViewEmbedElementType extends ElementType {
   getDefaultValues(page, context) {
     return {
       view_id: null,
+    }
+  }
+}
+
+export class RecordReviewElementType extends ElementType {
+  static getType() {
+    return 'record_review'
+  }
+
+  get name() {
+    return this.app.i18n.t('elementType.recordReview')
+  }
+
+  get description() {
+    return this.app.i18n.t('elementType.recordReviewDescription')
+  }
+
+  get iconClass() {
+    return 'iconoir-file-stack'
+  }
+
+  get image() {
+    return elementImageRecordReview
+  }
+
+  get component() {
+    return RecordReviewElement
+  }
+
+  get editComponent() {
+    return RecordReviewElement
+  }
+
+  get generalFormComponent() {
+    return RecordReviewElementForm
+  }
+
+  getDefaultValues(page, context) {
+    return {
+      data_source_id: null,
     }
   }
 }

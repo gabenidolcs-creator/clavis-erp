@@ -1184,6 +1184,16 @@ class ViewEmbedElement(Element):
     )
 
 
+class RecordReviewElement(Element):
+    data_source = models.ForeignKey(
+        "builder.DataSource",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Builder data source providing rows for record-review navigation.",
+    )
+
+
 class SimpleContainerElement(ContainerElement):
     """
     A simple container to group elements

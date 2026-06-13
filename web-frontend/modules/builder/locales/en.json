@@ -151,6 +151,8 @@
     "metricDescription": "Display a single aggregated value from a data source.",
     "viewEmbed": "View Embed",
     "viewEmbedDescription": "Embed a Kanban, Calendar, or Timeline view on the page.",
+    "recordReview": "Record Review",
+    "recordReviewDescription": "Step through records one at a time with previous/next navigation.",
     "simpleContainer": "Container",
     "simpleContainerDescription": "A container for other elements",
     "fileInput": "File input",
@@ -203,6 +205,16 @@
   "viewEmbedElementForm": {
     "databaseLabel": "Database",
     "viewLabel": "View"
+  },
+  "recordReviewElement": {
+    "dataSourceError": "Data source misconfigured. Check the element settings.",
+    "noData": "No records to review.",
+    "previous": "Previous",
+    "next": "Next",
+    "rowCounter": "{current} of {total}"
+  },
+  "recordReviewElementForm": {
+    "dataSource": "Data source"
   },
   "addElementButton": {
     "label": "Element"

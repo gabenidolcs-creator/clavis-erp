@@ -64,6 +64,7 @@ from baserow.contrib.builder.elements.models import (
     NavigationElementMixin,
     RatingElement,
     RatingInputElement,
+    RecordReviewElement,
     RecordSelectorElement,
     RepeatElement,
     SimpleContainerElement,
@@ -2612,3 +2613,27 @@ class ViewEmbedElementType(ElementType):
         return {
             "view_id": None,
         }
+
+
+class RecordReviewElementType(ElementType):
+    type = "record_review"
+    model_class = RecordReviewElement
+    allowed_fields = ["data_source", "data_source_id"]
+    serializer_field_names = ["data_source_id"]
+    request_serializer_field_names = ["data_source_id"]
+
+    class SerializedDict(ElementDict):
+        data_source_id: int
+
+    @property
+    def serializer_field_overrides(self):
+        return {
+            "data_source_id": serializers.IntegerField(
+                allow_null=True,
+                default=None,
+                required=False,
+            ),
+        }
+
+    def get_pytest_params(self, pytest_data_fixture):
+        return {"data_source_id": None}
