@@ -7,17 +7,9 @@ import {
 } from '@baserow_premium/tableExporterTypes'
 import { LicensesAdminType } from '@baserow_premium/adminTypes'
 import rowCommentsStore from '@baserow_premium/store/row_comments'
-import kanbanStore from '@baserow_premium/store/view/kanban'
-import calendarStore from '@baserow_premium/store/view/calendar'
-import timelineStore from '@baserow_premium/store/view/timeline'
 import impersonatingStore from '@baserow_premium/store/impersonating'
 import { PremiumDatabaseApplicationType } from '@baserow_premium/applicationTypes'
 
-import {
-  KanbanViewType,
-  CalendarViewType,
-  TimelineViewType,
-} from '@baserow_premium/viewTypes'
 
 import {
   LeftBorderColorViewDecoratorType,
@@ -137,12 +129,6 @@ export default defineNuxtPlugin({
     }*/
 
     $store.registerModuleNuxtSafe('row_comments', rowCommentsStore)
-    $store.registerModuleNuxtSafe('page/view/kanban', kanbanStore)
-    $store.registerModuleNuxtSafe('page/view/calendar', calendarStore)
-    $store.registerModuleNuxtSafe('page/view/timeline', timelineStore)
-    $store.registerModuleNuxtSafe('template/view/kanban', kanbanStore)
-    $store.registerModuleNuxtSafe('template/view/calendar', calendarStore)
-    $store.registerModuleNuxtSafe('template/view/timeline', timelineStore)
     $store.registerModuleNuxtSafe('impersonating', impersonatingStore)
 
     $registry.registerNamespace('aiFieldOutputType')
@@ -160,9 +146,6 @@ export default defineNuxtPlugin({
     $registry.register('exporter', new FileTableExporter(context))
     $registry.register('field', new AIFieldType(context))
     $registry.register('field', new PremiumFormulaFieldType(context))
-    $registry.register('view', new KanbanViewType(context))
-    $registry.register('view', new CalendarViewType(context))
-    $registry.register('view', new TimelineViewType(context))
 
     $registry.register(
       'viewDecorator',

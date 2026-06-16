@@ -29,7 +29,7 @@ This document provides the complete epic and story breakdown for clavis-erp (Air
 **Batch 1 — Views**
 - **FR-1** `[A]`: Create and configure a Kanban View — add a Kanban view to any Table, choose the Single-select Field defining columns (one column per option + "Uncategorized"); filters/sorts/field-visibility apply; persists and reopens.
 - **FR-2** `[A]`: Drag a card between columns — dropping updates the Row's grouping Field; broadcasts in real time; failed update rolls back with error.
-- **FR-3** `[A]`: Configure card appearance — choose which Fields show on the card face and whether a cover image shows; persists per view. (Row coloring is out of scope — cards do not depend on it.)
+- **FR-3** `[A]`: Configure card appearance — choose which Fields show on the card face and whether a cover image shows; persists per view. (Card appearance does not depend on row coloring; conditional row coloring is delivered separately by FR-34.)
 - **FR-4** `[A]`: Create and configure a Calendar View — select the Date Field positioning Rows; month/week modes; unscheduled tray; optional start+end span as a multi-day bar; filters/sorts apply.
 - **FR-5** `[A]`: Reschedule by drag (calendar) — drop updates the Date Field, broadcasts real time; failure rolls back.
 - **FR-6** `[A]`: Create and configure a Timeline View — map start+end Date Fields; bars on time axis; day/week/month zoom persists; rows missing start/end listed separately.
@@ -40,6 +40,7 @@ This document provides the complete epic and story breakdown for clavis-erp (Air
 - **FR-11** `[B]`: Milestones and Critical Path — mark zero-duration Milestone diamond; CPM forward/backward pass over FS graph, zero-slack tasks distinguished; recompute on dependency/date change; contradiction rule flags conflicts. Out of scope: resource leveling, lag/lead, SS/FF/SF in CPM.
 - **FR-12** `[B]`: Configure a Map View — choose address Field (or lat/lng pair); resolvable Rows render as pins, unresolvable to a "could not locate" tray; filters/sorts apply.
 - **FR-13** `[B]`: Geocode and interact with pins — geocode address values (cached, not re-requested); click pin opens Row; pins cluster at low zoom; geocoding respects provider rate limits without blocking UI.
+- **FR-34** `[A]`: Conditional row coloring (view decorations) — color rows by condition (view-filter semantics); first-matching ordered rule wins; both `left_border_color` and `background_color` decorator types; renders across Grid/Gallery/Kanban/Calendar/Timeline; persists per view. Single-select-field color deferred. Clean-room (decoration scaffold already MIT core).
 
 **Batch 2 — Dashboard**
 - **FR-14** `[B]`: Grouped-aggregate Data Source for charts — configurable group-by Field + aggregation (count/sum/avg/min/max) returning (category, value[, series]); honors requesting principal's field-hide + row permissions; own deliverable, prerequisite for FR-15.
@@ -131,6 +132,7 @@ No UX Design Specification exists for this release. UX is a downstream BMad work
 - **FR-11** Milestones + Critical Path (CPM) → Epic 3
 - **FR-12** Map View configure → Epic 3
 - **FR-13** Geocode + pin interaction → Epic 3
+- **FR-34** Conditional row coloring → Epic 3
 - **FR-14** Grouped-aggregate Data Source → Epic 4
 - **FR-15** Chart Widgets (bar/line/pie/scatter) → Epic 4
 - **FR-16** Metric Widget (non-regression only) → Epic 4
@@ -170,8 +172,8 @@ Editors can capture business data faithfully with five new typed Fields — Curr
 
 ### Epic 3: Visualize Data Multiple Ways
 Editors can flip one Table between Kanban board, Calendar, Timeline, Gantt (with task dependencies, CPM critical path, and milestones), and Map views — visualizing and rescheduling the same data without exporting or duplicating it (Realizes UJ-1, UJ-2, UJ-5).
-**FRs covered:** FR-1, FR-2, FR-3, FR-4, FR-5, FR-6, FR-7, FR-8, FR-9, FR-10, FR-11, FR-12, FR-13
-**Dependency note:** Kanban/Calendar/Timeline are Bucket A (gated on clean-room); Gantt/Map are Bucket B. All views honor Epic 1's field-permission layer. Includes geocoding infra (AR-6) + TaskDependency/CPM backend engine (AR-8) + Frappe Gantt/MapLibre lazy-loaded renderers (AR-4/AR-5).
+**FRs covered:** FR-1, FR-2, FR-3, FR-4, FR-5, FR-6, FR-7, FR-8, FR-9, FR-10, FR-11, FR-12, FR-13, FR-34
+**Dependency note:** Kanban/Calendar/Timeline and conditional row coloring (FR-34) are Bucket A (gated on clean-room); Gantt/Map are Bucket B. FR-34 reuses the MIT decoration scaffold already in core — Calendar/Timeline need new render wiring. All views honor Epic 1's field-permission layer. Includes geocoding infra (AR-6) + TaskDependency/CPM backend engine (AR-8) + Frappe Gantt/MapLibre lazy-loaded renderers (AR-4/AR-5).
 
 ### Epic 4: Dashboards & Charts
 Users can report on data by adding bar/line/pie/scatter chart Widgets and summary metrics to a Dashboard and sharing it via a least-privilege public link (Realizes UJ-1).

@@ -59,7 +59,6 @@ class BaserowPremiumConfig(AppConfig):
             decorator_type_registry,
             decorator_value_provider_type_registry,
             form_view_mode_registry,
-            view_type_registry,
         )
         from baserow.core.action.registries import action_type_registry
         from baserow.core.registries import plugin_registry
@@ -83,7 +82,6 @@ class BaserowPremiumConfig(AppConfig):
             SelectColorValueProviderType,
         )
         from .views.form_view_mode_types import FormViewModeTypeSurvey
-        from .views.view_types import CalendarViewType, KanbanViewType, TimelineViewType
 
         plugin_registry.register(PremiumPlugin())
 
@@ -97,9 +95,11 @@ class BaserowPremiumConfig(AppConfig):
 
         user_data_registry.register(ActiveLicensesDataType())
 
-        view_type_registry.register(KanbanViewType())
-        view_type_registry.register(CalendarViewType())
-        view_type_registry.register(TimelineViewType())
+        # Kanban, Calendar and Timeline view types are intentionally NOT
+        # registered here. The free, clean-room versions in core own these type
+        # slugs and ship license-free API endpoints. Registering the premium
+        # versions would shadow them and gate row fetches behind a 402 Payment
+        # Required license check.
 
         form_view_mode_registry.register(FormViewModeTypeSurvey())
 

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-06
-last_updated: 2026-06-13T01:15:00Z
+last_updated: 2026-06-16T06:42:00Z
 project: clavis-erp
 project_key: NOKEY
 tracking_system: file-system
@@ -80,6 +80,7 @@ development_status:
   3-12-geocoding-infrastructure-provider-abstraction-throttled-queue: done
   3-13-configure-a-map-view: done
   3-14-geocode-and-interact-with-map-pins: done
+  3-15-conditional-row-coloring: ready-for-dev
   epic-3-retrospective: optional
 
   # Epic 4: Dashboards & Charts

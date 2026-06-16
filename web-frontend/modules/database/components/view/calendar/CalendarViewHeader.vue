@@ -166,10 +166,9 @@ export default {
       ]
     },
     displayModeOptions() {
-      const { $i18n: i18n } = this.app || this
       return [
-        { label: i18n.t('calendarViewHeader.month'), value: 'month' },
-        { label: i18n.t('calendarViewHeader.week'), value: 'week' },
+        { label: this.$t('calendarViewHeader.month'), value: 'month' },
+        { label: this.$t('calendarViewHeader.week'), value: 'week' },
       ]
     },
     dateFieldName() {

@@ -363,17 +363,16 @@ class DatabaseConfig(AppConfig):
         view_type_registry.register(GanttViewType())
         # Map view — Bucket B greenfield, no premium twin.
         view_type_registry.register(MapViewType())
-        # The free, clean-room Kanban and Calendar views live in core. In
-        # open-core builds that still ship the premium plugin, the premium views
-        # (types "kanban" and "calendar") register themselves and take
-        # precedence, so we only register the core views when the premium plugin
-        # is not installed to avoid a duplicate-type clash.
-        from django.conf import settings
-
-        if "baserow_premium" not in settings.INSTALLED_APPS:
-            view_type_registry.register(KanbanViewType())
-            view_type_registry.register(CalendarViewType())
-            view_type_registry.register(TimelineViewType())
+        # The free, clean-room Kanban, Calendar and Timeline views live in core
+        # and are always registered. The premium plugin intentionally does NOT
+        # register its paywalled versions of these view types (see
+        # baserow_premium/apps.py), so the free core types own the "kanban",
+        # "calendar" and "timeline" type slugs and their license-free API
+        # endpoints. Registering them unconditionally avoids the premium API's
+        # 402 Payment Required gate on row fetches.
+        view_type_registry.register(KanbanViewType())
+        view_type_registry.register(CalendarViewType())
+        view_type_registry.register(TimelineViewType())
         view_type_registry.register(FormViewType())
 
         from .views.view_filters import (
@@ -1174,7 +1173,6 @@ class DatabaseConfig(AppConfig):
         operation_type_registry.register(RowCommentUnsubscribeOperationType())
 
         import baserow.contrib.database.ws.row_comments.signals  # noqa: F401
-
         from baserow.contrib.database.mcp.fields.tools import (
             CreateFieldsMcpTool,
             DeleteFieldsMcpTool,

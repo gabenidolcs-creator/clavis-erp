@@ -102,6 +102,12 @@ class SummaryWidget(Widget):
 
 
 class ChartWidget(Widget):
+    widget_ptr = models.OneToOneField(
+        Widget,
+        parent_link=True,
+        on_delete=models.CASCADE,
+        related_name="core_chartwidget",
+    )
     CHART_TYPE_BAR = "bar"
     CHART_TYPE_PIE = "pie"
     CHART_TYPE_DOUGHNUT = "doughnut"
@@ -122,5 +128,6 @@ class ChartWidget(Widget):
     data_source = models.ForeignKey(
         "dashboard.DashboardDataSource",
         on_delete=models.PROTECT,
+        related_name="core_chartwidget_set",
         help_text="Data source providing grouped-aggregate rows for chart rendering.",
     )

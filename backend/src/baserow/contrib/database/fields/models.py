@@ -1090,7 +1090,7 @@ class FieldPermission(models.Model):
     field = models.OneToOneField(
         Field,
         on_delete=models.CASCADE,
-        related_name="permission",
+        related_name="core_permission",
         help_text="The field this edit-restriction rule applies to.",
     )
     editable_by_role = models.CharField(

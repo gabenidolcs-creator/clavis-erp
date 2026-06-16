@@ -128,6 +128,27 @@ class LocalBaserowGroupedAggregateRows(
 ):
     """Grouped-aggregate service — GROUP BY group_by_field, aggregate value_field."""
 
+    service_ptr = models.OneToOneField(
+        Service,
+        parent_link=True,
+        on_delete=models.CASCADE,
+        related_name="core_localbaserowgroupedaggregaterows",
+    )
+    table = models.ForeignKey(
+        Table,
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+        related_name="core_localbaserowgroupedaggregaterows_set",
+    )
+    view = models.ForeignKey(
+        View,
+        null=True,
+        default=None,
+        on_delete=models.SET_NULL,
+        related_name="core_localbaserowgroupedaggregaterows_set",
+    )
+
     AGGREGATION_CHOICES = [
         ("count", "Count"),
         ("sum", "Sum"),

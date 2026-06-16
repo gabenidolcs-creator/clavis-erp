@@ -173,3 +173,4 @@ web-frontend/storybook-static
 .agents/
 _bmad/
 .agents/.story-automator-active
+.playwright-mcp

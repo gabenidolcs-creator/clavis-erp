@@ -162,11 +162,10 @@ export default {
       return this.view.timescale || 'month'
     },
     timescaleOptions() {
-      const { $i18n: i18n } = this.app || this
       return [
-        { label: i18n.t('timelineViewHeader.day'), value: 'day' },
-        { label: i18n.t('timelineViewHeader.week'), value: 'week' },
-        { label: i18n.t('timelineViewHeader.month'), value: 'month' },
+        { label: this.$t('timelineViewHeader.day'), value: 'day' },
+        { label: this.$t('timelineViewHeader.week'), value: 'week' },
+        { label: this.$t('timelineViewHeader.month'), value: 'month' },
       ]
     },
     dateFieldsName() {

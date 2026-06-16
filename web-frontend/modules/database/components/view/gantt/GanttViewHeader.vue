@@ -159,11 +159,10 @@ export default {
       return this.view.timescale || 'month'
     },
     timescaleOptions() {
-      const { $i18n: i18n } = this.app || this
       return [
-        { label: i18n.t('ganttViewHeader.day'), value: 'day' },
-        { label: i18n.t('ganttViewHeader.week'), value: 'week' },
-        { label: i18n.t('ganttViewHeader.month'), value: 'month' },
+        { label: this.$t('ganttViewHeader.day'), value: 'day' },
+        { label: this.$t('ganttViewHeader.week'), value: 'week' },
+        { label: this.$t('ganttViewHeader.month'), value: 'month' },
       ]
     },
     dateFieldsName() {
