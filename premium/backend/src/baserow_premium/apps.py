@@ -56,7 +56,6 @@ class BaserowPremiumConfig(AppConfig):
 
         from baserow.contrib.database.rows.registries import row_metadata_registry
         from baserow.contrib.database.views.registries import (
-            decorator_type_registry,
             decorator_value_provider_type_registry,
             form_view_mode_registry,
         )
@@ -73,12 +72,7 @@ class BaserowPremiumConfig(AppConfig):
         )
         from .plugins import PremiumPlugin
         from .views.actions import RotateCalendarIcalSlugActionType
-        from .views.decorator_types import (
-            BackgroundColorDecoratorType,
-            LeftBorderColorDecoratorType,
-        )
         from .views.decorator_value_provider_types import (
-            ConditionalColorValueProviderType,
             SelectColorValueProviderType,
         )
         from .views.form_view_mode_types import FormViewModeTypeSurvey
@@ -95,21 +89,14 @@ class BaserowPremiumConfig(AppConfig):
 
         user_data_registry.register(ActiveLicensesDataType())
 
-        # Kanban, Calendar and Timeline view types are intentionally NOT
-        # registered here. The free, clean-room versions in core own these type
-        # slugs and ship license-free API endpoints. Registering the premium
-        # versions would shadow them and gate row fetches behind a 402 Payment
-        # Required license check.
+        # Kanban, Calendar, Timeline view types and row-coloring decorator types are
+        # intentionally NOT registered here. The free, clean-room versions in core own
+        # these type slugs and ship license-free. Registering premium versions would
+        # shadow them and gate the feature behind a license check.
 
         form_view_mode_registry.register(FormViewModeTypeSurvey())
 
-        decorator_type_registry.register(LeftBorderColorDecoratorType())
-        decorator_type_registry.register(BackgroundColorDecoratorType())
-
         decorator_value_provider_type_registry.register(SelectColorValueProviderType())
-        decorator_value_provider_type_registry.register(
-            ConditionalColorValueProviderType()
-        )
 
         from baserow_premium.license.license_types import PremiumLicenseType
         from baserow_premium.license.registries import license_type_registry

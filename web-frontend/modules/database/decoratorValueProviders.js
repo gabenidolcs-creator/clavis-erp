@@ -1,4 +1,12 @@
 import { Registerable } from '@baserow/modules/core/registry'
+import {
+  createFiltersTree,
+} from '@baserow/modules/database/utils/view'
+import ConditionalColorValueProviderForm from '@baserow/modules/database/components/view/ConditionalColorValueProviderForm'
+import {
+  LeftBorderColorViewDecoratorType,
+  BackgroundColorViewDecoratorType,
+} from '@baserow/modules/database/viewDecorators'
 
 export class DecoratorValueProviderType extends Registerable {
   /**
@@ -107,5 +115,71 @@ export class DecoratorValueProviderType extends Registerable {
       type: this.type,
       name: this.getName(),
     }
+  }
+}
+
+export class ConditionalColorValueProviderType extends DecoratorValueProviderType {
+  static getType() {
+    return 'conditional_color'
+  }
+
+  getName() {
+    return this.app.$i18n.t('conditionalColorProvider.name')
+  }
+
+  getDescription() {
+    return this.app.$i18n.t('conditionalColorProvider.description')
+  }
+
+  getIconClass() {
+    return 'iconoir-filter'
+  }
+
+  getCompatibleDecoratorTypes() {
+    return [LeftBorderColorViewDecoratorType, BackgroundColorViewDecoratorType]
+  }
+
+  getFormComponent() {
+    return ConditionalColorValueProviderForm
+  }
+
+  getDefaultConfiguration({ fields }) {
+    return { rules: [] }
+  }
+
+  /**
+   * Evaluates the ordered list of color rules against a row and returns the
+   * color of the first matching rule, or null if no rule matches.
+   *
+   * @param {object} row - The row data object.
+   * @param {object} options - The value_provider_conf: { rules: [...] }.
+   * @param {Array} fields - The list of field definitions for the view.
+   * @returns {string|null} CSS color string, or null.
+   */
+  getValue({ row, options, fields }) {
+    const rules = (options && options.rules) || []
+    if (!rules.length) return null
+
+    for (const rule of rules) {
+      const filters = rule.filters || []
+      const filterGroups = rule.filter_groups || []
+      const filterType = rule.filter_type || 'AND'
+
+      if (!filters.length) {
+        // Rule with no conditions matches all rows.
+        return rule.color || null
+      }
+
+      try {
+        const tree = createFiltersTree(filterType, filters, filterGroups)
+        const matches = tree.matches(this.app.$registry, fields, row)
+        if (matches) {
+          return rule.color || null
+        }
+      } catch {
+        // Skip malformed rules rather than crashing the view.
+      }
+    }
+    return null
   }
 }

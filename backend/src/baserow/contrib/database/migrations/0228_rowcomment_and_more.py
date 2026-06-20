@@ -13,21 +13,30 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='RowComment',
-            fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('row_id', models.PositiveIntegerField(db_index=True)),
-                ('message', models.JSONField(default=dict, help_text='Tiptap document JSON.')),
-                ('created_on', models.DateTimeField(auto_now_add=True, db_index=True)),
-                ('updated_on', models.DateTimeField(auto_now=True)),
-                ('deleted_on', models.DateTimeField(db_index=True, null=True)),
-                ('trashed', models.BooleanField(db_index=True, default=False)),
+        # database_rowcomment was already created by migration 0226 using IF NOT EXISTS
+        # raw SQL (safe for both OSS and premium environments). Skip the CREATE TABLE
+        # here but register the model in Django's migration state so subsequent
+        # AddField/AddIndex operations can reference it.
+        migrations.SeparateDatabaseAndState(
+            database_operations=[],
+            state_operations=[
+                migrations.CreateModel(
+                    name='RowComment',
+                    fields=[
+                        ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                        ('row_id', models.PositiveIntegerField(db_index=True)),
+                        ('message', models.JSONField(default=dict, help_text='Tiptap document JSON.')),
+                        ('created_on', models.DateTimeField(auto_now_add=True, db_index=True)),
+                        ('updated_on', models.DateTimeField(auto_now=True)),
+                        ('deleted_on', models.DateTimeField(db_index=True, null=True)),
+                        ('trashed', models.BooleanField(db_index=True, default=False)),
+                    ],
+                    options={
+                        'db_table': 'database_rowcomment',
+                        'ordering': ['created_on'],
+                    },
+                ),
             ],
-            options={
-                'db_table': 'database_rowcomment',
-                'ordering': ['created_on'],
-            },
         ),
         migrations.RenameIndex(
             model_name='rowcommentsubscription',
@@ -54,15 +63,21 @@ class Migration(migrations.Migration):
             name='mode',
             field=models.TextField(choices="[('form', 'form'), ('survey', 'survey')]", default='form', help_text='Configurable mode of the form.', max_length=64),
         ),
-        migrations.AddField(
-            model_name='rowcomment',
-            name='table',
-            field=models.ForeignKey(help_text='The table the row this comment is for is found in.', on_delete=django.db.models.deletion.CASCADE, related_name='+', to='database.table'),
-        ),
-        migrations.AddField(
-            model_name='rowcomment',
-            name='user',
-            field=models.ForeignKey(help_text='The user who made the comment.', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL),
+        # table_id and user_id columns already exist (created by migration 0226).
+        migrations.SeparateDatabaseAndState(
+            database_operations=[],
+            state_operations=[
+                migrations.AddField(
+                    model_name='rowcomment',
+                    name='table',
+                    field=models.ForeignKey(help_text='The table the row this comment is for is found in.', on_delete=django.db.models.deletion.CASCADE, related_name='+', to='database.table'),
+                ),
+                migrations.AddField(
+                    model_name='rowcomment',
+                    name='user',
+                    field=models.ForeignKey(help_text='The user who made the comment.', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL),
+                ),
+            ],
         ),
         migrations.AddIndex(
             model_name='rowcomment',

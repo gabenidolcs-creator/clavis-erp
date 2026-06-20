@@ -1050,29 +1050,6 @@ createdAt: "2026-06-06T10:38:43Z"
           "model": "claude-haiku-4-5-20251001"
         }
       }
-    },
-    {
-      "storyId": "3.15",
-      "title": "Conditional row coloring (view decorations)",
-      "complexity": "medium",
-      "tasks": {
-        "create": {
-          "primary": "claude",
-          "fallback": false
-        },
-        "dev": {
-          "primary": "claude",
-          "fallback": false
-        },
-        "auto": {
-          "primary": "claude",
-          "fallback": false
-        },
-        "review": {
-          "primary": "claude",
-          "fallback": false
-        }
-      }
     }
   ]
 }

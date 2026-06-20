@@ -384,6 +384,11 @@ import {
   DatabaseRowSearchType,
 } from '@baserow/modules/database/searchTypes'
 import { searchTypeRegistry } from '@baserow/modules/core/search/types/registry'
+import {
+  LeftBorderColorViewDecoratorType,
+  BackgroundColorViewDecoratorType,
+} from '@baserow/modules/database/viewDecorators'
+import { ConditionalColorValueProviderType } from '@baserow/modules/database/decoratorValueProviders'
 
 export default defineNuxtPlugin({
   name: 'database',
@@ -449,6 +454,23 @@ export default defineNuxtPlugin({
     // Map view — Bucket B greenfield, no premium twin.
     $registry.register('view', new MapViewType(context))
     $registry.register('view', new FormViewType(context))
+
+    // Core (clean-room) view decorator + value provider types (Story 3.15).
+    // Premium may register its own concrete types later; in open-core builds
+    // the premium versions take precedence (last-registration-wins).
+    $registry.register(
+      'viewDecorator',
+      new LeftBorderColorViewDecoratorType(context)
+    )
+    $registry.register(
+      'viewDecorator',
+      new BackgroundColorViewDecoratorType(context)
+    )
+    $registry.register(
+      'decoratorValueProvider',
+      new ConditionalColorValueProviderType(context)
+    )
+
     $registry.register('viewFilter', new EqualViewFilterType(context))
     $registry.register('viewFilter', new NotEqualViewFilterType(context))
     $registry.register(

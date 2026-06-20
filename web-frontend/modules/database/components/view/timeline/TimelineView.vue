@@ -40,6 +40,7 @@
                 :row="row"
                 :workspace-id="database.workspace.id"
                 :cover-image-field="coverImageField"
+                :decorations-by-place="decorationsByPlace"
                 class="timeline-view__card"
               ></RowCard>
               <div
@@ -68,6 +69,7 @@
             :row="row"
             :workspace-id="database.workspace.id"
             :cover-image-field="coverImageField"
+            :decorations-by-place="decorationsByPlace"
             class="timeline-view__card timeline-view__card--tray"
             @click="rowClick(row)"
           ></RowCard>
@@ -140,6 +142,7 @@ import {
 import RowCard from '@baserow/modules/database/components/card/RowCard'
 import RowEditModal from '@baserow/modules/database/components/row/RowEditModal'
 import viewHelpers from '@baserow/modules/database/mixins/viewHelpers'
+import viewDecoration from '@baserow/modules/database/mixins/viewDecoration'
 import { populateRow } from '@baserow/modules/database/store/view/grid'
 import { clone } from '@baserow/modules/core/utils/object'
 
@@ -406,7 +409,7 @@ export function clampResizeUnits(mode, oldStart, oldEnd, deltaUnits, unit) {
 export default {
   name: 'TimelineView',
   components: { RowCard, RowEditModal },
-  mixins: [viewHelpers],
+  mixins: [viewHelpers, viewDecoration],
   props: {
     fields: {
       type: Array,

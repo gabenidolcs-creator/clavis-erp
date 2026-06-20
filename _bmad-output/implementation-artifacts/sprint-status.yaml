@@ -80,7 +80,7 @@ development_status:
   3-12-geocoding-infrastructure-provider-abstraction-throttled-queue: done
   3-13-configure-a-map-view: done
   3-14-geocode-and-interact-with-map-pins: done
-  3-15-conditional-row-coloring: ready-for-dev
+  3-15-conditional-row-coloring: review
   epic-3-retrospective: optional
 
   # Epic 4: Dashboards & Charts

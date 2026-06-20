@@ -1305,5 +1305,23 @@
   "rowCommentCreatedNotification": {
     "title": "{sender} commented on row {rowId}.",
     "unknownUser": "Unknown user"
+  },
+  "conditionalColorForm": {
+    "noRules": "No color rules yet. Add a rule to start coloring rows.",
+    "ruleLabel": "Rule {index}",
+    "addCondition": "Add condition",
+    "addRule": "Add color rule"
+  },
+  "leftBorderColorDecorator": {
+    "name": "Left border color",
+    "description": "Colors the left border of each row or card."
+  },
+  "backgroundColorDecorator": {
+    "name": "Background color",
+    "description": "Colors the background of each row or card."
+  },
+  "conditionalColorProvider": {
+    "name": "Conditional color",
+    "description": "Color rows based on matching conditions. The first matching rule wins."
   }
 }

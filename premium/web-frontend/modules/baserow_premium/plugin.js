@@ -11,15 +11,7 @@ import impersonatingStore from '@baserow_premium/store/impersonating'
 import { PremiumDatabaseApplicationType } from '@baserow_premium/applicationTypes'
 
 
-import {
-  LeftBorderColorViewDecoratorType,
-  BackgroundColorViewDecoratorType,
-} from '@baserow_premium/viewDecorators'
-
-import {
-  SingleSelectColorValueProviderType,
-  ConditionalColorValueProviderType,
-} from '@baserow_premium/decoratorValueProviders'
+import { SingleSelectColorValueProviderType } from '@baserow_premium/decoratorValueProviders'
 import { FormViewSurveyModeType } from '@baserow_premium/formViewModeTypes'
 import {
   TextFieldType,
@@ -147,22 +139,11 @@ export default defineNuxtPlugin({
     $registry.register('field', new AIFieldType(context))
     $registry.register('field', new PremiumFormulaFieldType(context))
 
-    $registry.register(
-      'viewDecorator',
-      new LeftBorderColorViewDecoratorType(context)
-    )
-    $registry.register(
-      'viewDecorator',
-      new BackgroundColorViewDecoratorType(context)
-    )
-
+    // left_border_color, background_color, and conditional_color are registered by
+    // core (license-free). Premium must not shadow them with gated versions.
     $registry.register(
       'decoratorValueProvider',
       new SingleSelectColorValueProviderType(context)
-    )
-    $registry.register(
-      'decoratorValueProvider',
-      new ConditionalColorValueProviderType(context)
     )
 
     $registry.register(

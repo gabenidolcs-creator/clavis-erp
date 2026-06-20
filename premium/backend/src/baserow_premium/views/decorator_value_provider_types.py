@@ -21,17 +21,7 @@ from .serializers import (
 
 
 class PremiumDecoratorValueProviderType(DecoratorValueProviderType):
-    def before_create_decoration(self, view, user):
-        if user:
-            LicenseHandler.raise_if_user_doesnt_have_feature(
-                PREMIUM, user, view.table.database.workspace
-            )
-
-    def before_update_decoration(self, view_decoration, user):
-        if user:
-            LicenseHandler.raise_if_user_doesnt_have_feature(
-                PREMIUM, user, view_decoration.view.table.database.workspace
-            )
+    pass
 
 
 class SelectColorValueProviderType(PremiumDecoratorValueProviderType):

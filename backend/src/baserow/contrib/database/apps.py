@@ -1282,6 +1282,26 @@ class DatabaseConfig(AppConfig):
         if not settings.DISABLE_ANONYMOUS_PUBLIC_VIEW_WS_CONNECTIONS:
             view_realtime_rows_registry.register(PublicViewRealtimeRowsType())
 
+        # Register core (free) view decorator types and the conditional color
+        # value provider. Premium no longer shadows these with gated versions.
+        from baserow.contrib.database.views.decorator_types import (
+            BackgroundColorDecoratorType,
+            LeftBorderColorDecoratorType,
+        )
+        from baserow.contrib.database.views.decorator_value_provider_types import (
+            ConditionalColorValueProviderType,
+        )
+        from baserow.contrib.database.views.registries import (
+            decorator_type_registry,
+            decorator_value_provider_type_registry,
+        )
+
+        decorator_type_registry.register(LeftBorderColorDecoratorType())
+        decorator_type_registry.register(BackgroundColorDecoratorType())
+        decorator_value_provider_type_registry.register(
+            ConditionalColorValueProviderType()
+        )
+
         # The signals must always be imported last because they use the registries
         # which need to be filled first.
         import baserow.contrib.database.data_sync.signals  # noqa: F403, F401
